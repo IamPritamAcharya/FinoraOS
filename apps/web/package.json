@@ -11,15 +11,17 @@
     "test": "vitest run --maxWorkers=2 --passWithNoTests"
   },
   "dependencies": {
+    "@ai-sdk/react": "4.0.80",
     "@finora/platform": "workspace:*",
     "@finora/ui": "workspace:*",
     "@razorpay/blade": "12.111.0",
     "@razorpay/i18nify-js": "1.12.3",
     "@razorpay/i18nify-react": "4.0.12",
+    "ai": "7.0.77",
     "framer-motion": "12.23.24",
     "next": "16.3.2",
-    "react": "19.1.1",
-    "react-dom": "19.1.1",
+    "react": "19.1.2",
+    "react-dom": "19.1.2",
     "react-hot-toast": "2.4.1",
     "styled-components": "5.3.11"
   },

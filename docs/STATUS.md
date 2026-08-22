@@ -1,12 +1,12 @@
 # FinoraOS Status
 
 Last updated: 2026-08-22  
-Current phase: V1 basic local prototype verified  
-Last verified commit: `8206757 feat(web): integrate Blade and local AI workflow`
+Current phase: V1 primary chat workspace complete
+Last verified commit: pending `feat(chat): build Finora operating workspace`
 
 ## Current state
 
-The repository contains a functional V1 architecture and web/API implementation. `pnpm dev` owns the local Docker lifecycle, applies migrations, refreshes the reproducible demo seed, and starts the web/API. A real terminal Ctrl+C test confirmed it removes the Compose services and network.
+The repository contains a functional V1 architecture and web/API implementation. Chat is now the default primary operating surface; `pnpm dev` owns the local Docker lifecycle, applies migrations, refreshes the reproducible demo seed, and starts the web/API. A real terminal Ctrl+C test confirmed it removes the Compose services and network.
 
 ## Completed
 
@@ -16,6 +16,7 @@ The repository contains a functional V1 architecture and web/API implementation.
 - Finance, reconciliation, controlled AI/chat and exception-agent API boundaries.
 - FinoraOS visual identity, SVG assets, branded responsive workspace.
 - Blade 12 is integrated through its published package: provider/theme, fonts, and a real chat action component are in the Next app.
+- Vercel AI SDK chat state is integrated through a same-origin Next transport that calls Finora's controlled Nest chat endpoint. The chat workspace has evidence cards, visible investigation activity, responsive finance context, keyboard send/stop, clear failure states, and reduced-motion-safe transitions.
 - Real local Qwen/Ollama smoke test passed. Settlement chat returns deterministic INR evidence; the model can add only a validated, number-free qualitative note.
 - `pnpm dev` uses persistent signal handlers because pnpm forwards interactive Ctrl+C twice; containers are reliably brought down after either signal.
 
@@ -25,9 +26,9 @@ The repository contains a functional V1 architecture and web/API implementation.
 
 ## Next highest-priority tasks
 
-1. Add browser/component tests and maintain the API smoke test in CI.
-2. Finish Gemini/OpenAI-compatible gateway adapters and true streamed chat.
-3. Add reconciliation-run trigger/rerun and human approval UI.
+1. Add browser/component tests for the chat transport and evidence-card interactions; maintain the API smoke test in CI.
+2. Finish Gemini/OpenAI-compatible gateway adapters and true token/tool streaming from the Nest API.
+3. Add persisted chat threads, reconciliation-run trigger/rerun, and human approval UI.
 
 ## Known issues
 
@@ -42,13 +43,14 @@ The repository contains a functional V1 architecture and web/API implementation.
 - `pnpm build`
 - `pnpm --filter @finora/web build`
 - `pnpm check:enums`
+- `pnpm test`
 - `pnpm eval:reconciliation`
 - `pnpm db:migrate --name init`
 - `pnpm seed`
 
 ## Environment notes
 
-`pnpm@10.16.0` is installed for the current user and pinned in the repository. `AI_PROVIDER=ollama` is configured locally; `.env` remains untracked.
+`pnpm@10.16.0` is installed for the current user and pinned in the repository. `AI_PROVIDER=ollama` is configured locally; `.env` remains untracked. `pnpm db:generate` must be run after a fresh dependency install before API type-checking, because Prisma generation is intentionally not an automatic package-install build script.
 
 ## Demo status
 

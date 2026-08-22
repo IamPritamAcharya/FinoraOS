@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { Button } from '@razorpay/blade/components';
 import { Amount, StatusBadge } from '@finora/ui';
+import { FinoraChat } from './components/finora-chat';
 
 const api = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
 const nav = ['Overview', 'Chat', 'Records', 'Reconciliation', 'Exceptions'];
@@ -14,25 +14,26 @@ const get = async (path: string) => {
 };
 
 export default function Workspace() {
-  const [page, setPage] = useState('Overview');
+  const [page, setPage] = useState('Chat');
   const [overview, setOverview] = useState<Data | null>(null);
   const [exceptions, setExceptions] = useState<Data[]>([]);
   const [transactions, setTransactions] = useState<Data[]>([]);
+  const [settlements, setSettlements] = useState<Data[]>([]);
   const [run, setRun] = useState<Data | null>(null);
-  const [message, setMessage] = useState('Why was settlement STL_0001 short?');
-  const [reply, setReply] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     Promise.all([
       get('/finance/overview'),
       get('/reconciliation/exceptions'),
       get('/finance/transactions'),
+      get('/finance/settlements'),
       get('/reconciliation/runs/latest'),
     ])
-      .then(([o, e, t, r]) => {
+      .then(([o, e, t, s, r]) => {
         setOverview(o);
         setExceptions(e);
         setTransactions(t);
+        setSettlements(s);
         setRun(r);
       })
       .catch((err: Error) => setError(err.message));
@@ -50,19 +51,6 @@ export default function Workspace() {
     [overview],
   );
   const open = exceptions.filter((item) => item.status !== 'RESOLVED');
-  const chat = async () => {
-    setReply({ loading: true });
-    try {
-      const response = await fetch(`${api}/chat`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message }),
-      });
-      setReply(await response.json());
-    } catch {
-      setReply({ text: 'Finora is offline. Check the API connection and try again.' });
-    }
-  };
   const investigate = async (id: string) => {
     const response = await fetch(`${api}/agents/exceptions/${id}/investigate`, { method: 'POST' });
     if (response.ok) {
@@ -100,14 +88,16 @@ export default function Workspace() {
           <small>Mock data · controlled AI</small>
         </div>
       </aside>
-      <section className="content">
-        <header>
-          <div>
-            <p className="eyebrow">FINANCE OPERATIONS</p>
-            <h1>{page}</h1>
-          </div>
-          <div className="profile">AM</div>
-        </header>
+      <section className={page === 'Chat' ? 'content content-chat' : 'content'}>
+        {page !== 'Chat' && (
+          <header>
+            <div>
+              <p className="eyebrow">FINANCE OPERATIONS</p>
+              <h1>{page}</h1>
+            </div>
+            <div className="profile">AM</div>
+          </header>
+        )}
         {error ? (
           <div className="error">
             <strong>Connection needed.</strong> {error}
@@ -116,7 +106,11 @@ export default function Workspace() {
         ) : page === 'Overview' ? (
           <Overview cards={cards} run={run} open={open} setPage={setPage} />
         ) : page === 'Chat' ? (
-          <Chat message={message} setMessage={setMessage} reply={reply} chat={chat} />
+          <FinoraChat
+            settlements={settlements}
+            openExceptions={open}
+            onViewSettlement={() => setPage('Records')}
+          />
         ) : page === 'Records' ? (
           <Records items={transactions} />
         ) : page === 'Reconciliation' ? (
@@ -196,97 +190,6 @@ function Overview({
         </section>
       </div>
     </>
-  );
-}
-function Chat({
-  message,
-  setMessage,
-  reply,
-  chat,
-}: {
-  message: string;
-  setMessage: (value: string) => void;
-  reply: Data | null;
-  chat: () => void;
-}) {
-  return (
-    <section className="chat">
-      <div className="chat-intro">
-        <p className="eyebrow">FINORA INTELLIGENCE</p>
-        <h2>Investigate with context, not guesswork.</h2>
-        <p>Finora uses controlled tools and clearly separates evidence from its explanation.</p>
-      </div>
-      <div className="suggestions">
-        {[
-          'Why was settlement STL_0001 short?',
-          'Show unresolved exceptions above ₹25,000.',
-          'What is our expected cash position?',
-        ].map((question) => (
-          <button key={question} onClick={() => setMessage(question)}>
-            {question}
-          </button>
-        ))}
-      </div>
-      {reply && (
-        <article className="reply">
-          <p className="assistant-name">
-            FINORA <span>Evidence-grounded</span>
-          </p>
-          {reply.loading ? (
-            <p>Investigating controlled financial records…</p>
-          ) : (
-            <>
-              <p>{reply.text}</p>
-              {reply.aiExplanation && <p className="ai-explanation">{reply.aiExplanation}</p>}
-              {reply.settlement && <SettlementCard settlement={reply.settlement} />}
-            </>
-          )}
-        </article>
-      )}
-      <div className="composer">
-        <input
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-          onKeyDown={(event) => event.key === 'Enter' && chat()}
-        />
-        <Button variant="primary" onClick={chat}>
-          Ask Finora
-        </Button>
-      </div>
-    </section>
-  );
-}
-function SettlementCard({ settlement }: { settlement: Data }) {
-  return (
-    <div className="settlement-card">
-      <strong>{settlement.externalId}</strong>
-      <dl>
-        <div>
-          <dt>Expected</dt>
-          <dd>
-            <Amount value={settlement.expectedAmount} />
-          </dd>
-        </div>
-        <div>
-          <dt>Received</dt>
-          <dd>
-            <Amount value={settlement.receivedAmount} />
-          </dd>
-        </div>
-        <div>
-          <dt>Gateway fees</dt>
-          <dd>
-            <Amount value={settlement.feeAmount} />
-          </dd>
-        </div>
-        <div>
-          <dt>GST on fees</dt>
-          <dd>
-            <Amount value={settlement.gstAmount} />
-          </dd>
-        </div>
-      </dl>
-    </div>
   );
 }
 function Metric({ label, value }: { label: string; value: string | number }) {

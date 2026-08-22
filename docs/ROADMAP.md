@@ -9,7 +9,7 @@
 ## V1.x
 
 - Complete gateway adapters for Gemini and OpenAI-compatible providers; real Ollama structured-output evaluation.
-- Reconciliation-run trigger/rerun UI, thread persistence and server streaming.
+- Persisted chat threads, reconciliation-run trigger/rerun UI, and true server token/tool streaming (the Vercel AI SDK client transport is already in place).
 - Better tax matching and a visual forecast.
 
 ## Later

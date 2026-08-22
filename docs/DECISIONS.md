@@ -6,6 +6,7 @@
 - **Next 16 + React 19 + Nest 11:** current compatible versions were checked. Blade 12 is now integrated through its published web entrypoint, `BladeProvider`, `createTheme`, and supported components. Native-only peer warnings are not installed for the web app. FinoraOS retains its own logo and product identity while using Blade's component and token system.
 - **Prisma 7 + PostgreSQL:** Prisma 7 uses `prisma.config.ts` for the migration connection URL and `@prisma/adapter-pg` in the runtime client. This matches current tooling and prevents schema-editor version drift. Persistence stays behind domain services/repositories when queries become non-trivial.
 - **Gateway boundary:** vendor SDKs live under `apps/api/src/gateways`; business modules depend on contracts, not Razorpay/Ollama implementations.
+- **Chat client state:** the web client uses Vercel AI SDK's `useChat` with a same-origin text transport. This gives the chat UI reliable message/state/stop handling without allowing a browser or model to access Prisma directly. The transport delegates to the existing controlled Nest endpoint; backend token/tool streaming remains a deliberate V1.x improvement rather than a fake stream.
 
 ## Financial and AI safety
 
