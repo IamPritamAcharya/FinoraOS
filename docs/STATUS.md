@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-22  
 Current phase: V1 basic local prototype verified  
-Last verified commit: pending current Blade/Ollama lifecycle commit
+Last verified commit: `8206757 feat(web): integrate Blade and local AI workflow`
 
 ## Current state
 
@@ -21,7 +21,7 @@ The repository contains a functional V1 architecture and web/API implementation.
 
 ## In progress
 
-- Commit the Blade, local-AI guardrail, and one-command lifecycle update.
+- No active implementation task; ready for the next V1 iteration.
 
 ## Next highest-priority tasks
 
