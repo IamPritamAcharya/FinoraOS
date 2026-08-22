@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { TextStreamChatTransport } from 'ai';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Amount, StatusBadge } from '@finora/ui';
+import { Amount, FinoraButton, FinoraIconButton, StatusBadge } from '@finora/ui';
 
 type Data = Record<string, any>;
 type Thread = { id: string; title: string; updatedAt: number; messages: Data[] };
@@ -108,9 +108,14 @@ function SettlementEvidence({
           </dd>
         </div>
       </dl>
-      <button className="evidence-link" type="button" onClick={onViewSettlement}>
+      <FinoraButton
+        className="evidence-link"
+        variant="ghost"
+        size="small"
+        onClick={onViewSettlement}
+      >
         View settlement <Icon name="chevron" />
-      </button>
+      </FinoraButton>
     </section>
   );
 }
@@ -207,18 +212,19 @@ export function FinoraChat({
     <section className="finora-chat-shell">
       <header className="chat-topbar">
         <div className="chat-header-actions">
-          <button className="new-thread-button" type="button" onClick={startNew}>
+          <FinoraButton className="new-thread-button" onClick={startNew}>
             <Icon name="plus" /> New chat
-          </button>
-          <button
+          </FinoraButton>
+          <FinoraIconButton
             className="history-button"
+            variant="secondary"
             type="button"
             aria-label="Browse chat history"
             aria-expanded={historyOpen}
             onClick={() => setHistoryOpen((open) => !open)}
           >
             <Icon name="history" />
-          </button>
+          </FinoraIconButton>
         </div>
         <div className="chat-header-title">
           <img src="/brand/logo-mark.svg" alt="" />
@@ -322,18 +328,19 @@ export function FinoraChat({
               </span>
               <div>
                 {isWorking && (
-                  <button className="stop-button" type="button" onClick={stop}>
+                  <FinoraButton className="stop-button" variant="ghost" size="small" onClick={stop}>
                     Stop
-                  </button>
+                  </FinoraButton>
                 )}
-                <button
+                <FinoraIconButton
                   className="send-button"
                   type="submit"
+                  variant="primary"
                   disabled={!input.trim() || isWorking}
                   aria-label="Send message to Finora"
                 >
                   <Icon name="send" />
-                </button>
+                </FinoraIconButton>
               </div>
             </div>
           </form>
@@ -399,9 +406,9 @@ export function FinoraChat({
             </div>
           )}
         </div>
-        <button className="drawer-new-chat" type="button" onClick={startNew}>
+        <FinoraButton className="drawer-new-chat" onClick={startNew}>
           <Icon name="plus" /> New chat
-        </button>
+        </FinoraButton>
       </aside>
     </section>
   );

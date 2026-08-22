@@ -10,15 +10,15 @@ Assets live in `apps/web/public/brand/`. Use the FinoraOS blue mark on light sur
 
 ## Typography and palette
 
-The product interface uses **Inter Variable**, bundled locally by Razorpay Blade, with `Inter Fallback Arial` only as the metric-compatible fallback. This is the sole default UI font for navigation, controls, data tables, chat, and financial numbers. **TASA Orbiter** is available from Blade but is reserved for deliberate brand/display moments; it is not a substitute for clear finance-product typography. Do not use raw Arial, Helvetica, or browser system stacks as the primary interface font.
+The product interface uses locally bundled **Manrope Variable** for navigation, controls, data tables, chat, and financial numbers. It is FinoraOS’s default UI typeface. Do not use raw Arial, Helvetica, browser system stacks, Razorpay Blade fonts, or remote Google-font imports as the primary interface font.
 
-Core tokens are in `packages/ui/src/tokens/finora.css`: a distinct finance-blue family provides action hierarchy, pale blue supports selection states, and neutral cool-grey surfaces create a compact Blade-inspired workspace. It deliberately follows Razorpay-quality design principles without copying Razorpay brand assets or exact colours. Semantic success, warning, danger and info colours have named tokens.
+Core tokens and primitives are in `packages/ui`: a distinct finance-blue family provides action hierarchy, pale blue supports selection states, and neutral cool-grey surfaces create a compact Finora workspace. Semantic success, warning, danger and info colours have named tokens.
 
 Numbers use `font-variant-numeric: tabular-nums` and `en-IN` formatting: `₹1,24,500.00`, with compact values such as `₹18.2L` only for summary metrics.
 
 ## UI guidance
 
-Use Blade components and Blade icons first; Finora wrappers live in `packages/ui` where a product-specific composition is genuinely required. Do not create local page-level substitutes for buttons, icon buttons, drawers, cards, text fields, empty states, messages, or tables. Use thin borders, compact spacing, structured tables, and statuses with text plus colour. Matched/resolved is green, needs review is amber, unresolved/open is red. Finora is the conversational assistant; agents remain functional capabilities, not cartoon personas.
+Use Finora components, tokens, and icons from `packages/ui`. Do not create local page-level substitutes for buttons, icon buttons, drawers, cards, text fields, empty states, messages, or tables. Use thin borders, compact spacing, structured tables, and statuses with text plus colour. Matched/resolved is green, needs review is amber, unresolved/open is red. Finora is the conversational assistant; agents remain functional capabilities, not cartoon personas.
 
 Modern product quality means one coherent hierarchy, a restrained surface system, obvious primary actions, and context only when it helps the task. It never means permanent explanatory sidebars, decorative “AI” elements, copied Dribbble visual noise, or CSS-only approximations of existing design-system components.
 

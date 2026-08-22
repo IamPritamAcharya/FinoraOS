@@ -15,3 +15,74 @@
   --finora-info: #2e6388;
   --finora-radius: 10px;
 }
+
+.finora-ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+.finora-ui-button:focus-visible {
+  outline: 2px solid var(--finora-brand);
+  outline-offset: 2px;
+}
+.finora-ui-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.finora-ui-button--small {
+  min-height: 32px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+.finora-ui-button--medium {
+  min-height: 38px;
+  padding: 9px 14px;
+  font-size: 13px;
+}
+.finora-ui-button--primary {
+  background: var(--finora-brand);
+  color: #fff;
+}
+.finora-ui-button--primary:hover:not(:disabled) {
+  background: var(--finora-brand-strong);
+  transform: translateY(-1px);
+}
+.finora-ui-button--secondary {
+  background: var(--finora-surface);
+  border-color: var(--finora-border);
+  color: var(--finora-text);
+}
+.finora-ui-button--secondary:hover:not(:disabled),
+.finora-ui-button--ghost:hover:not(:disabled) {
+  background: var(--finora-brand-subtle);
+  color: var(--finora-brand);
+}
+.finora-ui-button--ghost {
+  background: transparent;
+  color: var(--finora-text-muted);
+}
+.finora-ui-button--danger {
+  background: #fff1f0;
+  color: var(--finora-danger);
+  border-color: #f4d1ce;
+}
+.finora-ui-icon-button {
+  width: 38px;
+  padding: 0;
+}
+.finora-ui-surface {
+  background: var(--finora-surface);
+  border: 1px solid var(--finora-border);
+  border-radius: var(--finora-radius);
+}

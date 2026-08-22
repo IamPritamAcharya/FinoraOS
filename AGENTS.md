@@ -14,8 +14,8 @@ FinoraOS is an AI-native financial-operations platform. The flagship loop is det
 
 ## UI and brand rules
 
-- Use Razorpay Blade first; reusable Finora compositions belong in `packages/ui`, never as one-off route CSS/HTML.
-- Use Blade’s Inter and icon set, Finora tokens, and semantic finance statuses; detailed rules live in `docs/BRANDING.md` and `packages/ui/AGENTS.md`.
+- Use the Finora design system first; reusable components belong in `packages/ui`, never as one-off route CSS/HTML.
+- Use Finora tokens, shared icons, typography, and semantic finance statuses; detailed rules live in `docs/BRANDING.md` and `packages/ui/AGENTS.md`.
 - Visually review major UI changes before committing; do not extend a rejected layout.
 
 ## Workflow
