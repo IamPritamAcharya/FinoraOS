@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-22  
 Current phase: V1 basic local prototype verified  
-Last verified commit: `892b893 docs: finalize V1 status handoff`
+Last verified commit: `ea41e85 feat: add managed local prototype workflow`
 
 ## Current state
 
