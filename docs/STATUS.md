@@ -1,12 +1,12 @@
 # FinoraOS Status
 
 Last updated: 2026-08-22  
-Current phase: V1 primary chat workspace complete
-Last verified commit: pending `feat(chat): build Finora operating workspace`
+Current phase: V1 light chat workspace redesign verified
+Last verified commit: `83451f9 feat(chat): redesign light conversation workspace`
 
 ## Current state
 
-The repository contains a functional V1 architecture and web/API implementation. Chat is now the default primary operating surface; `pnpm dev` owns the local Docker lifecycle, applies migrations, refreshes the reproducible demo seed, and starts the web/API. A real terminal Ctrl+C test confirmed it removes the Compose services and network.
+The repository contains a functional V1 architecture and web/API implementation. Chat is now the default primary operating surface: a light, focused conversation canvas with contextual settlement evidence and a browser-persisted history drawer. `pnpm dev` owns the local Docker lifecycle, applies migrations, refreshes the reproducible demo seed, and starts the web/API. A real terminal Ctrl+C test confirmed it removes the Compose services and network.
 
 ## Completed
 
@@ -16,7 +16,7 @@ The repository contains a functional V1 architecture and web/API implementation.
 - Finance, reconciliation, controlled AI/chat and exception-agent API boundaries.
 - FinoraOS visual identity, SVG assets, branded responsive workspace.
 - Blade 12 is integrated through its published package: provider/theme, fonts, and a real chat action component are in the Next app.
-- Vercel AI SDK chat state is integrated through a same-origin Next transport that calls Finora's controlled Nest chat endpoint. The chat workspace has evidence cards, visible investigation activity, responsive finance context, keyboard send/stop, clear failure states, and reduced-motion-safe transitions.
+- Vercel AI SDK chat state is integrated through a same-origin Next transport that calls Finora's controlled Nest chat endpoint. The light chat workspace has a distraction-free empty state, contextual settlement evidence, a browser-persisted history drawer, keyboard send/stop, clear failure states, and reduced-motion-safe transitions.
 - Real local Qwen/Ollama smoke test passed. Settlement chat returns deterministic INR evidence; the model can add only a validated, number-free qualitative note.
 - `pnpm dev` uses persistent signal handlers because pnpm forwards interactive Ctrl+C twice; containers are reliably brought down after either signal.
 
