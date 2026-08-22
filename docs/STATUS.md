@@ -1,12 +1,12 @@
 # FinoraOS Status
 
 Last updated: 2026-08-22  
-Current phase: V1 light chat workspace redesign verified
-Last verified commit: `83451f9 feat(chat): redesign light conversation workspace`
+Current phase: UI system reset in progress
+Last verified commit: `83451f9 feat(chat): redesign light conversation workspace` (functionally verified; visual direction rejected)
 
 ## Current state
 
-The repository contains a functional V1 architecture and web/API implementation. Chat is now the default primary operating surface: a light, focused conversation canvas with contextual settlement evidence and a browser-persisted history drawer. `pnpm dev` owns the local Docker lifecycle, applies migrations, refreshes the reproducible demo seed, and starts the web/API. A real terminal Ctrl+C test confirmed it removes the Compose services and network.
+The repository contains a functional V1 architecture and web/API implementation. Chat is the default primary operating surface, but its current visual implementation has been rejected. Do not extend its custom CSS/layout. Rebuild it from Blade and shared Finora primitives after the UI package baseline is established. `pnpm dev` owns the local Docker lifecycle, applies migrations, refreshes the reproducible demo seed, and starts the web/API. A real terminal Ctrl+C test confirmed it removes the Compose services and network.
 
 ## Completed
 
@@ -16,25 +16,25 @@ The repository contains a functional V1 architecture and web/API implementation.
 - Finance, reconciliation, controlled AI/chat and exception-agent API boundaries.
 - FinoraOS visual identity, SVG assets, branded responsive workspace.
 - Blade 12 is integrated through its published package: provider/theme, fonts, and a real chat action component are in the Next app.
-- Vercel AI SDK chat state is integrated through a same-origin Next transport that calls Finora's controlled Nest chat endpoint. The light chat workspace has a distraction-free empty state, contextual settlement evidence, a browser-persisted history drawer, keyboard send/stop, clear failure states, and reduced-motion-safe transitions.
+- Vercel AI SDK chat state is integrated through a same-origin Next transport that calls Finora's controlled Nest chat endpoint. The interaction/state layer remains usable; the current custom visual layer must be replaced with Blade-first shared primitives.
 - Real local Qwen/Ollama smoke test passed. Settlement chat returns deterministic INR evidence; the model can add only a validated, number-free qualitative note.
 - `pnpm dev` uses persistent signal handlers because pnpm forwards interactive Ctrl+C twice; containers are reliably brought down after either signal.
 
 ## In progress
 
-- No active implementation task; ready for the next V1 iteration.
+- Establish a Blade-first Finora UI baseline: Inter typography, shared app shell/navigation/actions/drawer/composer/message/evidence primitives, then rebuild the Chat route from those primitives.
 
 ## Next highest-priority tasks
 
-1. Add browser/component tests for the chat transport and evidence-card interactions; maintain the API smoke test in CI.
-2. Finish Gemini/OpenAI-compatible gateway adapters and true token/tool streaming from the Nest API.
-3. Add persisted chat threads, reconciliation-run trigger/rerun, and human approval UI.
+1. Replace the rejected custom Chat layout with a design-system-composed screen and perform visual review before further feature work.
+2. Add browser/component tests for the chat transport and evidence-card interactions; maintain the API smoke test in CI.
+3. Finish Gemini/OpenAI-compatible gateway adapters and true token/tool streaming from the Nest API.
 
 ## Known issues
 
 - Blade's current development build emits an upstream `motion()` deprecation warning. It does not fail type-checking, runtime, or production build.
 - The direct Blade barrel import adds a substantial development compilation cost; add further Blade components deliberately and retain the package-import optimization.
-- Test scripts are configured but focused test files are the next milestone.
+- The current Chat visual implementation is not acceptable and must not be treated as a design baseline.
 
 ## Commands last verified
 

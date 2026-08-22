@@ -7,7 +7,7 @@ body {
   margin: 0;
   background: var(--finora-bg);
   color: var(--finora-text);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', 'Inter Fallback Arial', sans-serif;
   font-size: 14px;
 }
 .ai-explanation {
