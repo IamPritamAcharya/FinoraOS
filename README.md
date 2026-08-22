@@ -24,9 +24,19 @@ pnpm seed
 pnpm dev
 ```
 
-Open `http://localhost:3000`. API is `http://localhost:3001/api`.
+`pnpm dev` starts PostgreSQL and Redis, applies existing migrations, refreshes the deterministic demo seed, then starts the web/API. Press `Ctrl+C` for a graceful shutdown; it stops both app processes and brings the compose containers down. Set `FINORA_KEEP_INFRA=1 pnpm dev` to leave containers running. Open `http://localhost:3000`; API is `http://localhost:3001/api`.
 
-For local AI, install Ollama natively, pull `qwen3:4b-instruct-2507-q4_K_M`, then set `AI_PROVIDER=ollama`. Normal tests use the deterministic mock and never require a model.
+For local AI on Linux, install Ollama natively, then pull the development model:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama serve
+# In a second terminal
+ollama pull qwen3:4b-instruct-2507-q4_K_M
+ollama run qwen3:4b-instruct-2507-q4_K_M "Reply with OK"
+```
+
+Set `AI_PROVIDER=ollama` in `.env` and restart `pnpm dev`. Normal tests use the deterministic mock and never require a model.
 
 ## Useful commands
 

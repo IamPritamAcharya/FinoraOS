@@ -1,13 +1,14 @@
 :root {
-  --finora-brand: #155d62;
-  --finora-brand-strong: #0c4247;
-  --finora-accent: #d9a441;
-  --finora-bg: #f7f8f5;
+  --finora-brand: #2475d7;
+  --finora-brand-strong: #155bb6;
+  --finora-brand-subtle: #eaf2ff;
+  --finora-accent: #5b8fe1;
+  --finora-bg: #f5f7fb;
   --finora-surface: #ffffff;
-  --finora-muted: #eef1ed;
-  --finora-border: #dce2dc;
-  --finora-text: #17211f;
-  --finora-text-muted: #62706b;
+  --finora-muted: #f1f4f9;
+  --finora-border: #e1e7f0;
+  --finora-text: #172b4d;
+  --finora-text-muted: #5e6c84;
   --finora-success: #14715a;
   --finora-warning: #9d6500;
   --finora-danger: #b43d35;

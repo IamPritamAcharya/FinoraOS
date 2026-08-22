@@ -15,8 +15,8 @@ body {
   min-height: 100vh;
 }
 aside {
-  background: #102826;
-  color: #dce9e6;
+  background: #172b4d;
+  color: #dbe8ff;
   padding: 24px 14px;
   display: flex;
   flex-direction: column;
@@ -39,7 +39,7 @@ aside {
 .workspace-label {
   font-size: 10px;
   letter-spacing: 0.1em;
-  color: #89a09b;
+  color: #9cb8e4;
   margin: 36px 10px 12px;
 }
 nav {
@@ -51,20 +51,20 @@ nav button {
   text-align: left;
   border: 0;
   background: transparent;
-  color: #adc1bc;
+  color: #bbcff0;
   border-radius: 7px;
   padding: 10px 12px;
   cursor: pointer;
 }
 nav button:hover,
 nav button.active {
-  background: #1d403d;
+  background: #284b7b;
   color: #fff;
 }
 .sidebar-foot {
   margin-top: auto;
   padding: 12px 10px;
-  color: #adc1bc;
+  color: #bbcff0;
   font-size: 12px;
   line-height: 1.7;
 }
@@ -108,8 +108,8 @@ h1 {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: #d4e5dd;
-  color: #155d62;
+  background: var(--finora-brand-subtle);
+  color: var(--finora-brand);
   display: grid;
   place-items: center;
   font-weight: 700;
