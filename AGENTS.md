@@ -14,13 +14,9 @@ FinoraOS is an AI-native financial-operations platform. The flagship loop is det
 
 ## UI and brand rules
 
-- **Blade-first is mandatory.** Before creating UI, inspect the installed Blade component and icon exports. Use Blade's `Button`, `IconButton`, `Drawer`, `Card`, `SideNav`, inputs, typography, table, status, and motion primitives whenever they fit. Do not replace an available Blade component with a hand-styled HTML equivalent.
-- **No one-off UI primitives in application routes.** A reusable button, icon button, card, drawer, field, message, empty state, list item, or table pattern must be a Blade component or a typed Finora wrapper in `packages/ui`. Pages compose primitives; they do not invent their own interaction styling.
-- **No hand-drawn SVG icon sets.** Use Blade's exported icons. New icons must be justified in `docs/BRANDING.md` and shared from `packages/ui`.
-- **Typography is not negotiable.** Use Blade-bundled Inter for product UI and tabular finance data. Do not set Arial/Helvetica/system stacks as the primary UI font. TASA Orbiter is reserved for deliberate brand/display use, not general interface copy.
-- Reuse Finora tokens/primitives in `packages/ui`; do not scatter literals, override global token rules, or add random gradients. Preserve the FinoraOS mark and number formatting.
-- Financial status must use semantic tokens plus text, never colour alone. Prefer dense readable tables, subtle borders, and functional empty/error/loading states.
-- Major UI changes require a rendered visual review before commit. If the layout is not at the quality level of current enterprise products, stop and correct the design-system composition instead of adding more page CSS.
+- Use Razorpay Blade first; reusable Finora compositions belong in `packages/ui`, never as one-off route CSS/HTML.
+- Use Blade’s Inter and icon set, Finora tokens, and semantic finance statuses; detailed rules live in `docs/BRANDING.md` and `packages/ui/AGENTS.md`.
+- Visually review major UI changes before committing; do not extend a rejected layout.
 
 ## Workflow
 
