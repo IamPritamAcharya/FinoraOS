@@ -131,6 +131,7 @@ export function FinoraChat({
   const [currentThreadId, setCurrentThreadId] = useState(newThreadId);
   const [historyReady, setHistoryReady] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
   const isWorking = status === 'submitted' || status === 'streaming';
   const currentTitle = messages.length
     ? messageText(messages.find((message) => message.role === 'user') ?? messages[0]).slice(0, 52)
@@ -175,6 +176,15 @@ export function FinoraChat({
       return next;
     });
   }, [currentThreadId, currentTitle, historyReady, messages]);
+
+  useEffect(() => {
+    if (!historyReady || !messages.length) return;
+    const frame = window.requestAnimationFrame(() => {
+      const viewport = scrollViewportRef.current;
+      if (viewport) viewport.scrollTop = viewport.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [historyReady, isWorking, messages.length]);
 
   const send = async (text = input) => {
     const value = text.trim();
@@ -236,7 +246,7 @@ export function FinoraChat({
 
       <div className={styles.workspace}>
         <div className={styles.conversationColumn}>
-          <div className={styles.scrollViewport}>
+          <div className={styles.scrollViewport} ref={scrollViewportRef}>
             <div
               className={`${styles.conversationScroll} ${messages.length ? styles.hasMessages : ''}`}
             >
