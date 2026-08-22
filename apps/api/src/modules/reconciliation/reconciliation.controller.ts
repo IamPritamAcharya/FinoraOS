@@ -9,6 +9,9 @@ export class ReconciliationController {
   @Get('exceptions') exceptions() {
     return this.service.exceptions();
   }
+  @Post('runs') run() {
+    return this.service.run();
+  }
   @Post('exceptions/:id/approve') approve(@Param('id') id: string) {
     return this.service.approve(id);
   }

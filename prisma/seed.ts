@@ -54,17 +54,37 @@ async function main() {
     };
   });
   await prisma.settlement.createMany({ data: settlements });
-  const transactions = Array.from({ length: 120 }, (_, index) => ({
-    id: `txn-${index + 1}`,
-    organizationId: orgId,
-    externalId: `pay_${String(index + 1).padStart(5, '0')}`,
-    amount: (8500 + ((index * 791) % 17800)).toFixed(2),
-    currency: 'INR',
-    status: index % 29 === 0 ? ('REFUNDED' as const) : ('CAPTURED' as const),
-    occurredAt: iso((index % 12) + 1),
-    settlementId: settlements[index % 12].id,
-    sourceMetadata: { source: 'mock-razorpay', reference: `bank_ref_${index + 1}` },
-  }));
+  const transactions = Array.from({ length: 120 }, (_, index) => {
+    const scenario =
+      index < 100
+        ? 'EXACT'
+        : index < 104
+          ? 'COMPOSITE'
+          : index < 108
+            ? 'DATE_WINDOW'
+            : index < 112
+              ? 'AMBIGUOUS'
+              : index < 116
+                ? 'MISSING'
+                : 'AMOUNT_MISMATCH';
+    const externalId = `pay_${String(index + 1).padStart(5, '0')}`;
+    return {
+      id: `txn-${index + 1}`,
+      organizationId: orgId,
+      externalId,
+      amount: (8500 + ((index * 791) % 17800)).toFixed(2),
+      currency: 'INR',
+      status: index % 29 === 0 ? ('REFUNDED' as const) : ('CAPTURED' as const),
+      occurredAt: iso((index % 12) + 1),
+      settlementId: settlements[index % 12].id,
+      sourceMetadata: {
+        source: 'mock-razorpay',
+        bankReference: `bank_ref_${index + 1}`,
+        bankDescription: `payment ${externalId}`,
+        reconciliationScenario: scenario,
+      },
+    };
+  });
   await prisma.transaction.createMany({ data: transactions });
   await prisma.invoice.createMany({
     data: Array.from({ length: 18 }, (_, index) => ({

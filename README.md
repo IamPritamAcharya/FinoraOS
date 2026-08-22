@@ -41,7 +41,7 @@ The installer starts an Ollama system service. If it is not running, use `ollama
 
 `pnpm check`, `pnpm test`, `pnpm build`, `pnpm check:enums`, `pnpm eval:reconciliation`, `pnpm infra:down`, `pnpm db:studio`.
 
-The seed includes 120 transactions, 12 settlements and 14 honest exceptions. The evaluation reports match and closure accuracy from checked-in ground truth.
+The seed includes 120 transactions, 12 settlements and 14 demo exceptions. `POST /api/reconciliation/runs` executes the deterministic engine over organization-scoped seed records, persists its output and writes an audit event. `pnpm eval:reconciliation` runs that same engine against checked-in synthetic input and ground truth.
 
 ## Current limitations
 

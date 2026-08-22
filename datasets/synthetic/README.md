@@ -1,3 +1,5 @@
 # Synthetic V1 dataset
 
-The seed uses a deterministic, reproducible fixture: 120 payment transactions, 12 settlements, 18 invoices and tax lines, and 14 reconciliation exceptions. It includes fee/GST/refund deductions, tax mismatches, ambiguous references, and two intentionally unresolved records.
+The database seed contains 120 payment transactions, 12 settlements, 18 invoices/tax lines, and the existing demo exception history.
+
+`reconciliation-fixture.ts` is the deterministic engine-evaluation input: 120 payment records and 120 mock-bank counterparts. It covers exact references, settlement relationships, date-window and composite matches, plus ambiguous, missing, and amount-mismatch cases. The expected output is checked in under `datasets/expected/` and is evaluated by `pnpm eval:reconciliation`.

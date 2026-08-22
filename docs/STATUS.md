@@ -1,8 +1,8 @@
 # FinoraOS Status
 
 Last updated: 2026-08-22  
-Current phase: Scoped web UI foundation established; visual refinement continues
-Last verified commit: pending `feat(web): scope Finora workspace UI`
+Current phase: Deterministic reconciliation engine implemented; product-loop integration in progress
+Last verified commit: `7d3730d feat(reconciliation): add deterministic matching engine`
 
 ## Current state
 
@@ -17,23 +17,27 @@ The repository contains a functional V1 architecture and web/API implementation.
 - FinoraOS visual identity, SVG assets, branded responsive workspace.
 - Finora UI package owns tokens and shared primitives; the web app no longer uses Razorpay Blade at runtime.
 - Web styles are scoped by boundary: global foundations, workspace route, sidebar, and chat. Shared buttons and icons live in `packages/ui`.
+- Pure `@finora/reconciliation` package with explicit exact-reference, settlement-relationship, date-window, and composite-score stages; ambiguity is never auto-matched.
+- `POST /api/reconciliation/runs` maps organization-scoped seeded finance records into mock-bank counterparts, runs the shared engine, persists a run/matches/exceptions/evidence/audit event inside a transaction, and returns the real result.
+- Engine evaluation now runs the exact package over a checked-in 240-record synthetic fixture: 108 expected correct matches, 12 exceptions, and zero false auto-matches.
 - Vercel AI SDK chat state is integrated through a same-origin Next transport that calls Finora's controlled Nest chat endpoint.
 - Real local Qwen/Ollama smoke test passed. Settlement chat returns deterministic INR evidence; the model can add only a validated, number-free qualitative note.
 - `pnpm dev` uses persistent signal handlers because pnpm forwards interactive Ctrl+C twice; containers are reliably brought down after either signal.
 
 ## In progress
 
-- Visually refine the scoped chat and navigation surfaces from the new clean CSS baseline.
+- Wire exception investigation to the configured AI gateway after the deterministic run, then expose rerun/approval/audit actions in the workspace.
 
 ## Next highest-priority tasks
 
-1. Perform a focused visual review of the chat/sidebar shell and make spacing/typography refinements without reintroducing global CSS.
-2. Add browser/component tests for the chat transport and evidence-card interactions; maintain the API smoke test in CI.
-3. Finish Gemini/OpenAI-compatible gateway adapters and true token/tool streaming from the Nest API.
+1. Add a controlled reconciliation-run trigger and actual run metrics/exception evidence to the web UI.
+2. Route exception investigation through the configured AI gateway, then support approval → rerun → close/escalate in the UI.
+3. Replace remaining `Number(...)` money calculations in finance overview/forecast and make cash forecast/tax matching data-driven.
 
 ## Known issues
 
-- The Finora UI component catalog is newly established and needs component/visual tests before broad adoption.
+- The V1 banking source is a traceable mock-bank projection from seeded transaction metadata; a persisted bank-statement import model/connector is later work.
+- Reconciliation-match evidence is available in the pure engine output and audit logs; the narrow V1 Prisma match table does not yet store its full evidence payload separately.
 
 ## Commands last verified
 
