@@ -11,10 +11,15 @@ const labels: Record<string, string> = {
 };
 export function StatusBadge({
   status,
+  label,
 }: {
   status: ExceptionStatus | ReconciliationStatus | string;
+  /** Keeps the semantic status treatment while allowing contextual copy. */
+  label?: string;
 }) {
   return (
-    <span className={`status status-${status.toLowerCase()}`}>{labels[status] ?? status}</span>
+    <span className={`finora-status finora-status--${status.toLowerCase()}`}>
+      {label ?? labels[status] ?? status}
+    </span>
   );
 }

@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-22  
 Current phase: Deterministic reconciliation engine implemented; product-loop integration in progress
-Last verified commit: `7d3730d feat(reconciliation): add deterministic matching engine`
+Last verified commit: `feat(reconciliation): add deterministic matching engine` (see `git log -1`)
 
 ## Current state
 

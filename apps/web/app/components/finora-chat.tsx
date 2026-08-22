@@ -8,6 +8,8 @@ import styles from './finora-chat.module.css';
 
 type Data = Record<string, any>;
 type Thread = { id: string; title: string; updatedAt: number; messages: Data[] };
+const chatHistoryKey = 'finora-chat-history';
+const activeChatThreadKey = 'finora-active-chat-thread';
 
 const suggestions = [
   {
@@ -50,7 +52,7 @@ function SettlementEvidence({
           <span className={styles.cardKicker}>Settlement breakdown</span>
           <strong>{settlement.externalId}</strong>
         </div>
-        <StatusBadge status="MATCHED" />
+        <StatusBadge status="MATCHED" label="Explained variance" />
       </div>
       <dl>
         <div>
@@ -75,6 +77,12 @@ function SettlementEvidence({
           <dt>GST</dt>
           <dd>
             <Amount value={settlement.gstAmount} />
+          </dd>
+        </div>
+        <div>
+          <dt>Refunds</dt>
+          <dd>
+            <Amount value={settlement.refundAmount} />
           </dd>
         </div>
       </dl>
@@ -130,8 +138,17 @@ export function FinoraChat({
 
   useEffect(() => {
     try {
-      const stored = window.localStorage.getItem('finora-chat-history');
-      if (stored) setThreads(JSON.parse(stored) as Thread[]);
+      const stored = window.localStorage.getItem(chatHistoryKey);
+      const savedThreads = stored ? (JSON.parse(stored) as Thread[]) : [];
+      setThreads(savedThreads);
+
+      const activeThreadId = window.localStorage.getItem(activeChatThreadKey);
+      const activeThread =
+        savedThreads.find((thread) => thread.id === activeThreadId) ?? savedThreads[0];
+      if (activeThread) {
+        setCurrentThreadId(activeThread.id);
+        setMessages(activeThread.messages as typeof messages);
+      }
     } catch {
       // Browser history is a convenience only; finance data remains server-side.
     }
@@ -150,7 +167,8 @@ export function FinoraChat({
         ...current.filter((thread) => thread.id !== currentThreadId),
       ].slice(0, 12);
       try {
-        window.localStorage.setItem('finora-chat-history', JSON.stringify(next));
+        window.localStorage.setItem(chatHistoryKey, JSON.stringify(next));
+        window.localStorage.setItem(activeChatThreadKey, currentThreadId);
       } catch {
         /* no-op */
       }
@@ -168,12 +186,22 @@ export function FinoraChat({
     setMessages([]);
     setInput('');
     setCurrentThreadId(newThreadId());
+    try {
+      window.localStorage.removeItem(activeChatThreadKey);
+    } catch {
+      // A new blank chat has no persisted thread until its first message.
+    }
     setHistoryOpen(false);
     composerRef.current?.focus();
   };
   const loadThread = (thread: Thread) => {
     setMessages(thread.messages as typeof messages);
     setCurrentThreadId(thread.id);
+    try {
+      window.localStorage.setItem(activeChatThreadKey, thread.id);
+    } catch {
+      // Browser history is optional.
+    }
     setHistoryOpen(false);
   };
   const filteredThreads = threads.filter((thread) =>
@@ -208,77 +236,79 @@ export function FinoraChat({
 
       <div className={styles.workspace}>
         <div className={styles.conversationColumn}>
-          <div
-            className={`${styles.conversationScroll} ${messages.length ? styles.hasMessages : ''}`}
-          >
-            {!messages.length && !isWorking && (
-              <section className={styles.welcome}>
-                <div className={styles.welcomeMark}>
-                  <img src="/brand/logo-mark.svg" alt="" />
-                </div>
-                <p className={styles.welcomeKicker}>FINORA</p>
-                <h1 className={styles.welcomeHeading}>What can I help you reconcile?</h1>
-                <p className={styles.welcomeHelper}>
-                  Ask about settlements, exceptions, records, or the cash position.
-                </p>
-                <div className={styles.suggestionGrid}>
-                  {suggestions.map((suggestion) => (
-                    <FinoraButton
-                      key={suggestion.title}
-                      className={styles.suggestionCard}
-                      type="button"
-                      variant="ghost"
-                      onClick={() => {
-                        void send(suggestion.prompt);
-                      }}
-                    >
-                      <strong className={styles.suggestionTitle}>{suggestion.title}</strong>
-                      <span className={styles.suggestionDetail}>{suggestion.detail}</span>
-                      <FinoraIcon name="chevronRight" />
-                    </FinoraButton>
-                  ))}
-                </div>
-              </section>
-            )}
-            {messages.map((message) => {
-              const text = messageText(message);
-              if (!text) return null;
-              const settlement =
-                message.role === 'assistant'
-                  ? settlements.find((item) => text.includes(item.externalId))
-                  : undefined;
-              return (
-                <article
-                  className={`${styles.message} ${message.role === 'assistant' ? styles.assistantMessage : ''}`}
-                  key={message.id}
-                >
-                  <span
-                    className={`${styles.avatar} ${message.role === 'assistant' ? styles.assistantAvatar : styles.userAvatar}`}
-                  >
-                    {message.role === 'assistant' ? <FinoraIcon name="finora" /> : 'AM'}
-                  </span>
-                  <div className={styles.messageContent}>
-                    <p className={styles.messageAuthor}>
-                      {message.role === 'assistant' ? 'Finora' : 'Aarav Mehta'}
-                    </p>
-                    <div className={styles.messageCopy}>{text}</div>
-                    {settlement && (
-                      <SettlementEvidence
-                        settlement={settlement}
-                        onViewSettlement={onViewSettlement}
-                      />
-                    )}
-                    {message.role === 'assistant' && <InvestigationState active={false} />}
+          <div className={styles.scrollViewport}>
+            <div
+              className={`${styles.conversationScroll} ${messages.length ? styles.hasMessages : ''}`}
+            >
+              {!messages.length && !isWorking && (
+                <section className={styles.welcome}>
+                  <div className={styles.welcomeMark}>
+                    <img src="/brand/logo-mark.svg" alt="" />
                   </div>
-                </article>
-              );
-            })}
-            {isWorking && <InvestigationState active />}
-            {error && (
-              <div className={styles.error}>
-                Finora could not complete this request. Check the local API and try again.
-              </div>
-            )}
+                  <p className={styles.welcomeKicker}>FINORA</p>
+                  <h1 className={styles.welcomeHeading}>What can I help you reconcile?</h1>
+                  <p className={styles.welcomeHelper}>
+                    Ask about settlements, exceptions, records, or the cash position.
+                  </p>
+                  <div className={styles.suggestionGrid}>
+                    {suggestions.map((suggestion) => (
+                      <FinoraButton
+                        key={suggestion.title}
+                        className={styles.suggestionCard}
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          void send(suggestion.prompt);
+                        }}
+                      >
+                        <strong className={styles.suggestionTitle}>{suggestion.title}</strong>
+                        <span className={styles.suggestionDetail}>{suggestion.detail}</span>
+                        <FinoraIcon name="chevronRight" />
+                      </FinoraButton>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {messages.map((message) => {
+                const text = messageText(message);
+                if (!text) return null;
+                const settlement =
+                  message.role === 'assistant'
+                    ? settlements.find((item) => text.includes(item.externalId))
+                    : undefined;
+                return (
+                  <article
+                    className={`${styles.message} ${message.role === 'assistant' ? styles.assistantMessage : ''}`}
+                    key={message.id}
+                  >
+                    <span
+                      className={`${styles.avatar} ${message.role === 'assistant' ? styles.assistantAvatar : styles.userAvatar}`}
+                    >
+                      {message.role === 'assistant' ? <FinoraIcon name="finora" /> : 'AM'}
+                    </span>
+                    <div className={styles.messageContent}>
+                      <p className={styles.messageAuthor}>
+                        {message.role === 'assistant' ? 'Finora' : 'Aarav Mehta'}
+                      </p>
+                      <div className={styles.messageCopy}>{text}</div>
+                      {settlement && (
+                        <SettlementEvidence
+                          settlement={settlement}
+                          onViewSettlement={onViewSettlement}
+                        />
+                      )}
+                      {message.role === 'assistant' && <InvestigationState active={false} />}
+                    </div>
+                  </article>
+                );
+              })}
+              {isWorking && <InvestigationState active />}
+              {error && (
+                <div className={styles.error}>
+                  Finora could not complete this request. Check the local API and try again.
+                </div>
+              )}
+            </div>
           </div>
 
           <form

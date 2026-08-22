@@ -116,19 +116,40 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
+}
+
+.scrollViewport {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
   padding: 0 24px;
+  scrollbar-color: rgb(100 124 160 / 28%) transparent;
+  scrollbar-width: thin;
+}
+
+.scrollViewport::-webkit-scrollbar {
+  width: 7px;
+}
+
+.scrollViewport::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  background-color: rgb(100 124 160 / 24%);
+}
+
+.scrollViewport:hover::-webkit-scrollbar-thumb {
+  background-color: rgb(67 96 137 / 38%);
 }
 
 .conversationScroll {
   display: flex;
   width: 100%;
   max-width: 760px;
-  min-height: 0;
-  flex: 1;
+  min-height: 100%;
   flex-direction: column;
   gap: 28px;
   margin: 0 auto;
-  overflow-y: auto;
   padding: 28px 0 8px;
 }
 
