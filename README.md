@@ -11,6 +11,7 @@
   <a href="#the-finoraos-loop">How it works</a> ·
   <a href="#demo-workflow">Demo workflow</a> ·
   <a href="#evaluation">Evaluation</a> ·
+  <a href="https://github.com/IamPritamAcharya/FinoraOS">GitHub</a> ·
   <a href="docs/STATUS.md">Project status</a>
 </p>
 
@@ -104,7 +105,7 @@ npm exec --package=pnpm@10.16.0 -- pnpm install
 ### Run the complete local demo
 
 ```bash
-git clone <your-fork-or-repository-url> finora-os
+git clone https://github.com/IamPritamAcharya/FinoraOS.git finora-os
 cd finora-os
 cp .env.example .env
 pnpm install
