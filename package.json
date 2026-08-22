@@ -1,0 +1,66 @@
+{
+  "name": "finora-os",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.16.0",
+  "engines": {
+    "node": ">=24 <27",
+    "pnpm": ">=10.16.0"
+  },
+  "scripts": {
+    "dev": "turbo dev --concurrency=2",
+    "dev:web": "pnpm --filter @finora/web dev",
+    "dev:api": "pnpm --filter @finora/api dev",
+    "build": "turbo build --concurrency=2",
+    "lint": "turbo lint --concurrency=2",
+    "lint:fix": "turbo lint:fix --concurrency=2",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "turbo typecheck --concurrency=2",
+    "test": "turbo test --concurrency=2",
+    "test:unit": "turbo test --concurrency=2",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "verify:push": "pnpm check:enums && pnpm lint && pnpm typecheck && pnpm test:unit",
+    "infra:up": "docker compose up -d postgres redis",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f postgres redis",
+    "infra:reset": "docker compose down -v && docker compose up -d postgres redis",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma migrate reset --force",
+    "db:studio": "prisma studio",
+    "seed": "pnpm db:seed",
+    "check:enums": "tsx scripts/check-enums.ts",
+    "eval": "pnpm eval:reconciliation",
+    "eval:reconciliation": "tsx evals/reconciliation.ts",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "20.4.1",
+    "@commitlint/config-conventional": "20.4.1",
+    "@eslint/js": "9.34.0",
+    "@prisma/adapter-pg": "7.9.1",
+    "@prisma/client": "7.9.1",
+    "@types/node": "24.3.0",
+    "eslint": "9.34.0",
+    "eslint-config-prettier": "10.1.8",
+    "husky": "9.1.7",
+    "lint-staged": "16.1.5",
+    "prettier": "3.6.2",
+    "pnpm": "10.16.0",
+    "pg": "8.16.3",
+    "prisma": "7.9.1",
+    "tsx": "4.20.4",
+    "turbo": "2.5.6",
+    "typescript-eslint": "8.41.0",
+    "typescript": "5.9.2"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,json,md,css,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

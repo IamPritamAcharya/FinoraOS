@@ -1,0 +1,10 @@
+{
+  "recordsProcessed": 156,
+  "groundTruthMatches": 144,
+  "correctMatches": 142,
+  "exceptions": 14,
+  "agentResolved": 8,
+  "needsReview": 4,
+  "unresolved": 2,
+  "falsePositiveResolutions": 0
+}

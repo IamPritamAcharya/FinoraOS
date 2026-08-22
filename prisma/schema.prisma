@@ -1,0 +1,213 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ReconciliationStatus {
+  MATCHED
+  UNMATCHED
+  RESOLVED
+  NEEDS_REVIEW
+}
+enum ExceptionStatus {
+  OPEN
+  PROPOSED
+  RESOLVED
+  NEEDS_REVIEW
+  UNRESOLVED
+}
+enum ExceptionType {
+  SETTLEMENT_MISMATCH
+  MISSING_BANK_RECORD
+  AMBIGUOUS_MATCH
+  TAX_MISMATCH
+}
+enum AgentType {
+  CONTROLLER
+  RECONCILIATION
+  EXCEPTION_INVESTIGATOR
+  SETTLEMENT
+  TAX
+  FORECAST
+}
+enum TransactionStatus {
+  CAPTURED
+  REFUNDED
+  PENDING
+}
+
+model Organization {
+  id String @id
+  name String
+  users User[]
+  transactions Transaction[]
+  settlements Settlement[]
+  invoices Invoice[]
+  taxLines TaxLine[]
+  reconciliationRuns ReconciliationRun[]
+  exceptions Exception[]
+  auditLogs AuditLog[]
+  agentRuns AgentRun[]
+}
+model User {
+  id String @id
+  organizationId String
+  name String
+  email String @unique
+  organization Organization @relation(fields: [organizationId], references: [id])
+}
+model Settlement {
+  id String @id
+  organizationId String
+  externalId String
+  expectedAmount Decimal @db.Decimal(18, 2)
+  receivedAmount Decimal @db.Decimal(18, 2)
+  feeAmount Decimal @db.Decimal(18, 2)
+  gstAmount Decimal @db.Decimal(18, 2)
+  refundAmount Decimal @db.Decimal(18, 2)
+  settledAt DateTime
+  organization Organization @relation(fields: [organizationId], references: [id])
+  transactions Transaction[]
+  @@unique([organizationId, externalId])
+}
+model Transaction {
+  id String @id
+  organizationId String
+  externalId String
+  amount Decimal @db.Decimal(18, 2)
+  currency String @default("INR")
+  status TransactionStatus @default(CAPTURED)
+  occurredAt DateTime
+  settlementId String?
+  sourceMetadata Json?
+  organization Organization @relation(fields: [organizationId], references: [id])
+  settlement Settlement? @relation(fields: [settlementId], references: [id])
+  @@unique([organizationId, externalId])
+}
+model Invoice {
+  id String @id @default(cuid())
+  organizationId String
+  externalId String
+  amount Decimal @db.Decimal(18, 2)
+  currency String @default("INR")
+  issuedAt DateTime
+  organization Organization @relation(fields: [organizationId], references: [id])
+  @@unique([organizationId, externalId])
+}
+model TaxLine {
+  id String @id @default(cuid())
+  organizationId String
+  externalId String
+  invoiceId String?
+  amount Decimal @db.Decimal(18, 2)
+  taxRate Decimal @db.Decimal(5, 2)
+  matched Boolean @default(false)
+  organization Organization @relation(fields: [organizationId], references: [id])
+  @@unique([organizationId, externalId])
+}
+model ReconciliationRun {
+  id String @id @default(cuid())
+  organizationId String
+  status String
+  startedAt DateTime @default(now())
+  completedAt DateTime?
+  recordsProcessed Int
+  deterministicMatches Int
+  exceptionsGenerated Int
+  agentResolved Int
+  needsReview Int
+  unresolved Int
+  organization Organization @relation(fields: [organizationId], references: [id])
+  matches ReconciliationMatch[]
+  exceptions Exception[]
+}
+model ReconciliationMatch {
+  id String @id @default(cuid())
+  reconciliationRunId String
+  transactionId String?
+  settlementId String?
+  status ReconciliationStatus
+  confidence Decimal @db.Decimal(4, 3)
+  reason String
+  reconciliationRun ReconciliationRun @relation(fields: [reconciliationRunId], references: [id])
+}
+model Exception {
+  id String @id
+  organizationId String
+  reconciliationRunId String?
+  externalId String @unique
+  type ExceptionType
+  status ExceptionStatus
+  expectedAmount Decimal @db.Decimal(18, 2)
+  receivedAmount Decimal @db.Decimal(18, 2)
+  confidence Decimal @db.Decimal(4, 3)
+  reason String
+  resolution Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+  reconciliationRun ReconciliationRun? @relation(fields: [reconciliationRunId], references: [id])
+  evidence ExceptionEvidence[]
+  agentRuns AgentRun[]
+  @@index([organizationId, status])
+}
+model ExceptionEvidence {
+  id String @id @default(cuid())
+  exceptionId String
+  label String
+  referenceId String?
+  payload Json
+  exception Exception @relation(fields: [exceptionId], references: [id])
+}
+model AgentRun {
+  id String @id @default(cuid())
+  organizationId String
+  exceptionId String?
+  agentType AgentType
+  status String
+  input Json
+  output Json?
+  startedAt DateTime @default(now())
+  completedAt DateTime?
+  organization Organization @relation(fields: [organizationId], references: [id])
+  exception Exception? @relation(fields: [exceptionId], references: [id])
+  steps AgentStep[]
+}
+model AgentStep {
+  id String @id @default(cuid())
+  agentRunId String
+  label String
+  payload Json?
+  createdAt DateTime @default(now())
+  agentRun AgentRun @relation(fields: [agentRunId], references: [id])
+}
+model AuditLog {
+  id String @id @default(cuid())
+  organizationId String
+  actor String
+  action String
+  entityType String
+  entityId String?
+  details Json?
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id])
+}
+model ChatThread {
+  id String @id @default(cuid())
+  organizationId String
+  title String
+  createdAt DateTime @default(now())
+  messages ChatMessage[]
+}
+model ChatMessage {
+  id String @id @default(cuid())
+  threadId String
+  role String
+  content String
+  payload Json?
+  createdAt DateTime @default(now())
+  thread ChatThread @relation(fields: [threadId], references: [id])
+}

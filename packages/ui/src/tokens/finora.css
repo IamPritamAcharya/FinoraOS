@@ -1,0 +1,16 @@
+:root {
+  --finora-brand: #155d62;
+  --finora-brand-strong: #0c4247;
+  --finora-accent: #d9a441;
+  --finora-bg: #f7f8f5;
+  --finora-surface: #ffffff;
+  --finora-muted: #eef1ed;
+  --finora-border: #dce2dc;
+  --finora-text: #17211f;
+  --finora-text-muted: #62706b;
+  --finora-success: #14715a;
+  --finora-warning: #9d6500;
+  --finora-danger: #b43d35;
+  --finora-info: #2e6388;
+  --finora-radius: 10px;
+}
