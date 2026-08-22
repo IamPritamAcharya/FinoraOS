@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import { Button } from '@razorpay/blade/components';
 import { Amount, StatusBadge } from '@finora/ui';
 
 const api = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
@@ -236,6 +237,7 @@ function Chat({
           ) : (
             <>
               <p>{reply.text}</p>
+              {reply.aiExplanation && <p className="ai-explanation">{reply.aiExplanation}</p>}
               {reply.settlement && <SettlementCard settlement={reply.settlement} />}
             </>
           )}
@@ -247,7 +249,9 @@ function Chat({
           onChange={(event) => setMessage(event.target.value)}
           onKeyDown={(event) => event.key === 'Enter' && chat()}
         />
-        <button onClick={chat}>Ask Finora</button>
+        <Button variant="primary" onClick={chat}>
+          Ask Finora
+        </Button>
       </div>
     </section>
   );

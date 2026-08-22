@@ -2,11 +2,11 @@
 
 Last updated: 2026-08-22  
 Current phase: V1 basic local prototype verified  
-Last verified commit: `ea41e85 feat: add managed local prototype workflow`
+Last verified commit: pending current Blade/Ollama lifecycle commit
 
 ## Current state
 
-The repository contains a functional V1 architecture and web/API implementation. `pnpm dev` owns the local Docker lifecycle, applies migrations, refreshes the reproducible demo seed, and starts the web/API. `Ctrl+C` stops the app processes and compose services.
+The repository contains a functional V1 architecture and web/API implementation. `pnpm dev` owns the local Docker lifecycle, applies migrations, refreshes the reproducible demo seed, and starts the web/API. A real terminal Ctrl+C test confirmed it removes the Compose services and network.
 
 ## Completed
 
@@ -15,12 +15,13 @@ The repository contains a functional V1 architecture and web/API implementation.
 - Synthetic 120-transaction / 12-settlement / 14-exception seed model and evaluation harness.
 - Finance, reconciliation, controlled AI/chat and exception-agent API boundaries.
 - FinoraOS visual identity, SVG assets, branded responsive workspace.
-- Razorpay-quality Blade-inspired blue financial UI tokens, without copying Razorpay’s brand assets.
-- Live local smoke test: overview returned seeded data and settlement chat returned controlled evidence.
+- Blade 12 is integrated through its published package: provider/theme, fonts, and a real chat action component are in the Next app.
+- Real local Qwen/Ollama smoke test passed. Settlement chat returns deterministic INR evidence; the model can add only a validated, number-free qualitative note.
+- `pnpm dev` uses persistent signal handlers because pnpm forwards interactive Ctrl+C twice; containers are reliably brought down after either signal.
 
 ## In progress
 
-- Commit the one-command local development and visual-system update.
+- Commit the Blade, local-AI guardrail, and one-command lifecycle update.
 
 ## Next highest-priority tasks
 
@@ -30,8 +31,8 @@ The repository contains a functional V1 architecture and web/API implementation.
 
 ## Known issues
 
-- Ollama is not installed on this machine, so no local Qwen smoke test has occurred. Setup commands are in the README.
-- Blade 12/Next 16/React 19 peer incompatibilities were observed; V1 uses a Finora-owned Blade-informed UI layer instead.
+- Blade's current development build emits an upstream `motion()` deprecation warning. It does not fail type-checking, runtime, or production build.
+- The direct Blade barrel import adds a substantial development compilation cost; add further Blade components deliberately and retain the package-import optimization.
 - Test scripts are configured but focused test files are the next milestone.
 
 ## Commands last verified
@@ -39,6 +40,7 @@ The repository contains a functional V1 architecture and web/API implementation.
 - `pnpm lint`
 - `pnpm typecheck`
 - `pnpm build`
+- `pnpm --filter @finora/web build`
 - `pnpm check:enums`
 - `pnpm eval:reconciliation`
 - `pnpm db:migrate --name init`
@@ -46,7 +48,7 @@ The repository contains a functional V1 architecture and web/API implementation.
 
 ## Environment notes
 
-`pnpm` and `corepack` were not preinstalled. A project-local pnpm shim is included; bootstrap remains possible through `npx --yes pnpm@10.16.0`.
+`pnpm@10.16.0` is installed for the current user and pinned in the repository. `AI_PROVIDER=ollama` is configured locally; `.env` remains untracked.
 
 ## Demo status
 

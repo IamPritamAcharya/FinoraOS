@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { FinoraBladeProvider } from './blade-provider';
 import './globals.css';
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000'),
@@ -14,7 +15,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <FinoraBladeProvider>{children}</FinoraBladeProvider>
+      </body>
     </html>
   );
 }

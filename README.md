@@ -30,13 +30,12 @@ For local AI on Linux, install Ollama natively, then pull the development model:
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
-ollama serve
 # In a second terminal
 ollama pull qwen3:4b-instruct-2507-q4_K_M
 ollama run qwen3:4b-instruct-2507-q4_K_M "Reply with OK"
 ```
 
-Set `AI_PROVIDER=ollama` in `.env` and restart `pnpm dev`. Normal tests use the deterministic mock and never require a model.
+The installer starts an Ollama system service. If it is not running, use `ollama serve`. Set `AI_PROVIDER=ollama` in `.env` and restart `pnpm dev`. Normal tests use the deterministic mock and never require a model.
 
 ## Useful commands
 

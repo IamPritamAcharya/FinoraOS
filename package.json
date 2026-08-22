@@ -8,9 +8,9 @@
     "pnpm": ">=10.16.0"
   },
   "scripts": {
-    "dev": "tsx scripts/dev.ts",
-    "dev:services": "tsx scripts/dev.ts --services-only",
-    "dev:keep-infra": "FINORA_KEEP_INFRA=1 tsx scripts/dev.ts",
+    "dev": "node scripts/dev.mjs",
+    "dev:services": "node scripts/dev.mjs --services-only",
+    "dev:keep-infra": "FINORA_KEEP_INFRA=1 node scripts/dev.mjs",
     "dev:web": "pnpm --filter @finora/web dev",
     "dev:api": "pnpm --filter @finora/api dev",
     "build": "turbo build --concurrency=2",
