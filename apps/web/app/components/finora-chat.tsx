@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { TextStreamChatTransport } from 'ai';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Amount, FinoraButton, FinoraIconButton, StatusBadge } from '@finora/ui';
+import { Amount, FinoraButton, FinoraIcon, FinoraIconButton, StatusBadge } from '@finora/ui';
 import styles from './finora-chat.module.css';
 
 type Data = Record<string, any>;
@@ -32,37 +32,6 @@ const messageText = (message: { parts: Array<{ type: string; text?: string }> })
     .filter((part) => part.type === 'text')
     .map((part) => part.text ?? '')
     .join('');
-
-function Icon({
-  name,
-}: {
-  name: 'spark' | 'plus' | 'send' | 'history' | 'close' | 'search' | 'chevron';
-}) {
-  const paths = {
-    spark: (
-      <path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Zm6 12 .7 2.3L21 18l-2.3.7L18 21l-.7-2.3L15 18l2.3-.7L18 15Z" />
-    ),
-    plus: <path d="M12 5v14M5 12h14" />,
-    send: <path d="m4 4 16 8-16 8 3-8-3-8Zm3 8h13" />,
-    history: <path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5m4-3v6l4 2" />,
-    close: <path d="m6 6 12 12M18 6 6 18" />,
-    search: <path d="m20 20-4.2-4.2M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4Z" />,
-    chevron: <path d="m9 18 6-6-6-6" />,
-  };
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {paths[name]}
-    </svg>
-  );
-}
 
 function SettlementEvidence({
   settlement,
@@ -115,7 +84,7 @@ function SettlementEvidence({
         size="small"
         onClick={onViewSettlement}
       >
-        View settlement <Icon name="chevron" />
+        View settlement <FinoraIcon name="chevronRight" />
       </FinoraButton>
     </section>
   );
@@ -222,7 +191,7 @@ export function FinoraChat({
         </div>
         <div className={styles.headerActions}>
           <FinoraButton className={styles.newThreadButton} onClick={startNew}>
-            <Icon name="plus" /> New chat
+            <FinoraIcon name="add" /> New chat
           </FinoraButton>
           <FinoraIconButton
             className={styles.historyButton}
@@ -232,7 +201,7 @@ export function FinoraChat({
             aria-expanded={historyOpen}
             onClick={() => setHistoryOpen((open) => !open)}
           >
-            <Icon name="history" />
+            <FinoraIcon name="history" />
           </FinoraIconButton>
         </div>
       </header>
@@ -265,7 +234,7 @@ export function FinoraChat({
                     >
                       <strong className={styles.suggestionTitle}>{suggestion.title}</strong>
                       <span className={styles.suggestionDetail}>{suggestion.detail}</span>
-                      <Icon name="chevron" />
+                      <FinoraIcon name="chevronRight" />
                     </FinoraButton>
                   ))}
                 </div>
@@ -286,7 +255,7 @@ export function FinoraChat({
                   <span
                     className={`${styles.avatar} ${message.role === 'assistant' ? styles.assistantAvatar : styles.userAvatar}`}
                   >
-                    {message.role === 'assistant' ? <Icon name="spark" /> : 'AM'}
+                    {message.role === 'assistant' ? <FinoraIcon name="finora" /> : 'AM'}
                   </span>
                   <div className={styles.messageContent}>
                     <p className={styles.messageAuthor}>
@@ -350,7 +319,7 @@ export function FinoraChat({
                   disabled={!input.trim() || isWorking}
                   aria-label="Send message to Finora"
                 >
-                  <Icon name="send" />
+                  <FinoraIcon name="send" />
                 </FinoraIconButton>
               </div>
             </div>
@@ -378,11 +347,11 @@ export function FinoraChat({
             aria-label="Close chat history"
             onClick={() => setHistoryOpen(false)}
           >
-            <Icon name="close" />
+            <FinoraIcon name="close" />
           </FinoraIconButton>
         </div>
         <label className={styles.search}>
-          <Icon name="search" />
+          <FinoraIcon name="search" />
           <input
             value={historyQuery}
             onChange={(event) => setHistoryQuery(event.target.value)}
@@ -405,13 +374,13 @@ export function FinoraChat({
                     thread.updatedAt,
                   )}
                 </span>
-                <Icon name="chevron" />
+                <FinoraIcon name="chevronRight" />
               </FinoraButton>
             ))
           ) : (
             <div className={styles.historyEmpty}>
               <span className={styles.historyEmptyIcon}>
-                <Icon name="history" />
+                <FinoraIcon name="history" />
               </span>
               <strong>No conversations yet</strong>
               <p>Chats started here will appear in this browser.</p>
@@ -419,7 +388,7 @@ export function FinoraChat({
           )}
         </div>
         <FinoraButton className={styles.drawerNewChat} onClick={startNew}>
-          <Icon name="plus" /> New chat
+          <FinoraIcon name="add" /> New chat
         </FinoraButton>
       </aside>
     </section>

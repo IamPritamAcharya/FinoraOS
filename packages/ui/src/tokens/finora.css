@@ -29,6 +29,7 @@
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
+    box-shadow 160ms ease,
     color 160ms ease,
     transform 160ms ease;
 }
@@ -58,10 +59,16 @@
 .finora-ui-button--primary {
   background: var(--finora-brand);
   color: #fff;
+  box-shadow: 0 8px 18px -12px rgb(36 117 215 / 58%);
 }
 .finora-ui-button--primary:hover:not(:disabled) {
   background: var(--finora-brand-strong);
+  box-shadow: 0 10px 22px -12px rgb(36 117 215 / 70%);
   transform: translateY(-1px);
+}
+.finora-ui-button--primary:active:not(:disabled) {
+  box-shadow: 0 4px 10px -8px rgb(36 117 215 / 50%);
+  transform: translateY(0);
 }
 .finora-ui-button--secondary {
   background: var(--finora-surface);
@@ -72,6 +79,9 @@
 .finora-ui-button--ghost:hover:not(:disabled) {
   background: var(--finora-brand-subtle);
   color: var(--finora-brand);
+}
+.finora-ui-button--secondary:hover:not(:disabled) {
+  border-color: #b8d1f0;
 }
 .finora-ui-button--ghost {
   background: transparent;
