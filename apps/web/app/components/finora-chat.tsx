@@ -2,15 +2,28 @@
 
 import { useChat } from '@ai-sdk/react';
 import { TextStreamChatTransport } from 'ai';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Amount, StatusBadge } from '@finora/ui';
 
 type Data = Record<string, any>;
+type Thread = { id: string; title: string; updatedAt: number; messages: Data[] };
 
 const suggestions = [
-  'Why was settlement STL_0001 short?',
-  'Show unresolved exceptions above ₹25,000.',
-  'What is our expected cash position this week?',
+  {
+    title: 'Explain a settlement',
+    prompt: 'Why was settlement STL_0001 short?',
+    detail: 'Break down a variance',
+  },
+  {
+    title: 'Review exceptions',
+    prompt: 'Show unresolved exceptions above ₹25,000.',
+    detail: 'Prioritise what needs review',
+  },
+  {
+    title: 'Find a cash risk',
+    prompt: 'What is our expected cash position this week?',
+    detail: 'See the near-term outlook',
+  },
 ];
 
 const messageText = (message: { parts: Array<{ type: string; text?: string }> }) =>
@@ -19,20 +32,21 @@ const messageText = (message: { parts: Array<{ type: string; text?: string }> })
     .map((part) => part.text ?? '')
     .join('');
 
-function Icon({ name }: { name: 'spark' | 'plus' | 'send' | 'shield' | 'database' | 'calc' }) {
+function Icon({
+  name,
+}: {
+  name: 'spark' | 'plus' | 'send' | 'history' | 'close' | 'search' | 'chevron';
+}) {
   const paths = {
     spark: (
       <path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Zm6 12 .7 2.3L21 18l-2.3.7L18 21l-.7-2.3L15 18l2.3-.7L18 15Z" />
     ),
     plus: <path d="M12 5v14M5 12h14" />,
     send: <path d="m4 4 16 8-16 8 3-8-3-8Zm3 8h13" />,
-    shield: <path d="M12 3 5 6v5c0 4.6 3 7.8 7 10 4-2.2 7-5.4 7-10V6l-7-3Zm-3 9 2 2 4-4" />,
-    database: (
-      <path d="M19 6c0 1.7-3.1 3-7 3S5 7.7 5 6s3.1-3 7-3 7 1.3 7 3Zm0 0v6c0 1.7-3.1 3-7 3s-7-1.3-7-3V6m14 6v6c0 1.7-3.1 3-7 3s-7-1.3-7-3v-6" />
-    ),
-    calc: (
-      <path d="M6 3h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm3 4h6M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01" />
-    ),
+    history: <path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5m4-3v6l4 2" />,
+    close: <path d="m6 6 12 12M18 6 6 18" />,
+    search: <path d="m20 20-4.2-4.2M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4Z" />,
+    chevron: <path d="m9 18 6-6-6-6" />,
   };
   return (
     <svg
@@ -63,7 +77,7 @@ function SettlementEvidence({
     >
       <div className="evidence-card-head">
         <div>
-          <span className="card-kicker">Settlement evidence</span>
+          <span className="card-kicker">Settlement breakdown</span>
           <strong>{settlement.externalId}</strong>
         </div>
         <StatusBadge status="MATCHED" />
@@ -82,61 +96,42 @@ function SettlementEvidence({
           </dd>
         </div>
         <div>
-          <dt>Gateway fees</dt>
+          <dt>Gateway fee</dt>
           <dd>
             <Amount value={settlement.feeAmount} />
           </dd>
         </div>
         <div>
-          <dt>GST on fees</dt>
+          <dt>GST</dt>
           <dd>
             <Amount value={settlement.gstAmount} />
           </dd>
         </div>
       </dl>
       <button className="evidence-link" type="button" onClick={onViewSettlement}>
-        Open settlement record <span>→</span>
+        View settlement <Icon name="chevron" />
       </button>
     </section>
   );
 }
 
-function ToolActivity({ streaming }: { streaming: boolean }) {
-  const steps = [
-    ['database', 'Locate financial records'],
-    ['calc', 'Calculate deterministic breakdown'],
-    ['shield', 'Validate grounded response'],
-  ] as const;
+function InvestigationState({ active }: { active: boolean }) {
   return (
-    <div className="tool-activity" aria-live="polite">
-      <div className="tool-activity-label">
-        <span className="activity-pulse" /> Finora is investigating
-      </div>
-      {steps.map(([icon, label], index) => (
-        <div
-          className={`tool-step ${streaming && index === 2 ? 'tool-step-active' : ''}`}
-          key={label}
-        >
-          <span className="tool-icon">
-            <Icon name={icon} />
-          </span>
-          <span>{label}</span>
-          <span className="tool-step-state">
-            {streaming && index === 2 ? 'Checking' : 'Complete'}
-          </span>
-        </div>
-      ))}
+    <div className="investigation-state" aria-live="polite">
+      <span className={active ? 'investigation-dot is-active' : 'investigation-dot'} />
+      {active ? 'Checking linked financial records…' : 'Checked linked financial records'}
     </div>
   );
 }
 
+const newThreadId = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `thread-${Date.now()}`;
+
 export function FinoraChat({
   settlements,
-  openExceptions,
   onViewSettlement,
 }: {
   settlements: Data[];
-  openExceptions: Data[];
   onViewSettlement: () => void;
 }) {
   const transport = useMemo(() => new TextStreamChatTransport({ api: '/api/finora-chat' }), []);
@@ -145,13 +140,46 @@ export function FinoraChat({
     throttle: 40,
   });
   const [input, setInput] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyQuery, setHistoryQuery] = useState('');
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [currentThreadId, setCurrentThreadId] = useState(newThreadId);
+  const [historyReady, setHistoryReady] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const isWorking = status === 'submitted' || status === 'streaming';
-  const latestSettlement = [...messages]
-    .reverse()
-    .map(messageText)
-    .map((text) => settlements.find((settlement) => text.includes(settlement.externalId)))
-    .find(Boolean);
+  const currentTitle = messages.length
+    ? messageText(messages.find((message) => message.role === 'user') ?? messages[0]).slice(0, 52)
+    : 'New conversation';
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem('finora-chat-history');
+      if (stored) setThreads(JSON.parse(stored) as Thread[]);
+    } catch {
+      // Browser history is a convenience only; finance data remains server-side.
+    }
+    setHistoryReady(true);
+  }, []);
+  useEffect(() => {
+    if (!historyReady || !messages.length) return;
+    setThreads((current) => {
+      const next = [
+        {
+          id: currentThreadId,
+          title: currentTitle || 'Untitled conversation',
+          updatedAt: Date.now(),
+          messages: messages as unknown as Data[],
+        },
+        ...current.filter((thread) => thread.id !== currentThreadId),
+      ].slice(0, 12);
+      try {
+        window.localStorage.setItem('finora-chat-history', JSON.stringify(next));
+      } catch {
+        /* no-op */
+      }
+      return next;
+    });
+  }, [currentThreadId, currentTitle, historyReady, messages]);
 
   const send = async (text = input) => {
     const value = text.trim();
@@ -159,70 +187,76 @@ export function FinoraChat({
     setInput('');
     await sendMessage({ text: value });
   };
+  const startNew = () => {
+    setMessages([]);
+    setInput('');
+    setCurrentThreadId(newThreadId());
+    setHistoryOpen(false);
+    composerRef.current?.focus();
+  };
+  const loadThread = (thread: Thread) => {
+    setMessages(thread.messages as typeof messages);
+    setCurrentThreadId(thread.id);
+    setHistoryOpen(false);
+  };
+  const filteredThreads = threads.filter((thread) =>
+    thread.title.toLowerCase().includes(historyQuery.trim().toLowerCase()),
+  );
 
   return (
     <section className="finora-chat-shell">
       <header className="chat-topbar">
-        <div className="chat-title-lockup">
-          <span className="finora-orb">
-            <Icon name="spark" />
-          </span>
-          <div>
-            <div className="chat-title-row">
-              <h2>Finora</h2>
-              <span className="available-badge">
-                <span /> Available
-              </span>
-            </div>
-            <p>AI-native financial operations</p>
-          </div>
+        <div className="chat-header-actions">
+          <button className="new-thread-button" type="button" onClick={startNew}>
+            <Icon name="plus" /> New chat
+          </button>
+          <button
+            className="history-button"
+            type="button"
+            aria-label="Browse chat history"
+            aria-expanded={historyOpen}
+            onClick={() => setHistoryOpen((open) => !open)}
+          >
+            <Icon name="history" />
+          </button>
         </div>
-        <button
-          className="new-thread-button"
-          type="button"
-          onClick={() => {
-            setMessages([]);
-            setInput('');
-            composerRef.current?.focus();
-          }}
-        >
-          <Icon name="plus" /> New conversation
-        </button>
+        <div className="chat-header-title">
+          <img src="/brand/logo-mark.svg" alt="" />
+          <span>Finora</span>
+          <span className="header-separator">/</span>
+          <strong>{currentTitle}</strong>
+        </div>
+        <div className="chat-header-meta">Acme Commerce India</div>
       </header>
 
       <div className="chat-workspace">
         <div className="conversation-column">
-          <div className="conversation-scroll">
-            <article className="finora-welcome">
-              <span className="message-avatar assistant-avatar">
-                <Icon name="spark" />
-              </span>
-              <div className="message-content">
-                <p className="message-author">
-                  Finora <span>Controlled intelligence</span>
-                </p>
-                <h1>What would you like to investigate?</h1>
-                <p>
-                  I’ll use controlled finance tools, show the evidence, and keep calculations
-                  deterministic.
-                </p>
+          <div className={`conversation-scroll ${messages.length ? 'has-messages' : ''}`}>
+            {!messages.length && !isWorking && (
+              <section className="finora-welcome">
+                <div className="welcome-mark">
+                  <img src="/brand/logo-mark.svg" alt="" />
+                </div>
+                <p className="welcome-kicker">FINORA</p>
+                <h1>What can I help you reconcile?</h1>
+                <p>Ask about settlements, exceptions, records, or the cash position.</p>
                 <div className="suggestion-grid">
                   {suggestions.map((suggestion) => (
                     <button
-                      key={suggestion}
+                      key={suggestion.title}
                       type="button"
                       onClick={() => {
-                        void send(suggestion);
+                        void send(suggestion.prompt);
                       }}
                     >
-                      {suggestion}
-                      <span>↗</span>
+                      <strong>{suggestion.title}</strong>
+                      <span>{suggestion.detail}</span>
+                      <Icon name="chevron" />
                     </button>
                   ))}
                 </div>
-              </div>
-            </article>
-
+              </section>
+            )}
             {messages.map((message) => {
               const text = messageText(message);
               if (!text) return null;
@@ -240,7 +274,6 @@ export function FinoraChat({
                   <div className="message-content">
                     <p className="message-author">
                       {message.role === 'assistant' ? 'Finora' : 'Aarav Mehta'}
-                      {message.role === 'assistant' && <span> Evidence-grounded</span>}
                     </p>
                     <div className="message-copy">{text}</div>
                     {settlement && (
@@ -249,11 +282,12 @@ export function FinoraChat({
                         onViewSettlement={onViewSettlement}
                       />
                     )}
+                    {message.role === 'assistant' && <InvestigationState active={false} />}
                   </div>
                 </article>
               );
             })}
-            {isWorking && <ToolActivity streaming={status === 'streaming'} />}
+            {isWorking && <InvestigationState active />}
             {error && (
               <div className="chat-error">
                 Finora could not complete this request. Check the local API and try again.
@@ -273,7 +307,7 @@ export function FinoraChat({
               ref={composerRef}
               value={input}
               rows={1}
-              placeholder="Ask Finora to investigate, explain, or review…"
+              placeholder="Ask Finora anything about your finances…"
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
@@ -284,7 +318,7 @@ export function FinoraChat({
             />
             <div className="composer-footer">
               <span>
-                <Icon name="shield" /> Controlled tools only
+                Enter to send <b>·</b> Shift + Enter for new line
               </span>
               <div>
                 {isWorking && (
@@ -304,60 +338,71 @@ export function FinoraChat({
             </div>
           </form>
           <p className="chat-disclaimer">
-            Finora can explain and propose. Financial changes remain subject to policy and approval.
+            Finora uses your connected financial records. Verify recommendations before taking
+            action.
           </p>
         </div>
-
-        <aside className="chat-context" aria-label="Conversation context">
-          <div className="context-section">
-            <p className="context-heading">CONVERSATION CONTEXT</p>
-            <div className="context-record">
-              <span className="context-icon">
-                <Icon name="database" />
-              </span>
-              <div>
-                <strong>Acme Commerce India</strong>
-                <small>Demo organization</small>
-              </div>
-            </div>
-          </div>
-          <div className="context-section">
-            <p className="context-heading">CURRENT FOCUS</p>
-            {latestSettlement ? (
-              <div className="focus-record">
-                <strong>{latestSettlement.externalId}</strong>
-                <span>Settlement evidence attached</span>
-                <Amount value={latestSettlement.receivedAmount} />
-              </div>
-            ) : (
-              <p className="context-empty">
-                Select a record through a question to attach its evidence here.
-              </p>
-            )}
-          </div>
-          <div className="context-section">
-            <p className="context-heading">OPEN EXCEPTIONS</p>
-            <div className="exception-context-list">
-              {openExceptions.slice(0, 3).map((item) => (
-                <div key={item.id}>
-                  <div>
-                    <strong>{item.externalId}</strong>
-                    <small>{item.type.replaceAll('_', ' ')}</small>
-                  </div>
-                  <StatusBadge status={item.status} />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="guardrail-note">
-            <Icon name="shield" />
-            <p>
-              <strong>Financial guardrail</strong>Amounts, matches and variances are calculated
-              deterministically before Finora explains them.
-            </p>
-          </div>
-        </aside>
       </div>
+
+      <aside
+        className={`chat-history-drawer ${historyOpen ? 'is-open' : ''}`}
+        aria-label="Chat history"
+        aria-hidden={!historyOpen}
+      >
+        <div className="history-drawer-header">
+          <div>
+            <p>CHAT HISTORY</p>
+            <h2>Recent conversations</h2>
+          </div>
+          <button
+            type="button"
+            className="history-close"
+            aria-label="Close chat history"
+            onClick={() => setHistoryOpen(false)}
+          >
+            <Icon name="close" />
+          </button>
+        </div>
+        <label className="history-search">
+          <Icon name="search" />
+          <input
+            value={historyQuery}
+            onChange={(event) => setHistoryQuery(event.target.value)}
+            placeholder="Search conversations"
+          />
+        </label>
+        <div className="history-list">
+          {filteredThreads.length ? (
+            filteredThreads.map((thread) => (
+              <button
+                className={thread.id === currentThreadId ? 'is-current' : ''}
+                key={thread.id}
+                type="button"
+                onClick={() => loadThread(thread)}
+              >
+                <strong>{thread.title}</strong>
+                <span>
+                  {new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' }).format(
+                    thread.updatedAt,
+                  )}
+                </span>
+                <Icon name="chevron" />
+              </button>
+            ))
+          ) : (
+            <div className="history-empty">
+              <span className="history-empty-icon">
+                <Icon name="history" />
+              </span>
+              <strong>No conversations yet</strong>
+              <p>Chats started here will appear in this browser.</p>
+            </div>
+          )}
+        </div>
+        <button className="drawer-new-chat" type="button" onClick={startNew}>
+          <Icon name="plus" /> New chat
+        </button>
+      </aside>
     </section>
   );
 }

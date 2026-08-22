@@ -66,7 +66,7 @@ export default function Workspace() {
     <main className="shell">
       <aside>
         <a className="brand" href="#">
-          <img src="/brand/logo-mark-dark.svg" alt="" />
+          <img src="/brand/logo-mark.svg" alt="" />
           <span>FinoraOS</span>
         </a>
         <p className="workspace-label">ACME COMMERCE INDIA</p>
@@ -106,11 +106,7 @@ export default function Workspace() {
         ) : page === 'Overview' ? (
           <Overview cards={cards} run={run} open={open} setPage={setPage} />
         ) : page === 'Chat' ? (
-          <FinoraChat
-            settlements={settlements}
-            openExceptions={open}
-            onViewSettlement={() => setPage('Records')}
-          />
+          <FinoraChat settlements={settlements} onViewSettlement={() => setPage('Records')} />
         ) : page === 'Records' ? (
           <Records items={transactions} />
         ) : page === 'Reconciliation' ? (
