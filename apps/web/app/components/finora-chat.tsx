@@ -4,6 +4,7 @@ import { useChat } from '@ai-sdk/react';
 import { TextStreamChatTransport } from 'ai';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Amount, FinoraButton, FinoraIconButton, StatusBadge } from '@finora/ui';
+import styles from './finora-chat.module.css';
 
 type Data = Record<string, any>;
 type Thread = { id: string; title: string; updatedAt: number; messages: Data[] };
@@ -72,12 +73,12 @@ function SettlementEvidence({
 }) {
   return (
     <section
-      className="chat-evidence-card"
+      className={styles.evidenceCard}
       aria-label={`Settlement evidence for ${settlement.externalId}`}
     >
-      <div className="evidence-card-head">
+      <div className={styles.evidenceHead}>
         <div>
-          <span className="card-kicker">Settlement breakdown</span>
+          <span className={styles.cardKicker}>Settlement breakdown</span>
           <strong>{settlement.externalId}</strong>
         </div>
         <StatusBadge status="MATCHED" />
@@ -109,7 +110,7 @@ function SettlementEvidence({
         </div>
       </dl>
       <FinoraButton
-        className="evidence-link"
+        className={styles.evidenceLink}
         variant="ghost"
         size="small"
         onClick={onViewSettlement}
@@ -122,8 +123,10 @@ function SettlementEvidence({
 
 function InvestigationState({ active }: { active: boolean }) {
   return (
-    <div className="investigation-state" aria-live="polite">
-      <span className={active ? 'investigation-dot is-active' : 'investigation-dot'} />
+    <div className={styles.investigation} aria-live="polite">
+      <span
+        className={`${styles.investigationDot} ${active ? styles.investigationDotActive : ''}`}
+      />
       {active ? 'Checking linked financial records…' : 'Checked linked financial records'}
     </div>
   );
@@ -209,14 +212,20 @@ export function FinoraChat({
   );
 
   return (
-    <section className="finora-chat-shell">
-      <header className="chat-topbar">
-        <div className="chat-header-actions">
-          <FinoraButton className="new-thread-button" onClick={startNew}>
+    <section className={styles.shell}>
+      <header className={styles.topbar}>
+        <div className={styles.headerTitle}>
+          <img src="/brand/logo-mark.svg" alt="" />
+          <span>Finora</span>
+          <span className={styles.separator}>/</span>
+          <strong>{currentTitle}</strong>
+        </div>
+        <div className={styles.headerActions}>
+          <FinoraButton className={styles.newThreadButton} onClick={startNew}>
             <Icon name="plus" /> New chat
           </FinoraButton>
           <FinoraIconButton
-            className="history-button"
+            className={styles.historyButton}
             variant="secondary"
             type="button"
             aria-label="Browse chat history"
@@ -226,39 +235,38 @@ export function FinoraChat({
             <Icon name="history" />
           </FinoraIconButton>
         </div>
-        <div className="chat-header-title">
-          <img src="/brand/logo-mark.svg" alt="" />
-          <span>Finora</span>
-          <span className="header-separator">/</span>
-          <strong>{currentTitle}</strong>
-        </div>
-        <div className="chat-header-meta">Acme Commerce India</div>
       </header>
 
-      <div className="chat-workspace">
-        <div className="conversation-column">
-          <div className={`conversation-scroll ${messages.length ? 'has-messages' : ''}`}>
+      <div className={styles.workspace}>
+        <div className={styles.conversationColumn}>
+          <div
+            className={`${styles.conversationScroll} ${messages.length ? styles.hasMessages : ''}`}
+          >
             {!messages.length && !isWorking && (
-              <section className="finora-welcome">
-                <div className="welcome-mark">
+              <section className={styles.welcome}>
+                <div className={styles.welcomeMark}>
                   <img src="/brand/logo-mark.svg" alt="" />
                 </div>
-                <p className="welcome-kicker">FINORA</p>
-                <h1>What can I help you reconcile?</h1>
-                <p>Ask about settlements, exceptions, records, or the cash position.</p>
-                <div className="suggestion-grid">
+                <p className={styles.welcomeKicker}>FINORA</p>
+                <h1 className={styles.welcomeHeading}>What can I help you reconcile?</h1>
+                <p className={styles.welcomeHelper}>
+                  Ask about settlements, exceptions, records, or the cash position.
+                </p>
+                <div className={styles.suggestionGrid}>
                   {suggestions.map((suggestion) => (
-                    <button
+                    <FinoraButton
                       key={suggestion.title}
+                      className={styles.suggestionCard}
                       type="button"
+                      variant="ghost"
                       onClick={() => {
                         void send(suggestion.prompt);
                       }}
                     >
-                      <strong>{suggestion.title}</strong>
-                      <span>{suggestion.detail}</span>
+                      <strong className={styles.suggestionTitle}>{suggestion.title}</strong>
+                      <span className={styles.suggestionDetail}>{suggestion.detail}</span>
                       <Icon name="chevron" />
-                    </button>
+                    </FinoraButton>
                   ))}
                 </div>
               </section>
@@ -271,17 +279,20 @@ export function FinoraChat({
                   ? settlements.find((item) => text.includes(item.externalId))
                   : undefined;
               return (
-                <article className={`chat-message chat-message-${message.role}`} key={message.id}>
+                <article
+                  className={`${styles.message} ${message.role === 'assistant' ? styles.assistantMessage : ''}`}
+                  key={message.id}
+                >
                   <span
-                    className={`message-avatar ${message.role === 'assistant' ? 'assistant-avatar' : 'user-avatar'}`}
+                    className={`${styles.avatar} ${message.role === 'assistant' ? styles.assistantAvatar : styles.userAvatar}`}
                   >
                     {message.role === 'assistant' ? <Icon name="spark" /> : 'AM'}
                   </span>
-                  <div className="message-content">
-                    <p className="message-author">
+                  <div className={styles.messageContent}>
+                    <p className={styles.messageAuthor}>
                       {message.role === 'assistant' ? 'Finora' : 'Aarav Mehta'}
                     </p>
-                    <div className="message-copy">{text}</div>
+                    <div className={styles.messageCopy}>{text}</div>
                     {settlement && (
                       <SettlementEvidence
                         settlement={settlement}
@@ -295,14 +306,14 @@ export function FinoraChat({
             })}
             {isWorking && <InvestigationState active />}
             {error && (
-              <div className="chat-error">
+              <div className={styles.error}>
                 Finora could not complete this request. Check the local API and try again.
               </div>
             )}
           </div>
 
           <form
-            className="finora-composer"
+            className={styles.composer}
             onSubmit={(event) => {
               event.preventDefault();
               void send();
@@ -322,18 +333,18 @@ export function FinoraChat({
                 }
               }}
             />
-            <div className="composer-footer">
+            <div className={styles.composerFooter}>
               <span>
                 Enter to send <b>·</b> Shift + Enter for new line
               </span>
               <div>
                 {isWorking && (
-                  <FinoraButton className="stop-button" variant="ghost" size="small" onClick={stop}>
+                  <FinoraButton variant="ghost" size="small" onClick={stop}>
                     Stop
                   </FinoraButton>
                 )}
                 <FinoraIconButton
-                  className="send-button"
+                  className={styles.sendButton}
                   type="submit"
                   variant="primary"
                   disabled={!input.trim() || isWorking}
@@ -344,7 +355,7 @@ export function FinoraChat({
               </div>
             </div>
           </form>
-          <p className="chat-disclaimer">
+          <p className={styles.disclaimer}>
             Finora uses your connected financial records. Verify recommendations before taking
             action.
           </p>
@@ -352,25 +363,25 @@ export function FinoraChat({
       </div>
 
       <aside
-        className={`chat-history-drawer ${historyOpen ? 'is-open' : ''}`}
+        className={`${styles.drawer} ${historyOpen ? styles.drawerOpen : ''}`}
         aria-label="Chat history"
         aria-hidden={!historyOpen}
       >
-        <div className="history-drawer-header">
+        <div className={styles.drawerHeader}>
           <div>
             <p>CHAT HISTORY</p>
             <h2>Recent conversations</h2>
           </div>
-          <button
-            type="button"
-            className="history-close"
+          <FinoraIconButton
+            className={styles.closeButton}
+            variant="ghost"
             aria-label="Close chat history"
             onClick={() => setHistoryOpen(false)}
           >
             <Icon name="close" />
-          </button>
+          </FinoraIconButton>
         </div>
-        <label className="history-search">
+        <label className={styles.search}>
           <Icon name="search" />
           <input
             value={historyQuery}
@@ -378,13 +389,14 @@ export function FinoraChat({
             placeholder="Search conversations"
           />
         </label>
-        <div className="history-list">
+        <div className={styles.historyList}>
           {filteredThreads.length ? (
             filteredThreads.map((thread) => (
-              <button
-                className={thread.id === currentThreadId ? 'is-current' : ''}
+              <FinoraButton
+                className={thread.id === currentThreadId ? styles.current : ''}
                 key={thread.id}
                 type="button"
+                variant="ghost"
                 onClick={() => loadThread(thread)}
               >
                 <strong>{thread.title}</strong>
@@ -394,11 +406,11 @@ export function FinoraChat({
                   )}
                 </span>
                 <Icon name="chevron" />
-              </button>
+              </FinoraButton>
             ))
           ) : (
-            <div className="history-empty">
-              <span className="history-empty-icon">
+            <div className={styles.historyEmpty}>
+              <span className={styles.historyEmptyIcon}>
                 <Icon name="history" />
               </span>
               <strong>No conversations yet</strong>
@@ -406,7 +418,7 @@ export function FinoraChat({
             </div>
           )}
         </div>
-        <FinoraButton className="drawer-new-chat" onClick={startNew}>
+        <FinoraButton className={styles.drawerNewChat} onClick={startNew}>
           <Icon name="plus" /> New chat
         </FinoraButton>
       </aside>

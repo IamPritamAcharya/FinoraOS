@@ -1,0 +1,212 @@
+.sidebar {
+  --row-height: 40px;
+  --row-gap: 4px;
+
+  position: sticky;
+  top: 14px;
+  display: flex;
+  height: calc(100vh - 28px);
+  width: 224px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--finora-border);
+  border-radius: 14px;
+  background: var(--finora-surface);
+  box-shadow: 0 10px 28px rgb(32 69 118 / 7%);
+  color: var(--finora-text);
+  padding: 22px 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 5px 10px;
+  color: var(--finora-text);
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.9px;
+  text-decoration: none;
+}
+
+.brand img {
+  width: 25px;
+  height: 25px;
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.brand:hover img {
+  transform: rotate(-5deg) scale(1.04);
+}
+
+.nav {
+  position: relative;
+  display: grid;
+  gap: var(--row-gap);
+  margin-top: 34px;
+}
+
+.indicator {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 0;
+  height: var(--row-height);
+  border-radius: 8px;
+  background: var(--finora-brand-subtle);
+  box-shadow:
+    0 0 0 1px rgb(36 117 215 / 8%),
+    0 10px 22px -12px rgb(36 117 215 / 42%),
+    0 14px 28px -18px rgb(36 117 215 / 40%);
+  pointer-events: none;
+  transform: translateY(calc(var(--active-index, 0) * (var(--row-height) + var(--row-gap))));
+  transition: transform 300ms cubic-bezier(0.25, 1.15, 0.45, 1);
+}
+
+.indicator::after {
+  position: absolute;
+  right: 18px;
+  bottom: -9px;
+  left: 18px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgb(36 117 215 / 28%);
+  content: '';
+  filter: blur(9px);
+}
+
+.navButton {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: var(--row-height);
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #40536f;
+  cursor: pointer;
+  font: inherit;
+  padding: 0 12px;
+  text-align: left;
+  font-weight: 650;
+  letter-spacing: -0.1px;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.navIcon {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+}
+
+.navButton:hover {
+  background: rgb(36 117 215 / 6%);
+  color: var(--finora-brand);
+  transform: translateX(2px);
+}
+
+.navButtonActive {
+  color: var(--finora-brand);
+  font-weight: 750;
+}
+
+.navButton:active {
+  transform: scale(0.98);
+}
+
+.account {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-top: auto;
+  border-top: 1px solid var(--finora-border);
+  border-radius: 0;
+  color: var(--finora-text);
+  padding: 14px 10px 4px;
+  text-align: left;
+}
+
+.account:hover {
+  background: transparent;
+  color: var(--finora-brand);
+}
+
+.accountIcon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border: 1px solid var(--finora-border);
+  border-radius: 50%;
+  background: var(--finora-muted);
+}
+
+.accountIcon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.accountLabel {
+  min-width: 0;
+}
+
+.accountLabel strong,
+.accountLabel small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountLabel strong {
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.accountLabel small {
+  margin-top: 2px;
+  color: var(--finora-text-muted);
+  font-size: 10px;
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    position: static;
+    height: auto;
+    margin-bottom: 10px;
+    border-radius: 12px;
+  }
+
+  .account {
+    display: none;
+  }
+
+  .nav {
+    display: flex;
+    margin-top: 0;
+    overflow-x: auto;
+  }
+
+  .indicator {
+    display: none;
+  }
+
+  .navButton {
+    flex: 0 0 auto;
+  }
+
+  .navButtonActive {
+    background: var(--finora-brand-subtle);
+  }
+}

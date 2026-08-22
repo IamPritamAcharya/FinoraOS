@@ -7,3 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+Keep `app/globals.css` limited to reset, fonts, global tokens, and accessibility defaults. Component and route styling belongs in adjacent CSS Modules; reusable controls belong in `packages/ui`.
+
+Do not add page-specific global selectors or one-off buttons, inputs, cards, drawers, or navigation styles. Reuse Finora primitives and update them when the pattern is shared.

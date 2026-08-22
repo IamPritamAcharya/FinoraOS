@@ -1,8 +1,8 @@
 # FinoraOS Status
 
 Last updated: 2026-08-22  
-Current phase: UI system reset in progress
-Last verified commit: `83451f9 feat(chat): redesign light conversation workspace` (functionally verified; visual direction rejected)
+Current phase: Scoped web UI foundation established; visual refinement continues
+Last verified commit: pending `feat(web): scope Finora workspace UI`
 
 ## Current state
 
@@ -16,17 +16,18 @@ The repository contains a functional V1 architecture and web/API implementation.
 - Finance, reconciliation, controlled AI/chat and exception-agent API boundaries.
 - FinoraOS visual identity, SVG assets, branded responsive workspace.
 - Finora UI package owns tokens and shared primitives; the web app no longer uses Razorpay Blade at runtime.
+- Web styles are scoped by boundary: global foundations, workspace route, sidebar, and chat. Shared buttons and icons live in `packages/ui`.
 - Vercel AI SDK chat state is integrated through a same-origin Next transport that calls Finora's controlled Nest chat endpoint.
 - Real local Qwen/Ollama smoke test passed. Settlement chat returns deterministic INR evidence; the model can add only a validated, number-free qualitative note.
 - `pnpm dev` uses persistent signal handlers because pnpm forwards interactive Ctrl+C twice; containers are reliably brought down after either signal.
 
 ## In progress
 
-- Expand the Finora UI baseline with shared app shell/navigation/drawer/composer/message/evidence primitives and rebuild remaining route-level UI from it.
+- Visually refine the scoped chat and navigation surfaces from the new clean CSS baseline.
 
 ## Next highest-priority tasks
 
-1. Replace the rejected custom Chat layout with a design-system-composed screen and perform visual review before further feature work.
+1. Perform a focused visual review of the chat/sidebar shell and make spacing/typography refinements without reintroducing global CSS.
 2. Add browser/component tests for the chat transport and evidence-card interactions; maintain the API smoke test in CI.
 3. Finish Gemini/OpenAI-compatible gateway adapters and true token/tool streaming from the Nest API.
 
