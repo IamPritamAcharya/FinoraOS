@@ -23,6 +23,7 @@ The repository contains a functional V1 architecture and web/API implementation.
 - Vercel AI SDK chat state is integrated through a same-origin Next transport that calls Finora's controlled Nest chat endpoint.
 - Real local Qwen/Ollama smoke test passed. Settlement chat returns deterministic INR evidence; the model can add only a validated, number-free qualitative note.
 - `pnpm dev` uses persistent signal handlers because pnpm forwards interactive Ctrl+C twice; containers are reliably brought down after either signal.
+- Root README is now a Buildathon-ready project entry point with setup, demo, safety, architecture, evaluation and command guidance, plus a committed FinoraOS banner asset.
 
 ## In progress
 
