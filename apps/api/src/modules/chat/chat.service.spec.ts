@@ -32,6 +32,7 @@ describe('ChatService', () => {
     const result = await service.respond('Who are you?');
 
     expect(ai.complete).toHaveBeenCalledTimes(2);
+    expect(ai.complete.mock.calls[0]?.[0]).toMatchObject({ responseFormat: 'json' });
     expect(result).toMatchObject({
       kind: 'general',
       text: 'I am Finora, your finance operations assistant.',

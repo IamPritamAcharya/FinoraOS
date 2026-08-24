@@ -34,6 +34,7 @@ class OpenAiCompatibleGateway implements AiGateway {
       body: JSON.stringify({
         model: this.config.model,
         temperature: 0.2,
+        ...(input.responseFormat === 'json' ? { response_format: { type: 'json_object' } } : {}),
         messages: [
           { role: 'system', content: input.system },
           { role: 'user', content: input.prompt },

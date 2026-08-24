@@ -34,6 +34,7 @@ The repository contains a functional V1 architecture and web/API implementation.
 - `pnpm dev` now provisions the separate local `finora_agent_ro` PostgreSQL role before seeding; `pnpm db:agent-role` is available for manual role provisioning.
 - The Controller Agent now asks the configured AI gateway to select a Zod-validated allowlisted tool call instead of relying on phrase regexes. The catalogue includes organization users, transactions, invoices, settlements, exceptions/evidence, tax lines, cash forecast, reconciliation runs, audit events, and agent runs.
 - Controlled agent reads now execute through the separate `finora_agent_ro` role with `SELECT` only, `NOBYPASSRLS`, read-only transactions, and organization RLS policies. A missing or wrong tenant context produces zero rows; the provisioning command verifies this live.
+- Controller routing explicitly requests JSON-mode output from compatible providers. Development logs record only the selected controlled tool or a concise fallback reason—never prompt text, model output, secrets, or financial record bodies.
 
 ## In progress
 

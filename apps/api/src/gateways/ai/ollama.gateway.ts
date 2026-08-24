@@ -15,6 +15,7 @@ export class OllamaGateway implements AiGateway {
         body: JSON.stringify({
           model,
           stream: false,
+          ...(input.responseFormat === 'json' ? { format: 'json' } : {}),
           messages: [
             { role: 'system', content: input.system },
             { role: 'user', content: input.prompt },

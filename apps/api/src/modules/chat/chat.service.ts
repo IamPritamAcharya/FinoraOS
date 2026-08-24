@@ -14,13 +14,21 @@ export class ChatService {
     private readonly agentRead: AgentReadService,
   ) {}
   async respond(message: string, context: ChatContextEntry[] = []) {
-    const decision = await new ControllerAgent({
+    const route = await new ControllerAgent({
       complete: async (input) => (await this.ai.complete(input)).text,
-    }).route(message, context);
-    apiLogger.info('Chat request routed to controlled capability', {
-      tool: decision.tool,
-      hasConversationContext: context.length > 0,
-    });
+    }).routeDetailed(message, context);
+    const decision = route.decision;
+    if (route.source === 'fallback') {
+      apiLogger.warn('Chat controller fell back to general conversation', {
+        reason: route.fallbackReason,
+        hasConversationContext: context.length > 0,
+      });
+    } else {
+      apiLogger.info('Chat controller selected controlled capability', {
+        tool: decision.tool,
+        hasConversationContext: context.length > 0,
+      });
+    }
     switch (decision.tool) {
       case 'getSettlement':
         return this.settlementResponse(decision.arguments.settlementId);

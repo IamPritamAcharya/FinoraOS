@@ -1,6 +1,6 @@
 import type { AiProvider } from './provider-selection.js';
 
-export type AiPrompt = { system: string; prompt: string };
+export type AiPrompt = { system: string; prompt: string; responseFormat?: 'json' };
 export type AiCompletion = {
   text: string;
   provider: AiProvider;

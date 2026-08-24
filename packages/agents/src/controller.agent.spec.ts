@@ -30,4 +30,15 @@ describe('ControllerAgent', () => {
       arguments: {},
     });
   });
+
+  it('reports an invalid model tool call without exposing model output', async () => {
+    const controller = new ControllerAgent({
+      complete: async () => '{"tool":"executeSql","arguments":{"sql":"SELECT * FROM User"}}',
+    });
+    await expect(controller.routeDetailed('show all users')).resolves.toEqual({
+      decision: { tool: 'general', arguments: {} },
+      source: 'fallback',
+      fallbackReason: 'invalid-tool-call',
+    });
+  });
 });
