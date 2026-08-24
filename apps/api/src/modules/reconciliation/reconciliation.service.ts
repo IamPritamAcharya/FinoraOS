@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { ExceptionStatus } from '@finora/platform';
+import { ExceptionStatus, money } from '@finora/platform';
 import { apiLogger } from '../../common/api-logger.js';
 import {
   runReconciliation,
@@ -47,6 +47,41 @@ export class ReconciliationService {
       include: { evidence: true, agentRuns: { include: { steps: true } } },
       orderBy: { createdAt: 'desc' },
     });
+  }
+  async exceptionByExternalId(externalId: string) {
+    return this.prisma.exception.findFirst({
+      where: { organizationId: org(), externalId: externalId.toUpperCase() },
+      include: { evidence: true, agentRuns: { include: { steps: true } } },
+    });
+  }
+  async exceptionsForChat(minimumAmount?: string) {
+    const exceptions = await this.prisma.exception.findMany({
+      where: {
+        organizationId: org(),
+        status: { in: ['OPEN', 'NEEDS_REVIEW', 'UNRESOLVED', 'PROPOSED'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    const minimum = minimumAmount ? money(minimumAmount) : null;
+    return exceptions
+      .map((exception) => ({
+        exception,
+        variance: money(exception.expectedAmount.toString()).minus(
+          exception.receivedAmount.toString(),
+        ),
+      }))
+      .filter(({ variance }) => !minimum || variance.abs().greaterThan(minimum))
+      .sort((left, right) => right.variance.abs().comparedTo(left.variance.abs()))
+      .slice(0, 7)
+      .map(({ exception, variance }) => ({
+        id: exception.id,
+        externalId: exception.externalId,
+        status: exception.status,
+        type: exception.type,
+        reason: exception.reason,
+        variance: variance.toFixed(2),
+      }));
   }
   async approve(id: string) {
     return this.prisma.exception.update({

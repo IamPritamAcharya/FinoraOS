@@ -64,6 +64,8 @@ The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, cl
 | Deterministic reconciliation | Exact-reference, settlement-relationship, date-window, and explicit composite-score matching. Ambiguous cases are never forced into a match.                        |
 | Exception persistence        | Reconciliation runs persist matches, exceptions, exception evidence, metrics, and audit events transactionally.                                                     |
 | Settlement Q&A               | Ask Finora about `STL_0001`; amounts and variance are calculated deterministically, then a configured AI gateway may provide a constrained qualitative explanation. |
+| Exception investigation chat | Ask `Investigate EXC_005.`; Finora invokes the controlled investigator, stores an agent-run/proposal/audit record, and renders the approval-pending result.         |
+| Controlled chat controller   | Bounded conversation context routes approved settlement, exception, cash forecast, tax mismatch, and exception-list requests to typed backend tools—never SQL.      |
 | General Finora conversation  | Greetings, product-identity, and navigation questions use the configured model under a no-invented-finance-data system guardrail.                                   |
 | AI providers                 | API-key-first gateway selection for Gemini, Groq, and OpenRouter; local Ollama fallback; explicit mock only for tests.                                              |
 | Synthetic demo               | Reproducible Acme Commerce India data: 120 transactions, 12 settlements, invoices/tax lines, and seeded exceptions.                                                 |
@@ -81,9 +83,12 @@ The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, cl
 1. Open **Finora** at `http://localhost:3000`.
 2. Ask: `Why was settlement STL_0001 short?`
 3. See the deterministic settlement breakdown: expected amount, received amount, gateway fee, GST, refund, and the explained variance.
-4. Open **Reconciliation** to inspect the latest measured run.
-5. Open **Exceptions** to inspect the queue and its supporting reasons.
-6. Run the evaluation harness to demonstrate batch-level accuracy—not a cherry-picked result.
+4. Ask: `Investigate EXC_005.` See the AI-assisted qualitative explanation and typed proposal. This creates no financial adjustment and requires a later approval step.
+5. Follow up with: `What does the gateway fee mean?` Finora carries forward the bounded settlement context and retrieves the same controlled record.
+6. Ask: `Show unresolved exceptions above ₹25,000.`, `What is our expected cash position this week?`, or `Which GST lines failed to match?`
+7. Open **Reconciliation** to inspect the latest measured run.
+8. Open **Exceptions** to inspect the queue and its supporting reasons.
+9. Run the evaluation harness to demonstrate batch-level accuracy—not a cherry-picked result.
 
 The app supports normal route navigation. Chat threads restore from browser storage so a finance user can check another workspace view and continue the same conversation.
 
@@ -175,6 +180,14 @@ Why was settlement STL_0001 short?
 ```
 
 Finora calculates the amounts itself. The model can only contribute a concise, number-free qualitative explanation; it cannot generate SQL or mutate financial records.
+
+For the AI-backed exception workflow, ask:
+
+```text
+Investigate EXC_005.
+```
+
+Finora invokes the existing Exception Investigator with controlled evidence. It persists only an agent run, a typed **proposal**, and an audit event; raw imported records are not changed, and no proposal is approved or closed from chat.
 
 The API emits compact human-readable logs in development and structured JSON logs in production for gateway selection, completions, hosted-to-local fallback, request completion, reconciliation runs, and exception investigations. Prompts, API keys, authorization headers, and credentials are never logged.
 

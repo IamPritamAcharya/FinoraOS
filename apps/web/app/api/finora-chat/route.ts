@@ -7,6 +7,13 @@ type IncomingMessage = {
   parts?: Array<{ type?: string; text?: string }>;
 };
 
+const messageText = (message: IncomingMessage) =>
+  message.parts
+    ?.filter((part) => part.type === 'text')
+    .map((part) => part.text ?? '')
+    .join('')
+    .trim() ?? '';
+
 const textResponse = (text: string, status = 200) =>
   new Response(text, {
     status,
@@ -26,11 +33,7 @@ export async function POST(request: NextRequest) {
   const latestUserMessage = [...(payload.messages ?? [])]
     .reverse()
     .find((message) => message.role === 'user');
-  const message = latestUserMessage?.parts
-    ?.filter((part) => part.type === 'text')
-    .map((part) => part.text ?? '')
-    .join('')
-    .trim();
+  const message = latestUserMessage ? messageText(latestUserMessage) : '';
   if (!message) return textResponse('Ask Finora a finance operations question to begin.', 400);
 
   const api =
@@ -39,7 +42,17 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${api}/chat`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({
+        message,
+        context: (payload.messages ?? [])
+          .slice(-12)
+          .filter(
+            (item): item is IncomingMessage & { role: 'user' | 'assistant' } =>
+              item.role === 'user' || item.role === 'assistant',
+          )
+          .map((item) => ({ role: item.role, text: messageText(item) }))
+          .filter((item) => item.text.length > 0),
+      }),
       cache: 'no-store',
     });
     if (!response.ok)

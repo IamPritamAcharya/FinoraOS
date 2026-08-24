@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Amount, FinoraButton, StatusBadge } from '@finora/ui';
 import { AppSidebar, type WorkspaceView } from './components/app-sidebar';
@@ -83,6 +83,11 @@ export default function Workspace() {
     [overview],
   );
   const open = exceptions.filter((item) => item.status !== 'RESOLVED');
+  const refreshExceptions = useCallback(async () => {
+    const latest = await get('/reconciliation/exceptions');
+    setExceptions(latest);
+    if (workspaceCache) workspaceCache = { ...workspaceCache, exceptions: latest };
+  }, []);
   const investigate = async (id: string) => {
     const response = await fetch(`${api}/agents/exceptions/${id}/investigate`, { method: 'POST' });
     if (response.ok) {
@@ -118,7 +123,13 @@ export default function Workspace() {
         ) : page === 'Overview' ? (
           <Overview cards={cards} run={run} open={open} setPage={navigate} />
         ) : page === 'Chat' ? (
-          <FinoraChat settlements={settlements} onViewSettlement={() => navigate('Records')} />
+          <FinoraChat
+            settlements={settlements}
+            exceptions={exceptions}
+            onViewSettlement={() => navigate('Records')}
+            onViewException={() => navigate('Exceptions')}
+            onInvestigationCompleted={refreshExceptions}
+          />
         ) : page === 'Records' ? (
           <Records items={transactions} />
         ) : page === 'Reconciliation' ? (

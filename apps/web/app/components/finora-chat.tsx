@@ -18,9 +18,9 @@ const suggestions = [
     detail: 'Break down a variance',
   },
   {
-    title: 'Review exceptions',
-    prompt: 'Show unresolved exceptions above ₹25,000.',
-    detail: 'Prioritise what needs review',
+    title: 'Investigate an exception',
+    prompt: 'Investigate EXC_005.',
+    detail: 'Propose a safe resolution',
   },
   {
     title: 'Find a cash risk',
@@ -98,6 +98,56 @@ function SettlementEvidence({
   );
 }
 
+function ExceptionInvestigation({
+  exception,
+  onViewException,
+}: {
+  exception: Data;
+  onViewException: () => void;
+}) {
+  const resolution = exception.resolution as Data | undefined;
+  const action = resolution?.proposedActions?.[0] as Data | undefined;
+  const actionLabel = action?.type
+    ? String(action.type).replaceAll('_', ' ').toLowerCase()
+    : 'human review';
+  return (
+    <section
+      className={styles.exceptionCard}
+      aria-label={`Investigation for ${exception.externalId}`}
+    >
+      <div className={styles.evidenceHead}>
+        <div>
+          <span className={styles.cardKicker}>Exception investigation</span>
+          <strong>{exception.externalId}</strong>
+        </div>
+        <StatusBadge status={exception.status} />
+      </div>
+      <p>{exception.reason}</p>
+      <dl>
+        <div>
+          <dt>Confidence</dt>
+          <dd>{Math.round(Number(exception.confidence) * 100)}%</dd>
+        </div>
+        <div>
+          <dt>Proposed action</dt>
+          <dd className={styles.actionLabel}>{actionLabel}</dd>
+        </div>
+      </dl>
+      <p className={styles.exceptionGuardrail}>
+        Proposal only — no financial record was changed or approved.
+      </p>
+      <FinoraButton
+        className={styles.evidenceLink}
+        variant="ghost"
+        size="small"
+        onClick={onViewException}
+      >
+        View exception <FinoraIcon name="chevronRight" />
+      </FinoraButton>
+    </section>
+  );
+}
+
 function ResponseState() {
   return (
     <div className={styles.investigation} aria-live="polite">
@@ -112,10 +162,16 @@ const newThreadId = () =>
 
 export function FinoraChat({
   settlements,
+  exceptions,
   onViewSettlement,
+  onViewException,
+  onInvestigationCompleted,
 }: {
   settlements: Data[];
+  exceptions: Data[];
   onViewSettlement: () => void;
+  onViewException: () => void;
+  onInvestigationCompleted: () => void;
 }) {
   const transport = useMemo(() => new TextStreamChatTransport({ api: '/api/finora-chat' }), []);
   const { messages, sendMessage, status, error, stop, setMessages } = useChat({
@@ -183,6 +239,19 @@ export function FinoraChat({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [historyReady, isWorking, messages.length]);
+
+  const latestInvestigationReference = useMemo(() => {
+    const latestAssistantMessage = [...messages]
+      .reverse()
+      .find((message) => message.role === 'assistant');
+    return latestAssistantMessage
+      ? messageText(latestAssistantMessage).match(/\bEXC_\d{3}\b/i)?.[0]
+      : undefined;
+  }, [messages]);
+
+  useEffect(() => {
+    if (latestInvestigationReference) void onInvestigationCompleted();
+  }, [latestInvestigationReference, onInvestigationCompleted]);
 
   const send = async (text = input) => {
     const value = text.trim();
@@ -256,7 +325,7 @@ export function FinoraChat({
                   <p className={styles.welcomeKicker}>FINORA</p>
                   <h1 className={styles.welcomeHeading}>What can I help you reconcile?</h1>
                   <p className={styles.welcomeHelper}>
-                    Ask about settlements, exceptions, records, or the cash position.
+                    Ask about settlements, exceptions, cash position, or tax matching.
                   </p>
                   <div className={styles.suggestionGrid}>
                     {suggestions.map((suggestion) => (
@@ -284,6 +353,10 @@ export function FinoraChat({
                   message.role === 'assistant'
                     ? settlements.find((item) => text.includes(item.externalId))
                     : undefined;
+                const exception =
+                  message.role === 'assistant'
+                    ? exceptions.find((item) => text.includes(item.externalId))
+                    : undefined;
                 return (
                   <article
                     className={`${styles.message} ${message.role === 'assistant' ? styles.assistantMessage : ''}`}
@@ -303,6 +376,12 @@ export function FinoraChat({
                         <SettlementEvidence
                           settlement={settlement}
                           onViewSettlement={onViewSettlement}
+                        />
+                      )}
+                      {exception?.resolution && (
+                        <ExceptionInvestigation
+                          exception={exception}
+                          onViewException={onViewException}
                         />
                       )}
                     </div>

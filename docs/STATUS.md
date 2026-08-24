@@ -1,7 +1,7 @@
 # FinoraOS Status
 
 Last updated: 2026-08-24
-Current phase: Configured AI gateway and operational logging implemented; product-loop integration in progress
+Current phase: Controlled multi-tool chat routing implemented; approval/rerun product loop in progress
 Last verified commit: see `git log -1`
 
 ## Current state
@@ -28,6 +28,9 @@ The repository contains a functional V1 architecture and web/API implementation.
 - Exception investigation is now routed through the same configured API gateway as settlement chat; agent output remains guarded and cannot determine amounts or resolution state.
 - Structured Pino logs now cover request completion with correlation IDs, AI selection/completion/fallback, deterministic reconciliation metrics, and exception-investigation lifecycle. Credentials and prompts are not logged.
 - General Finora conversation now calls the configured gateway rather than repeating a static fallback; settlement math and record-specific answers remain deterministic and controlled.
+- Chat now recognizes a controlled exception reference such as `Investigate EXC_005.`, invokes the existing Exception Investigator through the configured AI gateway, and renders its typed proposal in chat. The operation writes only derived agent/proposal/audit records in one database transaction; it never changes raw imported records or approves/closes an exception.
+- The deterministic Controller Agent now routes bounded conversation context to approved settlement lookup, exception lookup/investigation, exception list, cash forecast, and tax-mismatch tools. Follow-up settlement questions reuse a prior controlled ID; generic model requests never receive database access or conversation evidence.
+- Finance overview and forecast aggregation now use the shared Decimal money helper instead of `Number(...)` arithmetic.
 
 ## In progress
 
@@ -37,7 +40,8 @@ The repository contains a functional V1 architecture and web/API implementation.
 
 1. Add a controlled reconciliation-run trigger and actual run metrics/exception evidence to the web UI.
 2. Support approval → rerun → close/escalate in the UI, including visible agent/tool activity.
-3. Replace remaining `Number(...)` money calculations in finance overview/forecast and make cash forecast/tax matching data-driven.
+3. Render structured result cards/tables for chat exception lists, cash forecast, and tax mismatches instead of the current evidence-grounded text rows.
+4. Make cash forecast/tax matching more data-driven and expand controlled chat tools to record search and reconciliation-run status.
 
 ## Known issues
 

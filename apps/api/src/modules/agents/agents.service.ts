@@ -4,6 +4,9 @@ import { apiLogger } from '../../common/api-logger.js';
 import { AI_GATEWAY, type AiGateway } from '../../gateways/ai/ai.gateway.js';
 import { ExceptionInvestigatorAiGateway } from '../../gateways/ai/exception-investigator-ai.gateway.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+
+const organizationId = () => process.env.DEMO_ORGANIZATION_ID ?? 'demo-org';
+
 @Injectable()
 export class AgentsService {
   constructor(
@@ -12,8 +15,8 @@ export class AgentsService {
   ) {}
   async investigate(exceptionId: string) {
     apiLogger.info('Exception investigation started', { exceptionId });
-    const exception = await this.prisma.exception.findUnique({
-      where: { id: exceptionId },
+    const exception = await this.prisma.exception.findFirst({
+      where: { id: exceptionId, organizationId: organizationId() },
       include: { evidence: true },
     });
     if (!exception) {
@@ -46,42 +49,45 @@ export class AgentsService {
       confidence: result.confidence,
     });
     const resultJson = JSON.parse(JSON.stringify(result));
-    const agentRun = await this.prisma.agentRun.create({
-      data: {
-        organizationId: exception.organizationId,
-        exceptionId,
-        agentType: 'EXCEPTION_INVESTIGATOR',
-        status: result.status,
-        input: { exceptionId },
-        output: resultJson,
-        completedAt: new Date(),
-        steps: {
-          create: [
-            { label: 'Fetched controlled settlement evidence' },
-            { label: 'Calculated deterministic settlement breakdown' },
-            { label: 'Validated typed proposed action' },
-          ],
+    const agentRun = await this.prisma.$transaction(async (tx) => {
+      const createdRun = await tx.agentRun.create({
+        data: {
+          organizationId: exception.organizationId,
+          exceptionId,
+          agentType: 'EXCEPTION_INVESTIGATOR',
+          status: result.status,
+          input: { exceptionId },
+          output: resultJson,
+          completedAt: new Date(),
+          steps: {
+            create: [
+              { label: 'Fetched controlled settlement evidence' },
+              { label: 'Calculated deterministic settlement breakdown' },
+              { label: 'Validated typed proposed action' },
+            ],
+          },
         },
-      },
-    });
-    await this.prisma.exception.update({
-      where: { id: exceptionId },
-      data: {
-        status: result.status,
-        confidence: result.confidence,
-        reason: result.reason,
-        resolution: resultJson,
-      },
-    });
-    await this.prisma.auditLog.create({
-      data: {
-        organizationId: exception.organizationId,
-        actor: 'Exception Investigator',
-        action: 'PROPOSED_RESOLUTION',
-        entityType: 'Exception',
-        entityId: exceptionId,
-        details: { agentRunId: agentRun.id, confidence: result.confidence },
-      },
+      });
+      await tx.exception.update({
+        where: { id: exceptionId },
+        data: {
+          status: result.status,
+          confidence: result.confidence,
+          reason: result.reason,
+          resolution: resultJson,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: exception.organizationId,
+          actor: 'Exception Investigator',
+          action: 'PROPOSED_RESOLUTION',
+          entityType: 'Exception',
+          entityId: exceptionId,
+          details: { agentRunId: createdRun.id, confidence: result.confidence },
+        },
+      });
+      return createdRun;
     });
     apiLogger.info('Exception investigation persisted', {
       exceptionId,
@@ -89,5 +95,14 @@ export class AgentsService {
       status: result.status,
     });
     return result;
+  }
+
+  async investigateByExternalId(externalId: string) {
+    const exception = await this.prisma.exception.findFirst({
+      where: { externalId: externalId.toUpperCase(), organizationId: organizationId() },
+      select: { id: true, externalId: true },
+    });
+    if (!exception) return null;
+    return { externalId: exception.externalId, result: await this.investigate(exception.id) };
   }
 }

@@ -343,6 +343,53 @@
   padding: 18px 18px 14px;
 }
 
+.exceptionCard {
+  max-width: 460px;
+  margin-top: 14px;
+  border: 1px solid #c8daf0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fbfdff, #f4f8fe);
+  padding: 18px 18px 14px;
+}
+
+.exceptionCard > p {
+  margin: 0 0 14px;
+  color: #465974;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.exceptionCard dl {
+  display: grid;
+  grid-template-columns: 0.75fr 1.25fr;
+  gap: 12px 16px;
+  margin: 0;
+}
+
+.exceptionCard dt {
+  margin-bottom: 2px;
+  color: var(--finora-text-muted);
+  font-size: 11px;
+}
+
+.exceptionCard dd {
+  margin: 0;
+  color: var(--finora-text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+}
+
+.exceptionCard .actionLabel {
+  text-transform: capitalize;
+}
+
+.exceptionCard .exceptionGuardrail {
+  margin: 14px 0 0;
+  color: var(--finora-text-muted);
+  font-size: 11px;
+}
+
 .evidenceHead {
   display: flex;
   align-items: flex-start;
