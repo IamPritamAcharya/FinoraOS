@@ -64,6 +64,7 @@ async function main() {
   }
   if ((await wait(run(['infra:up']))) !== 0) return shutdown(1);
   if ((await wait(run(['db:deploy']))) !== 0) return shutdown(1);
+  if ((await wait(run(['db:agent-role']))) !== 0) return shutdown(1);
   if (process.env.FINORA_SEED_ON_DEV !== '0' && (await wait(run(['db:seed']))) !== 0) {
     return shutdown(1);
   }

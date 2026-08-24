@@ -3,47 +3,60 @@ import { ControllerAgent, type ChatContextEntry } from '@finora/agents';
 import { formatInr, money } from '@finora/platform';
 import { apiLogger } from '../../common/api-logger.js';
 import { AI_GATEWAY, type AiGateway } from '../../gateways/ai/ai.gateway.js';
-import { FinanceService } from '../finance/finance.service.js';
 import { AgentsService } from '../agents/agents.service.js';
-import { ReconciliationService } from '../reconciliation/reconciliation.service.js';
+import { AgentReadService } from '../agents/agent-read.service.js';
 
-const controller = new ControllerAgent();
 @Injectable()
 export class ChatService {
   constructor(
     @Inject(AI_GATEWAY) private readonly ai: AiGateway,
-    private readonly finance: FinanceService,
     private readonly agents: AgentsService,
-    private readonly reconciliation: ReconciliationService,
+    private readonly agentRead: AgentReadService,
   ) {}
   async respond(message: string, context: ChatContextEntry[] = []) {
-    const decision = controller.route(message, context);
+    const decision = await new ControllerAgent({
+      complete: async (input) => (await this.ai.complete(input)).text,
+    }).route(message, context);
     apiLogger.info('Chat request routed to controlled capability', {
-      intent: decision.intent,
-      reference: decision.reference,
+      tool: decision.tool,
       hasConversationContext: context.length > 0,
     });
-    switch (decision.intent) {
-      case 'SETTLEMENT_LOOKUP':
-        return this.settlementResponse(decision.reference!);
-      case 'EXCEPTION_LOOKUP':
-        return this.exceptionResponse(decision.reference!);
-      case 'EXCEPTION_INVESTIGATION':
-        return this.investigateException(decision.reference!);
-      case 'EXCEPTION_LIST':
-        return this.exceptionListResponse(decision.minimumAmount);
-      case 'CASH_FORECAST':
+    switch (decision.tool) {
+      case 'getSettlement':
+        return this.settlementResponse(decision.arguments.settlementId);
+      case 'getException':
+        return this.exceptionResponse(decision.arguments.exceptionId);
+      case 'investigateException':
+        return this.investigateException(decision.arguments.exceptionId);
+      case 'findExceptions':
+        return this.exceptionListResponse(decision.arguments.minimumAmount);
+      case 'getCashForecast':
         return this.cashForecastResponse();
-      case 'TAX_MISMATCH_LIST':
+      case 'findUnmatchedTaxLines':
         return this.taxMismatchResponse();
-      case 'GENERAL':
+      case 'findTransactions':
+        return this.transactionsResponse(decision.arguments);
+      case 'findInvoices':
+        return this.invoicesResponse(decision.arguments.limit);
+      case 'findAuditEvents':
+        return this.auditEventsResponse(decision.arguments.limit);
+      case 'findAgentRuns':
+        return this.agentRunsResponse(decision.arguments.limit);
+      case 'findReconciliationRuns':
+        return this.reconciliationRunsResponse(decision.arguments.limit);
+      case 'getExceptionEvidence':
+        return this.exceptionEvidenceResponse(decision.arguments.exceptionId);
+      case 'getOrganizationSummary':
+        return this.organizationUserCountResponse();
+      case 'listOrganizationUsers':
+        return this.organizationUserListResponse();
+      case 'general':
         return { kind: 'general', text: await this.safeGeneralResponse(message) };
     }
   }
 
   private async settlementResponse(reference: string) {
-    const settlements = await this.finance.settlements();
-    const found = settlements.find((item) => item.externalId === reference);
+    const found = await this.agentRead.getSettlement('demo-org', reference);
     if (found) {
       apiLogger.info('Settlement chat request matched controlled record', {
         settlementId: found.externalId,
@@ -75,7 +88,7 @@ export class ChatService {
   }
 
   private async exceptionResponse(reference: string) {
-    const exception = await this.reconciliation.exceptionByExternalId(reference);
+    const exception = await this.agentRead.getException('demo-org', reference);
     if (!exception) {
       return {
         kind: 'exception-not-found',
@@ -122,7 +135,7 @@ export class ChatService {
   }
 
   private async exceptionListResponse(minimumAmount?: string) {
-    const exceptions = await this.reconciliation.exceptionsForChat(minimumAmount);
+    const exceptions = await this.agentRead.findExceptions('demo-org', minimumAmount);
     if (!exceptions.length) {
       return {
         kind: 'exception-list',
@@ -131,7 +144,7 @@ export class ChatService {
     }
     const rows = exceptions.map(
       (item) =>
-        `${item.externalId} · ${formatInr(item.variance)} · ${item.status.toLowerCase().replaceAll('_', ' ')}`,
+        `${item.externalId} · ${formatInr(item.expectedAmount.minus(item.receivedAmount))} · ${item.status.toLowerCase().replaceAll('_', ' ')}`,
     );
     return {
       kind: 'exception-list',
@@ -144,9 +157,10 @@ Ask “Investigate EXC_###” to create a proposal for one exception.`,
   }
 
   private async cashForecastResponse() {
-    const forecast = await this.finance.forecast();
+    const forecast = await this.agentRead.cashForecast('demo-org');
     const rows = forecast.map(
-      (item) => `${item.day} · ${formatInr(item.amount)}${item.risk ? ' · shortfall risk' : ''}`,
+      (item) =>
+        `${item.day} · ${formatInr(item.amount.toString())}${item.risk ? ' · shortfall risk' : ''}`,
     );
     return {
       kind: 'cash-forecast',
@@ -156,8 +170,7 @@ Ask “Investigate EXC_###” to create a proposal for one exception.`,
   }
 
   private async taxMismatchResponse() {
-    const taxLines = await this.finance.taxLines();
-    const unmatched = taxLines.filter((line) => !line.matched).slice(0, 10);
+    const unmatched = await this.agentRead.findUnmatchedTaxLines('demo-org');
     if (!unmatched.length)
       return { kind: 'tax-mismatch-list', text: 'All available tax lines are matched.' };
     const rows = unmatched.map(
@@ -167,6 +180,87 @@ Ask “Investigate EXC_###” to create a proposal for one exception.`,
       kind: 'tax-mismatch-list',
       text: `${unmatched.length} tax line${unmatched.length === 1 ? '' : 's'} need matching:\n${rows.join('\n')}\n\nThese are deterministic seeded tax-line relationships; investigation of ambiguous tax evidence is the next controlled workflow.`,
       taxLines: unmatched,
+    };
+  }
+
+  private async organizationUserCountResponse() {
+    const summary = await this.agentRead.organizationSummary('demo-org');
+    return {
+      kind: 'organization-user-count',
+      text: `There ${summary.users === 1 ? 'is' : 'are'} ${summary.users} user${summary.users === 1 ? '' : 's'} in this organization. This answer was read through the tenant-scoped agent database role.`,
+    };
+  }
+
+  private async organizationUserListResponse() {
+    const users = await this.agentRead.listUsers('demo-org');
+    return {
+      kind: 'organization-user-list',
+      text: users.length
+        ? `Organization users:\n${users.map((user) => `${user.name} · ${user.email}`).join('\n')}`
+        : 'No users were found in this organization.',
+    };
+  }
+
+  private async transactionsResponse(input: {
+    minimumAmount?: string;
+    status?: 'CAPTURED' | 'REFUNDED' | 'PENDING';
+    limit?: number;
+  }) {
+    const rows = await this.agentRead.findTransactions('demo-org', {
+      minimumAmount: input.minimumAmount,
+      status: input.status,
+      take: input.limit,
+    });
+    return {
+      kind: 'transactions',
+      text: rows.length
+        ? `Transactions:\n${rows.map((row) => `${row.externalId} · ${formatInr(row.amount.toString())} · ${row.status}`).join('\n')}`
+        : 'No transactions matched those filters.',
+    };
+  }
+  private async invoicesResponse(limit?: number) {
+    const rows = await this.agentRead.findInvoices('demo-org', limit);
+    return {
+      kind: 'invoices',
+      text: rows.length
+        ? `Invoices:\n${rows.map((row) => `${row.externalId} · ${formatInr(row.amount.toString())}`).join('\n')}`
+        : 'No invoices were found.',
+    };
+  }
+  private async auditEventsResponse(limit?: number) {
+    const rows = await this.agentRead.findAuditEvents('demo-org', limit);
+    return {
+      kind: 'audit-events',
+      text: rows.length
+        ? `Recent audit events:\n${rows.map((row) => `${row.actor} · ${row.action} · ${row.entityType}`).join('\n')}`
+        : 'No audit events were found.',
+    };
+  }
+  private async agentRunsResponse(limit?: number) {
+    const rows = await this.agentRead.findAgentRuns('demo-org', limit);
+    return {
+      kind: 'agent-runs',
+      text: rows.length
+        ? `Recent agent activity:\n${rows.map((row) => `${row.agentType} · ${row.status}`).join('\n')}`
+        : 'No agent runs were found.',
+    };
+  }
+  private async reconciliationRunsResponse(limit?: number) {
+    const rows = await this.agentRead.findReconciliationRuns('demo-org', limit);
+    return {
+      kind: 'reconciliation-runs',
+      text: rows.length
+        ? `Reconciliation runs:\n${rows.map((row) => `${row.status} · ${row.recordsProcessed} records · ${row.exceptionsGenerated} exceptions`).join('\n')}`
+        : 'No reconciliation runs were found.',
+    };
+  }
+  private async exceptionEvidenceResponse(exceptionId: string) {
+    const rows = await this.agentRead.findExceptionEvidence('demo-org', exceptionId);
+    return {
+      kind: 'exception-evidence',
+      text: rows.length
+        ? `Evidence for ${exceptionId}:\n${rows.map((row) => `${row.label}${row.referenceId ? ` · ${row.referenceId}` : ''}`).join('\n')}`
+        : `No evidence was found for ${exceptionId}.`,
     };
   }
 

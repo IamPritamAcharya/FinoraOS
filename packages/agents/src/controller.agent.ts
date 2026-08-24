@@ -1,77 +1,86 @@
-export type ChatContextEntry = {
-  role: 'user' | 'assistant';
-  text: string;
-};
+import { z } from 'zod';
 
-export type ControllerIntent =
-  | 'SETTLEMENT_LOOKUP'
-  | 'EXCEPTION_LOOKUP'
-  | 'EXCEPTION_INVESTIGATION'
-  | 'EXCEPTION_LIST'
-  | 'CASH_FORECAST'
-  | 'TAX_MISMATCH_LIST'
-  | 'GENERAL';
+export type ChatContextEntry = { role: 'user' | 'assistant'; text: string };
 
-export type ControllerDecision = {
-  intent: ControllerIntent;
-  reference?: string;
-  minimumAmount?: string;
-};
-
-const settlementReference = /\bSTL_\d{4}\b/i;
-const exceptionReference = /\bEXC_\d{3}\b/i;
-const investigationIntent = /\b(investigate|review|analyse|analyze)\b/i;
-const exceptionListIntent =
-  /\b(show|list|find)\b.*\b(unreconciled|open|unresolved|exceptions?)\b|\b(unreconciled|open|unresolved)\b.*\btransactions?\b/i;
-const cashIntent = /\b(cash|cash position|cashflow|cash flow|forecast)\b/i;
-const taxIntent =
-  /\b(tax|gst|tds)\b.*\b(match|mismatch|unmatched|failed)\b|\b(unmatched|failed)\b.*\b(tax|gst|tds)\b/i;
-
-const referenceFrom = (pattern: RegExp, text: string) => text.match(pattern)?.[0]?.toUpperCase();
-
-const contextReference = (pattern: RegExp, context: ChatContextEntry[]) => {
-  for (const entry of [...context].reverse()) {
-    const reference = referenceFrom(pattern, entry.text);
-    if (reference) return reference;
-  }
-  return undefined;
-};
-
-const minimumAmount = (text: string) => {
-  const match = text.match(/(?:₹|\bINR\s*)([\d,]+(?:\.\d{1,2})?)/i);
-  return match ? match[1].replaceAll(',', '') : undefined;
-};
-
-/**
- * A deterministic controller for the small, explicitly-approved V1 tool set.
- * It never asks an LLM to select arbitrary database access.
- */
+const ToolCallSchema = z.discriminatedUnion('tool', [
+  z.object({ tool: z.literal('getOrganizationSummary'), arguments: z.object({}) }),
+  z.object({
+    tool: z.literal('listOrganizationUsers'),
+    arguments: z.object({ limit: z.number().int().min(1).max(100).optional() }),
+  }),
+  z.object({
+    tool: z.literal('getSettlement'),
+    arguments: z.object({ settlementId: z.string().regex(/^STL_\d{4}$/) }),
+  }),
+  z.object({
+    tool: z.literal('getException'),
+    arguments: z.object({ exceptionId: z.string().regex(/^EXC_\d{3}$/) }),
+  }),
+  z.object({
+    tool: z.literal('investigateException'),
+    arguments: z.object({ exceptionId: z.string().regex(/^EXC_\d{3}$/) }),
+  }),
+  z.object({
+    tool: z.literal('findExceptions'),
+    arguments: z.object({
+      minimumAmount: z
+        .string()
+        .regex(/^\d+(\.\d{1,2})?$/)
+        .optional(),
+    }),
+  }),
+  z.object({ tool: z.literal('getCashForecast'), arguments: z.object({}) }),
+  z.object({ tool: z.literal('findUnmatchedTaxLines'), arguments: z.object({}) }),
+  z.object({
+    tool: z.literal('findTransactions'),
+    arguments: z.object({
+      minimumAmount: z
+        .string()
+        .regex(/^\d+(\.\d{1,2})?$/)
+        .optional(),
+      status: z.enum(['CAPTURED', 'REFUNDED', 'PENDING']).optional(),
+      limit: z.number().int().min(1).max(100).optional(),
+    }),
+  }),
+  z.object({
+    tool: z.literal('findInvoices'),
+    arguments: z.object({ limit: z.number().int().min(1).max(100).optional() }),
+  }),
+  z.object({
+    tool: z.literal('findAuditEvents'),
+    arguments: z.object({ limit: z.number().int().min(1).max(100).optional() }),
+  }),
+  z.object({
+    tool: z.literal('findAgentRuns'),
+    arguments: z.object({ limit: z.number().int().min(1).max(100).optional() }),
+  }),
+  z.object({
+    tool: z.literal('findReconciliationRuns'),
+    arguments: z.object({ limit: z.number().int().min(1).max(100).optional() }),
+  }),
+  z.object({
+    tool: z.literal('getExceptionEvidence'),
+    arguments: z.object({ exceptionId: z.string().regex(/^EXC_\d{3}$/) }),
+  }),
+  z.object({ tool: z.literal('general'), arguments: z.object({}) }),
+]);
+export type ControllerDecision = z.infer<typeof ToolCallSchema>;
+export interface ControllerModel {
+  complete(input: { system: string; prompt: string }): Promise<string>;
+}
+const system = `You are the FinoraOS Controller. Return JSON only. Choose one allowed tool: getOrganizationSummary {}, listOrganizationUsers {limit?}, getSettlement {settlementId}, getException {exceptionId}, getExceptionEvidence {exceptionId}, investigateException {exceptionId}, findExceptions {minimumAmount?}, getCashForecast {}, findUnmatchedTaxLines {}, findTransactions {minimumAmount?,status?,limit?}, findInvoices {limit?}, findAuditEvents {limit?}, findAgentRuns {limit?}, findReconciliationRuns {limit?}, general {}. Use context for prior references. Investigate only on explicit request. Never write SQL, invent IDs, organization IDs, or tools.`;
 export class ControllerAgent {
-  route(message: string, context: ChatContextEntry[] = []): ControllerDecision {
-    const settlementId = referenceFrom(settlementReference, message);
-    const exceptionId = referenceFrom(exceptionReference, message);
-
-    if (settlementId) return { intent: 'SETTLEMENT_LOOKUP', reference: settlementId };
-    if (exceptionId) {
-      return {
-        intent: investigationIntent.test(message) ? 'EXCEPTION_INVESTIGATION' : 'EXCEPTION_LOOKUP',
-        reference: exceptionId,
-      };
+  constructor(private readonly model: ControllerModel) {}
+  async route(message: string, context: ChatContextEntry[] = []): Promise<ControllerDecision> {
+    try {
+      const text = await this.model.complete({
+        system,
+        prompt: JSON.stringify({ message, context: context.slice(-12) }),
+      });
+      const json = text.match(/\{[\s\S]*\}/)?.[0];
+      return ToolCallSchema.parse(JSON.parse(json ?? ''));
+    } catch {
+      return { tool: 'general', arguments: {} };
     }
-    if (exceptionListIntent.test(message)) {
-      return { intent: 'EXCEPTION_LIST', minimumAmount: minimumAmount(message) };
-    }
-    if (taxIntent.test(message)) return { intent: 'TAX_MISMATCH_LIST' };
-    if (cashIntent.test(message)) return { intent: 'CASH_FORECAST' };
-
-    if (/\b(fee|gst|refund|variance|short)\b/i.test(message)) {
-      const reference = contextReference(settlementReference, context);
-      if (reference) return { intent: 'SETTLEMENT_LOOKUP', reference };
-    }
-    if (/\b(it|this|that|why|explain|status)\b/i.test(message)) {
-      const reference = contextReference(exceptionReference, context);
-      if (reference) return { intent: 'EXCEPTION_LOOKUP', reference };
-    }
-    return { intent: 'GENERAL' };
   }
 }

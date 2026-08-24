@@ -1,7 +1,7 @@
 # FinoraOS Status
 
 Last updated: 2026-08-24
-Current phase: Controlled multi-tool chat routing implemented; approval/rerun product loop in progress
+Current phase: Model-routed, RLS-backed agent read foundation complete; approval/rerun product loop follows
 Last verified commit: see `git log -1`
 
 ## Current state
@@ -31,6 +31,9 @@ The repository contains a functional V1 architecture and web/API implementation.
 - Chat now recognizes a controlled exception reference such as `Investigate EXC_005.`, invokes the existing Exception Investigator through the configured AI gateway, and renders its typed proposal in chat. The operation writes only derived agent/proposal/audit records in one database transaction; it never changes raw imported records or approves/closes an exception.
 - The deterministic Controller Agent now routes bounded conversation context to approved settlement lookup, exception lookup/investigation, exception list, cash forecast, and tax-mismatch tools. Follow-up settlement questions reuse a prior controlled ID; generic model requests never receive database access or conversation evidence.
 - Finance overview and forecast aggregation now use the shared Decimal money helper instead of `Number(...)` arithmetic.
+- `pnpm dev` now provisions the separate local `finora_agent_ro` PostgreSQL role before seeding; `pnpm db:agent-role` is available for manual role provisioning.
+- The Controller Agent now asks the configured AI gateway to select a Zod-validated allowlisted tool call instead of relying on phrase regexes. The catalogue includes organization users, transactions, invoices, settlements, exceptions/evidence, tax lines, cash forecast, reconciliation runs, audit events, and agent runs.
+- Controlled agent reads now execute through the separate `finora_agent_ro` role with `SELECT` only, `NOBYPASSRLS`, read-only transactions, and organization RLS policies. A missing or wrong tenant context produces zero rows; the provisioning command verifies this live.
 
 ## In progress
 

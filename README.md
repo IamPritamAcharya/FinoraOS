@@ -58,18 +58,18 @@ The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, cl
 
 ## What is working in V1
 
-| Capability                   | What it does now                                                                                                                                                    |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Finance workspace            | Branded overview, Finora chat, records, reconciliation, and exceptions views over seeded backend data.                                                              |
-| Deterministic reconciliation | Exact-reference, settlement-relationship, date-window, and explicit composite-score matching. Ambiguous cases are never forced into a match.                        |
-| Exception persistence        | Reconciliation runs persist matches, exceptions, exception evidence, metrics, and audit events transactionally.                                                     |
-| Settlement Q&A               | Ask Finora about `STL_0001`; amounts and variance are calculated deterministically, then a configured AI gateway may provide a constrained qualitative explanation. |
-| Exception investigation chat | Ask `Investigate EXC_005.`; Finora invokes the controlled investigator, stores an agent-run/proposal/audit record, and renders the approval-pending result.         |
-| Controlled chat controller   | Bounded conversation context routes approved settlement, exception, cash forecast, tax mismatch, and exception-list requests to typed backend tools—never SQL.      |
-| General Finora conversation  | Greetings, product-identity, and navigation questions use the configured model under a no-invented-finance-data system guardrail.                                   |
-| AI providers                 | API-key-first gateway selection for Gemini, Groq, and OpenRouter; local Ollama fallback; explicit mock only for tests.                                              |
-| Synthetic demo               | Reproducible Acme Commerce India data: 120 transactions, 12 settlements, invoices/tax lines, and seeded exceptions.                                                 |
-| Evaluation harness           | Runs the same shared reconciliation package against checked-in input and ground truth.                                                                              |
+| Capability                   | What it does now                                                                                                                                                                                                                               |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Finance workspace            | Branded overview, Finora chat, records, reconciliation, and exceptions views over seeded backend data.                                                                                                                                         |
+| Deterministic reconciliation | Exact-reference, settlement-relationship, date-window, and explicit composite-score matching. Ambiguous cases are never forced into a match.                                                                                                   |
+| Exception persistence        | Reconciliation runs persist matches, exceptions, exception evidence, metrics, and audit events transactionally.                                                                                                                                |
+| Settlement Q&A               | Ask Finora about `STL_0001`; amounts and variance are calculated deterministically, then a configured AI gateway may provide a constrained qualitative explanation.                                                                            |
+| Exception investigation chat | Ask `Investigate EXC_005.`; Finora invokes the controlled investigator, stores an agent-run/proposal/audit record, and renders the approval-pending result.                                                                                    |
+| Controlled chat controller   | The configured model selects one Zod-validated tool from an explicit catalogue: organization users, transactions, invoices, settlements, exceptions/evidence, tax lines, forecast, reconciliation runs, audit events, or agent runs—never SQL. |
+| General Finora conversation  | Greetings, product-identity, and navigation questions use the configured model under a no-invented-finance-data system guardrail.                                                                                                              |
+| AI providers                 | API-key-first gateway selection for Gemini, Groq, and OpenRouter; local Ollama fallback; explicit mock only for tests.                                                                                                                         |
+| Synthetic demo               | Reproducible Acme Commerce India data: 120 transactions, 12 settlements, invoices/tax lines, and seeded exceptions.                                                                                                                            |
+| Evaluation harness           | Runs the same shared reconciliation package against checked-in input and ground truth.                                                                                                                                                         |
 
 ### Honest V1 boundaries
 
@@ -188,6 +188,16 @@ Investigate EXC_005.
 ```
 
 Finora invokes the existing Exception Investigator with controlled evidence. It persists only an agent run, a typed **proposal**, and an audit event; raw imported records are not changed, and no proposal is approved or closed from chat.
+
+### Tenant-safe agent reads
+
+`pnpm dev` provisions `finora_agent_ro` before seeding. This separate PostgreSQL identity has `SELECT` only, no sequence or inherited privileges, `NOBYPASSRLS`, and read-only transactions. Every controlled read sets a transaction-local organization context; PostgreSQL row-level security returns no rows when the context is absent or belongs to another tenant. You can re-run and verify the setup directly:
+
+```bash
+pnpm db:agent-role
+```
+
+The model never receives this connection URL or SQL access. It chooses only from the typed tool catalogue, and the API supplies the trusted organization context. V1 uses the seeded demo organization; JWT-derived organization context is the next authentication milestone.
 
 The API emits compact human-readable logs in development and structured JSON logs in production for gateway selection, completions, hosted-to-local fallback, request completion, reconciliation runs, and exception investigations. Prompts, API keys, authorization headers, and credentials are never logged.
 
