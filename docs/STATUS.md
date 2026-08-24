@@ -27,6 +27,7 @@ The repository contains a functional V1 architecture and web/API implementation.
 - API-key-first AI selection: Gemini, Groq, and OpenRouter can be configured; otherwise local Ollama is selected. Hosted completion failures retry through Ollama. Mock remains an explicit test/CI provider.
 - Exception investigation is now routed through the same configured API gateway as settlement chat; agent output remains guarded and cannot determine amounts or resolution state.
 - Structured Pino logs now cover request completion with correlation IDs, AI selection/completion/fallback, deterministic reconciliation metrics, and exception-investigation lifecycle. Credentials and prompts are not logged.
+- General Finora conversation now calls the configured gateway rather than repeating a static fallback; settlement math and record-specific answers remain deterministic and controlled.
 
 ## In progress
 

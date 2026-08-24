@@ -38,10 +38,10 @@ export class ChatService {
         settlement: found,
       };
     }
-    apiLogger.info('Chat request did not match a controlled finance workflow');
+    apiLogger.info('General chat request will use the configured AI gateway');
     return {
       kind: 'general',
-      text: 'I can investigate a settlement ID, show unresolved exceptions, or explain the seven-day cash forecast. I only use controlled finance data and never change records from chat.',
+      text: await this.safeGeneralResponse(message),
     };
   }
 
@@ -68,6 +68,32 @@ export class ChatService {
       return accepted ? response : fallback;
     } catch (error) {
       apiLogger.warn('Settlement chat AI explanation fell back to deterministic copy', {
+        error: error instanceof Error ? error.message : 'Unknown AI gateway error',
+      });
+      return fallback;
+    }
+  }
+
+  private async safeGeneralResponse(message: string) {
+    const fallback =
+      'I’m Finora, the FinoraOS finance operations assistant. I can help investigate settlements, reconciliation exceptions, records, and cash visibility using controlled financial evidence.';
+    try {
+      const completion = await this.ai.complete({
+        system:
+          'You are Finora, the conversational assistant inside FinoraOS. Answer greetings, identity questions, and navigation questions concisely and professionally. Do not claim to have accessed financial records unless controlled evidence was supplied. Never invent amounts, transactions, settlements, policies, or capabilities. For a finance-data question without a specific controlled record, explain what identifier or context is needed.',
+        prompt: message,
+      });
+      const response = completion.text.replace(/\s+/g, ' ').trim();
+      const accepted = response.length > 0 && response.length <= 420;
+      apiLogger.info('General chat AI response completed', {
+        provider: completion.provider,
+        model: completion.model,
+        fallbackFrom: completion.fallbackFrom,
+        accepted,
+      });
+      return accepted ? response : fallback;
+    } catch (error) {
+      apiLogger.warn('General chat AI response fell back to Finora introduction', {
         error: error instanceof Error ? error.message : 'Unknown AI gateway error',
       });
       return fallback;

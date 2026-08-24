@@ -98,13 +98,11 @@ function SettlementEvidence({
   );
 }
 
-function InvestigationState({ active }: { active: boolean }) {
+function ResponseState() {
   return (
     <div className={styles.investigation} aria-live="polite">
-      <span
-        className={`${styles.investigationDot} ${active ? styles.investigationDotActive : ''}`}
-      />
-      {active ? 'Checking linked financial records…' : 'Checked linked financial records'}
+      <span className={`${styles.investigationDot} ${styles.investigationDotActive}`} />
+      Finora is responding…
     </div>
   );
 }
@@ -307,12 +305,11 @@ export function FinoraChat({
                           onViewSettlement={onViewSettlement}
                         />
                       )}
-                      {message.role === 'assistant' && <InvestigationState active={false} />}
                     </div>
                   </article>
                 );
               })}
-              {isWorking && <InvestigationState active />}
+              {isWorking && <ResponseState />}
               {error && (
                 <div className={styles.error}>
                   Finora could not complete this request. Check the local API and try again.

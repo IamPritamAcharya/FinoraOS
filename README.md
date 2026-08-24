@@ -64,6 +64,7 @@ The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, cl
 | Deterministic reconciliation | Exact-reference, settlement-relationship, date-window, and explicit composite-score matching. Ambiguous cases are never forced into a match.                        |
 | Exception persistence        | Reconciliation runs persist matches, exceptions, exception evidence, metrics, and audit events transactionally.                                                     |
 | Settlement Q&A               | Ask Finora about `STL_0001`; amounts and variance are calculated deterministically, then a configured AI gateway may provide a constrained qualitative explanation. |
+| General Finora conversation  | Greetings, product-identity, and navigation questions use the configured model under a no-invented-finance-data system guardrail.                                   |
 | AI providers                 | API-key-first gateway selection for Gemini, Groq, and OpenRouter; local Ollama fallback; explicit mock only for tests.                                              |
 | Synthetic demo               | Reproducible Acme Commerce India data: 120 transactions, 12 settlements, invoices/tax lines, and seeded exceptions.                                                 |
 | Evaluation harness           | Runs the same shared reconciliation package against checked-in input and ground truth.                                                                              |
@@ -175,7 +176,7 @@ Why was settlement STL_0001 short?
 
 Finora calculates the amounts itself. The model can only contribute a concise, number-free qualitative explanation; it cannot generate SQL or mutate financial records.
 
-The API emits structured JSON logs for gateway selection, completions, hosted-to-local fallback, request completion, reconciliation runs, and exception investigations. Prompts, API keys, authorization headers, and credentials are never logged.
+The API emits compact human-readable logs in development and structured JSON logs in production for gateway selection, completions, hosted-to-local fallback, request completion, reconciliation runs, and exception investigations. Prompts, API keys, authorization headers, and credentials are never logged.
 
 ## Evaluation
 

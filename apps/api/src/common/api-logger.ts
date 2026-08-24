@@ -1,27 +1,74 @@
 import pino from 'pino';
+import { Writable } from 'node:stream';
 import { requestContext } from './request-context.js';
 
 export type ApiLogContext = Record<string, unknown>;
 
-const logger = pino({
-  level: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
-  base: { service: 'finora-api' },
-  timestamp: pino.stdTimeFunctions.isoTime,
-  redact: {
-    paths: [
-      'apiKey',
-      'api_key',
-      'authorization',
-      'headers.authorization',
-      'headers["x-goog-api-key"]',
-      'GEMINI_API_KEY',
-      'GROQ_API_KEY',
-      'OPENROUTER_API_KEY',
-      'RAZORPAY_KEY_SECRET',
-    ],
-    censor: '[REDACTED]',
+type PinoRecord = Record<string, unknown> & { level?: number; msg?: string; time?: string };
+
+const isDevelopment = process.env.NODE_ENV !== 'production';
+const hiddenLogFields = new Set([
+  'level',
+  'time',
+  'pid',
+  'hostname',
+  'msg',
+  'service',
+  'requestId',
+]);
+
+const formatValue = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));
+
+const developmentDestination = new Writable({
+  write(chunk, _encoding, callback) {
+    try {
+      const record = JSON.parse(chunk.toString()) as PinoRecord;
+      const timestamp = String(record.time ?? '').slice(11, 19);
+      const level = pino.levels.labels[Number(record.level)]?.toUpperCase() ?? 'INFO';
+      const requestId =
+        typeof record.requestId === 'string' ? ` req=${record.requestId.slice(0, 8)}` : '';
+      const context = Object.entries(record)
+        .filter(([key, value]) => !hiddenLogFields.has(key) && value !== undefined)
+        .map(([key, value]) => `${key}=${formatValue(value)}`)
+        .join(' ');
+      if (record.msg === 'HTTP request completed') {
+        process.stdout.write(
+          `${timestamp} ${level.padEnd(5)} HTTP ${record.statusCode} ${record.method} ${record.path} ${record.durationMs}ms${requestId}\n`,
+        );
+      } else {
+        process.stdout.write(
+          `${timestamp} ${level.padEnd(5)} ${record.msg ?? 'FinoraOS event'}${context ? ` ${context}` : ''}${requestId}\n`,
+        );
+      }
+      callback();
+    } catch (error) {
+      callback(error instanceof Error ? error : new Error('Unable to format development log.'));
+    }
   },
 });
+
+const logger = pino(
+  {
+    level: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+    base: { service: 'finora-api' },
+    timestamp: pino.stdTimeFunctions.isoTime,
+    redact: {
+      paths: [
+        'apiKey',
+        'api_key',
+        'authorization',
+        'headers.authorization',
+        'headers["x-goog-api-key"]',
+        'GEMINI_API_KEY',
+        'GROQ_API_KEY',
+        'OPENROUTER_API_KEY',
+        'RAZORPAY_KEY_SECRET',
+      ],
+      censor: '[REDACTED]',
+    },
+  },
+  isDevelopment ? developmentDestination : undefined,
+);
 
 const withRequestContext = (context?: ApiLogContext) => ({
   requestId: requestContext.get()?.requestId,
