@@ -1,15 +1,25 @@
-import { Injectable } from '@nestjs/common';
-import { ExceptionInvestigator, MockAiGateway } from '@finora/agents';
+import { Inject, Injectable } from '@nestjs/common';
+import { ExceptionInvestigator } from '@finora/agents';
+import { apiLogger } from '../../common/api-logger.js';
+import { AI_GATEWAY, type AiGateway } from '../../gateways/ai/ai.gateway.js';
+import { ExceptionInvestigatorAiGateway } from '../../gateways/ai/exception-investigator-ai.gateway.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 @Injectable()
 export class AgentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(AI_GATEWAY) private readonly ai: AiGateway,
+  ) {}
   async investigate(exceptionId: string) {
+    apiLogger.info('Exception investigation started', { exceptionId });
     const exception = await this.prisma.exception.findUnique({
       where: { id: exceptionId },
       include: { evidence: true },
     });
-    if (!exception) throw new Error('Exception not found');
+    if (!exception) {
+      apiLogger.warn('Exception investigation requested for missing exception', { exceptionId });
+      throw new Error('Exception not found');
+    }
     const investigator = new ExceptionInvestigator(
       {
         getSettlementEvidence: async () => {
@@ -26,9 +36,15 @@ export class AgentsService {
             : null;
         },
       },
-      new MockAiGateway(),
+      new ExceptionInvestigatorAiGateway(this.ai),
     );
     const result = await investigator.investigate(exceptionId);
+    apiLogger.info('Exception investigation completed', {
+      exceptionId,
+      organizationId: exception.organizationId,
+      status: result.status,
+      confidence: result.confidence,
+    });
     const resultJson = JSON.parse(JSON.stringify(result));
     const agentRun = await this.prisma.agentRun.create({
       data: {
@@ -66,6 +82,11 @@ export class AgentsService {
         entityId: exceptionId,
         details: { agentRunId: agentRun.id, confidence: result.confidence },
       },
+    });
+    apiLogger.info('Exception investigation persisted', {
+      exceptionId,
+      agentRunId: agentRun.id,
+      status: result.status,
     });
     return result;
   }

@@ -13,8 +13,13 @@ export interface FinanceTools {
   getSettlementEvidence(exceptionId: string): Promise<SettlementEvidence | null>;
 }
 
+export type SettlementExplanationInput = {
+  settlementId: string;
+  fullyExplained: boolean;
+};
+
 export interface AiGateway {
-  explainSettlement(evidence: SettlementEvidence): Promise<string>;
+  explainSettlement(input: SettlementExplanationInput): Promise<string>;
 }
 
 export type InvestigationResult = ExceptionResolution & { explanation: string };

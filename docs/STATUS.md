@@ -1,8 +1,8 @@
 # FinoraOS Status
 
-Last updated: 2026-08-22  
-Current phase: Deterministic reconciliation engine implemented; product-loop integration in progress
-Last verified commit: `feat(reconciliation): add deterministic matching engine` (see `git log -1`)
+Last updated: 2026-08-24
+Current phase: Configured AI gateway and operational logging implemented; product-loop integration in progress
+Last verified commit: see `git log -1`
 
 ## Current state
 
@@ -24,15 +24,18 @@ The repository contains a functional V1 architecture and web/API implementation.
 - Real local Qwen/Ollama smoke test passed. Settlement chat returns deterministic INR evidence; the model can add only a validated, number-free qualitative note.
 - `pnpm dev` uses persistent signal handlers because pnpm forwards interactive Ctrl+C twice; containers are reliably brought down after either signal.
 - Root README is now a Buildathon-ready project entry point with setup, demo, safety, architecture, evaluation and command guidance, plus a committed FinoraOS banner asset.
+- API-key-first AI selection: Gemini, Groq, and OpenRouter can be configured; otherwise local Ollama is selected. Hosted completion failures retry through Ollama. Mock remains an explicit test/CI provider.
+- Exception investigation is now routed through the same configured API gateway as settlement chat; agent output remains guarded and cannot determine amounts or resolution state.
+- Structured Pino logs now cover request completion with correlation IDs, AI selection/completion/fallback, deterministic reconciliation metrics, and exception-investigation lifecycle. Credentials and prompts are not logged.
 
 ## In progress
 
-- Wire exception investigation to the configured AI gateway after the deterministic run, then expose rerun/approval/audit actions in the workspace.
+- Expose controlled reconciliation rerun, agent investigation, approval, and audit actions in the workspace.
 
 ## Next highest-priority tasks
 
 1. Add a controlled reconciliation-run trigger and actual run metrics/exception evidence to the web UI.
-2. Route exception investigation through the configured AI gateway, then support approval → rerun → close/escalate in the UI.
+2. Support approval → rerun → close/escalate in the UI, including visible agent/tool activity.
 3. Replace remaining `Number(...)` money calculations in finance overview/forecast and make cash forecast/tax matching data-driven.
 
 ## Known issues
@@ -54,7 +57,7 @@ The repository contains a functional V1 architecture and web/API implementation.
 
 ## Environment notes
 
-`pnpm@10.16.0` is installed for the current user and pinned in the repository. `AI_PROVIDER=ollama` is configured locally; `.env` remains untracked. `pnpm db:generate` must be run after a fresh dependency install before API type-checking, because Prisma generation is intentionally not an automatic package-install build script.
+`pnpm@10.16.0` is installed for the current user and pinned in the repository. `.env` remains untracked. Use `AI_PROVIDER=auto` for hosted-key-first selection with Ollama fallback; restart the API after environment changes. `pnpm db:generate` must be run after a fresh dependency install before API type-checking, because Prisma generation is intentionally not an automatic package-install build script.
 
 ## Demo status
 

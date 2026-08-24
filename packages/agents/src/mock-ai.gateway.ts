@@ -1,8 +1,9 @@
-import { formatInr } from '@finora/platform';
-import type { AiGateway, SettlementEvidence } from './types.js';
+import type { AiGateway, SettlementExplanationInput } from './types.js';
 
 export class MockAiGateway implements AiGateway {
-  async explainSettlement(evidence: SettlementEvidence): Promise<string> {
-    return `Settlement ${evidence.settlementId} is explained by gateway fees of ${formatInr(evidence.gatewayFees)}, GST of ${formatInr(evidence.gstOnFees)}, and refunds of ${formatInr(evidence.refunds)}. The result is grounded in the attached settlement evidence.`;
+  async explainSettlement(input: SettlementExplanationInput): Promise<string> {
+    return input.fullyExplained
+      ? 'The documented settlement adjustments account for the variance.'
+      : 'The remaining settlement variance needs finance review.';
   }
 }

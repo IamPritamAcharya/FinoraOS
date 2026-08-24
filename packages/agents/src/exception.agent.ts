@@ -46,6 +46,12 @@ export class ExceptionInvestigator {
             },
       ],
     });
-    return { ...resolution, explanation: await this.ai.explainSettlement(evidence) };
+    return {
+      ...resolution,
+      explanation: await this.ai.explainSettlement({
+        settlementId: evidence.settlementId,
+        fullyExplained: resolved,
+      }),
+    };
   }
 }

@@ -64,14 +64,14 @@ The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, cl
 | Deterministic reconciliation | Exact-reference, settlement-relationship, date-window, and explicit composite-score matching. Ambiguous cases are never forced into a match.                        |
 | Exception persistence        | Reconciliation runs persist matches, exceptions, exception evidence, metrics, and audit events transactionally.                                                     |
 | Settlement Q&A               | Ask Finora about `STL_0001`; amounts and variance are calculated deterministically, then a configured AI gateway may provide a constrained qualitative explanation. |
-| Local AI                     | `MockAiGateway` for tests and `OllamaGateway` for local Qwen development.                                                                                           |
+| AI providers                 | API-key-first gateway selection for Gemini, Groq, and OpenRouter; local Ollama fallback; explicit mock only for tests.                                              |
 | Synthetic demo               | Reproducible Acme Commerce India data: 120 transactions, 12 settlements, invoices/tax lines, and seeded exceptions.                                                 |
 | Evaluation harness           | Runs the same shared reconciliation package against checked-in input and ground truth.                                                                              |
 
 ### Honest V1 boundaries
 
 - Banking and payment connections are traceable mock adapters; no real money movement is performed.
-- Settlement chat can use Ollama through the API gateway. The exception investigator is still being wired from its mock provider to the configured gateway.
+- AI output is constrained to qualitative explanations. Deterministic finance logic remains authoritative, and an unavailable hosted provider falls back to local Ollama.
 - Chat history is browser-local for the demo; server-side thread persistence is V1.x work.
 - This is not a production payment system, tax-compliance product, or claim of regulatory certification.
 
@@ -134,9 +134,11 @@ pnpm dev:web
 pnpm dev:api
 ```
 
-## Local AI with Ollama
+## AI providers: hosted key first, local fallback
 
-FinoraOS defaults to `mock`, so tests and CI never download or call a model. To use local Qwen for the settlement-chat explanation layer:
+FinoraOS defaults to `AI_PROVIDER=auto`. In that mode it chooses the first configured hosted key in this order—Gemini, Groq, OpenRouter—and falls back to local Ollama when no key exists. If a hosted completion fails, the request is retried through Ollama. `AI_PROVIDER=mock` is reserved for deterministic tests and CI.
+
+To use local Qwen as the normal fallback:
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
@@ -147,9 +149,22 @@ ollama run qwen3:4b-instruct-2507-q4_K_M "Reply with exactly: Finora ready"
 Set these values in `.env` and restart `pnpm dev`:
 
 ```env
-AI_PROVIDER=ollama
+AI_PROVIDER=auto
 AI_MODEL=qwen3:4b-instruct-2507-q4_K_M
 OLLAMA_BASE_URL=http://localhost:11434
+```
+
+Add one hosted key when you want it to take precedence:
+
+```env
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.5-flash
+
+# Or use one of these OpenAI-compatible providers:
+GROQ_API_KEY=
+GROQ_MODEL=llama-3.3-70b-versatile
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=google/gemma-3-27b-it:free
 ```
 
 Then ask Finora:
@@ -159,6 +174,8 @@ Why was settlement STL_0001 short?
 ```
 
 Finora calculates the amounts itself. The model can only contribute a concise, number-free qualitative explanation; it cannot generate SQL or mutate financial records.
+
+The API emits structured JSON logs for gateway selection, completions, hosted-to-local fallback, request completion, reconciliation runs, and exception investigations. Prompts, API keys, authorization headers, and credentials are never logged.
 
 ## Evaluation
 

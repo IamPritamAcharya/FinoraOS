@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { ExceptionStatus } from '@finora/platform';
+import { apiLogger } from '../../common/api-logger.js';
 import {
   runReconciliation,
   type ReconciliationException,
@@ -59,9 +60,14 @@ export class ReconciliationService {
 
   async run() {
     const organizationId = org();
+    apiLogger.info('Reconciliation run started', { organizationId });
     const transactions = await this.prisma.transaction.findMany({
       where: { organizationId },
       orderBy: { id: 'asc' },
+    });
+    apiLogger.info('Reconciliation source records loaded', {
+      organizationId,
+      transactionCount: transactions.length,
     });
     const payments: ReconciliationRecord[] = transactions.map((transaction) => {
       const metadata = (transaction.sourceMetadata ?? {}) as SeedMetadata;
@@ -102,8 +108,14 @@ export class ReconciliationService {
       return scenario === 'AMBIGUOUS' ? [base, { ...base, id: `${base.id}-duplicate` }] : [base];
     });
     const result = runReconciliation(payments, bankRecords);
+    apiLogger.info('Deterministic reconciliation completed', {
+      organizationId,
+      paymentCount: payments.length,
+      bankRecordCount: bankRecords.length,
+      ...result.metrics,
+    });
 
-    return this.prisma.$transaction(async (tx) => {
+    const persisted = await this.prisma.$transaction(async (tx) => {
       const run = await tx.reconciliationRun.create({
         data: {
           organizationId,
@@ -171,5 +183,11 @@ export class ReconciliationService {
         exceptions: result.exceptions,
       };
     });
+    apiLogger.info('Reconciliation run persisted', {
+      organizationId,
+      reconciliationRunId: persisted.run.id,
+      ...persisted.metrics,
+    });
+    return persisted;
   }
 }
