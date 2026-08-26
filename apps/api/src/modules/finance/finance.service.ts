@@ -1,33 +1,44 @@
 import { Injectable } from '@nestjs/common';
-import { money } from '@finora/platform';
+import { money, type RequestPrincipal } from '@finora/platform';
 import { PrismaService } from '../../prisma/prisma.service.js';
-
-const organizationId = () => process.env.DEMO_ORGANIZATION_ID ?? 'demo-org';
 
 @Injectable()
 export class FinanceService {
   constructor(private readonly prisma: PrismaService) {}
-  async overview() {
-    const org = organizationId();
-    const [transactions, settlements, exceptions, latestRun, agentResolved] = await Promise.all([
-      this.prisma.transaction.count({ where: { organizationId: org } }),
-      this.prisma.settlement.findMany({
-        where: { organizationId: org },
-        orderBy: { settledAt: 'desc' },
-        take: 8,
-      }),
-      this.prisma.exception.count({
-        where: { organizationId: org, status: { in: ['OPEN', 'NEEDS_REVIEW', 'UNRESOLVED'] } },
-      }),
-      this.prisma.reconciliationRun.findFirst({
-        where: { organizationId: org },
-        orderBy: { startedAt: 'desc' },
-      }),
-      this.prisma.exception.count({ where: { organizationId: org, status: 'RESOLVED' } }),
-    ]);
-    const cash = settlements.reduce(
-      (total, settlement) => total.plus(settlement.receivedAmount.toString()),
+  async overview(principal: RequestPrincipal) {
+    const org = principal.organizationId;
+    const [transactions, settlements, exceptions, latestRun, agentResolved, accounts, movements] =
+      await Promise.all([
+        this.prisma.transaction.count({ where: { organizationId: org } }),
+        this.prisma.settlement.findMany({
+          where: { organizationId: org },
+          orderBy: { settledAt: 'desc' },
+          take: 8,
+        }),
+        this.prisma.exception.count({
+          where: { organizationId: org, status: { in: ['OPEN', 'NEEDS_REVIEW', 'UNRESOLVED'] } },
+        }),
+        this.prisma.reconciliationRun.findFirst({
+          where: { organizationId: org },
+          orderBy: { startedAt: 'desc' },
+        }),
+        this.prisma.exception.count({ where: { organizationId: org, status: 'RESOLVED' } }),
+        this.prisma.cashAccount.findMany({ where: { organizationId: org } }),
+        this.prisma.cashMovement.findMany({
+          where: { organizationId: org, status: 'POSTED' },
+          select: { direction: true, amount: true },
+        }),
+      ]);
+    const opening = accounts.reduce(
+      (total, account) => total.plus(account.openingBalance.toString()),
       money('0'),
+    );
+    const cash = movements.reduce(
+      (total, movement) =>
+        movement.direction === 'INFLOW'
+          ? total.plus(movement.amount.toString())
+          : total.minus(movement.amount.toString()),
+      opening,
     );
     return {
       cashPosition: cash.toFixed(2),
@@ -38,41 +49,86 @@ export class FinanceService {
       recentSettlements: settlements,
     };
   }
-  transactions(query?: string) {
+  transactions(principal: RequestPrincipal, query?: string) {
     return this.prisma.transaction.findMany({
       where: {
-        organizationId: organizationId(),
+        organizationId: principal.organizationId,
         ...(query ? { externalId: { contains: query, mode: 'insensitive' } } : {}),
       },
       orderBy: { occurredAt: 'desc' },
       take: 100,
     });
   }
-  settlements() {
+  settlements(principal: RequestPrincipal) {
     return this.prisma.settlement.findMany({
-      where: { organizationId: organizationId() },
+      where: { organizationId: principal.organizationId },
       orderBy: { settledAt: 'desc' },
     });
   }
-  taxLines() {
+  invoices(principal: RequestPrincipal) {
+    return this.prisma.invoice.findMany({
+      where: { organizationId: principal.organizationId },
+      orderBy: { issuedAt: 'desc' },
+    });
+  }
+  cashMovements(principal: RequestPrincipal) {
+    return this.prisma.cashMovement.findMany({
+      where: { organizationId: principal.organizationId },
+      orderBy: { occurredAt: 'desc' },
+      take: 200,
+    });
+  }
+  taxLines(principal: RequestPrincipal) {
     return this.prisma.taxLine.findMany({
-      where: { organizationId: organizationId() },
+      where: { organizationId: principal.organizationId },
       orderBy: { externalId: 'asc' },
     });
   }
-  async forecast() {
-    const settlements = await this.prisma.settlement.findMany({
-      where: { organizationId: organizationId() },
-    });
-    const current = settlements.reduce(
-      (sum, item) => sum.plus(item.receivedAmount.toString()),
+  async forecast(principal: RequestPrincipal) {
+    const [accounts, posted, scheduled] = await Promise.all([
+      this.prisma.cashAccount.findMany({ where: { organizationId: principal.organizationId } }),
+      this.prisma.cashMovement.findMany({
+        where: { organizationId: principal.organizationId, status: 'POSTED' },
+      }),
+      this.prisma.cashMovement.findMany({
+        where: { organizationId: principal.organizationId, status: 'SCHEDULED' },
+        orderBy: { occurredAt: 'asc' },
+      }),
+    ]);
+    let balance = accounts.reduce(
+      (total, account) => total.plus(account.openingBalance.toString()),
       money('0'),
     );
-    return [
-      { day: 'Today', amount: current.toFixed(2), risk: false },
-      { day: 'Aug 27', amount: current.minus('140000').toFixed(2), risk: false },
-      { day: 'Aug 29', amount: current.minus('1250000').toFixed(2), risk: true },
-      { day: 'Sep 02', amount: current.minus('490000').toFixed(2), risk: false },
+    for (const movement of posted) {
+      balance =
+        movement.direction === 'INFLOW'
+          ? balance.plus(movement.amount.toString())
+          : balance.minus(movement.amount.toString());
+    }
+    const rows = [
+      {
+        day: 'Today',
+        date: new Date(),
+        amount: balance.toFixed(2),
+        risk: balance.isNegative(),
+      },
     ];
+    for (const movement of scheduled) {
+      balance =
+        movement.direction === 'INFLOW'
+          ? balance.plus(movement.amount.toString())
+          : balance.minus(movement.amount.toString());
+      rows.push({
+        day: movement.occurredAt.toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          timeZone: 'UTC',
+        }),
+        date: movement.occurredAt,
+        amount: balance.toFixed(2),
+        risk: balance.isNegative(),
+      });
+    }
+    return rows;
   }
 }

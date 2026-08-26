@@ -24,8 +24,18 @@ async function main() {
       email: 'finance@finora.local',
     },
   });
+  if (process.argv.includes('--if-empty')) {
+    const existingRecords = await prisma.transaction.count({ where: { organizationId: orgId } });
+    if (existingRecords > 0) {
+      console.log(`Seed skipped: ${existingRecords} demo transactions already exist.`);
+      return;
+    }
+  }
   await prisma.agentStep.deleteMany();
   await prisma.agentRun.deleteMany();
+  await prisma.chatMessage.deleteMany();
+  await prisma.chatThread.deleteMany();
+  await prisma.adjustment.deleteMany();
   await prisma.exceptionEvidence.deleteMany();
   await prisma.exception.deleteMany();
   await prisma.reconciliationMatch.deleteMany();
@@ -35,6 +45,8 @@ async function main() {
   await prisma.invoice.deleteMany();
   await prisma.transaction.deleteMany();
   await prisma.settlement.deleteMany();
+  await prisma.cashMovement.deleteMany();
+  await prisma.cashAccount.deleteMany();
   const settlements = Array.from({ length: 12 }, (_, index) => {
     const expected = 142000 + index * 17350;
     const fees = 2450 + index * 110;
@@ -54,6 +66,125 @@ async function main() {
     };
   });
   await prisma.settlement.createMany({ data: settlements });
+  const cashAccount = await prisma.cashAccount.create({
+    data: {
+      id: 'cash-account-operating',
+      organizationId: orgId,
+      name: 'Operating Account',
+      currency: 'INR',
+      openingBalance: '1800000.00',
+    },
+  });
+  const settlementMovements = settlements.flatMap((settlement, index) => [
+    {
+      organizationId: orgId,
+      accountId: cashAccount.id,
+      externalId: `CM_COLLECTION_${String(index + 1).padStart(3, '0')}`,
+      direction: 'INFLOW' as const,
+      category: 'COLLECTION' as const,
+      status: 'POSTED' as const,
+      amount: settlement.receivedAmount,
+      currency: 'INR',
+      description: `Settlement collection ${settlement.externalId}`,
+      counterparty: 'Razorpay',
+      occurredAt: settlement.settledAt,
+      sourceType: 'SETTLEMENT',
+      sourceId: settlement.id,
+    },
+    {
+      organizationId: orgId,
+      accountId: cashAccount.id,
+      externalId: `CM_FEE_${String(index + 1).padStart(3, '0')}`,
+      direction: 'OUTFLOW' as const,
+      category: 'GATEWAY_FEE' as const,
+      status: 'POSTED' as const,
+      amount: settlement.feeAmount,
+      currency: 'INR',
+      description: `Gateway fee for ${settlement.externalId}`,
+      counterparty: 'Razorpay',
+      occurredAt: settlement.settledAt,
+      sourceType: 'SETTLEMENT_FEE',
+      sourceId: settlement.id,
+    },
+    {
+      organizationId: orgId,
+      accountId: cashAccount.id,
+      externalId: `CM_GST_${String(index + 1).padStart(3, '0')}`,
+      direction: 'OUTFLOW' as const,
+      category: 'GST' as const,
+      status: 'POSTED' as const,
+      amount: settlement.gstAmount,
+      currency: 'INR',
+      description: `GST on gateway fee for ${settlement.externalId}`,
+      counterparty: 'Razorpay',
+      occurredAt: settlement.settledAt,
+      sourceType: 'SETTLEMENT_GST',
+      sourceId: settlement.id,
+    },
+    ...(Number(settlement.refundAmount) > 0
+      ? [
+          {
+            organizationId: orgId,
+            accountId: cashAccount.id,
+            externalId: `CM_REFUND_${String(index + 1).padStart(3, '0')}`,
+            direction: 'OUTFLOW' as const,
+            category: 'REFUND' as const,
+            status: 'POSTED' as const,
+            amount: settlement.refundAmount,
+            currency: 'INR',
+            description: `Customer refunds in ${settlement.externalId}`,
+            counterparty: 'Customers',
+            occurredAt: settlement.settledAt,
+            sourceType: 'REFUND',
+            sourceId: settlement.id,
+          },
+        ]
+      : []),
+  ]);
+  const operatingMovements = [
+    ['CM_VENDOR_001', 'VENDOR_PAYMENT', '78500.00', 4, 'Cloud infrastructure', 'Nimbus Cloud'],
+    ['CM_VENDOR_002', 'VENDOR_PAYMENT', '42600.00', 9, 'Logistics services', 'Swift Logistics'],
+    ['CM_VENDOR_003', 'VENDOR_PAYMENT', '31250.00', 14, 'Customer support software', 'SupportDesk'],
+    ['CM_PAYROLL_001', 'PAYROLL', '480000.00', 7, 'August payroll', 'Employees'],
+    ['CM_RENT_001', 'RENT', '120000.00', 2, 'Office rent', 'Orbit Properties'],
+    ['CM_TAX_001', 'TAX_PAYMENT', '145000.00', 12, 'Advance tax payment', 'Income Tax Department'],
+  ].map(([externalId, category, amount, day, description, counterparty]) => ({
+    organizationId: orgId,
+    accountId: cashAccount.id,
+    externalId: String(externalId),
+    direction: 'OUTFLOW' as const,
+    category: category as 'VENDOR_PAYMENT' | 'PAYROLL' | 'RENT' | 'TAX_PAYMENT',
+    status: 'POSTED' as const,
+    amount: String(amount),
+    currency: 'INR',
+    description: String(description),
+    counterparty: String(counterparty),
+    occurredAt: iso(Number(day)),
+    sourceType: 'BANK_TRANSACTION',
+  }));
+  const scheduledMovements = [
+    ['CM_SCHEDULED_001', 'OUTFLOW', 'PAYROLL', '480000.00', 27, 'September payroll'],
+    ['CM_SCHEDULED_002', 'OUTFLOW', 'VENDOR_PAYMENT', '210000.00', 29, 'Inventory supplier'],
+    ['CM_SCHEDULED_003', 'INFLOW', 'COLLECTION', '760000.00', 31, 'Scheduled settlement'],
+    ['CM_SCHEDULED_004', 'OUTFLOW', 'TAX_PAYMENT', '185000.00', 2, 'GST payment'],
+  ].map(([externalId, direction, category, amount, day, description], index) => ({
+    organizationId: orgId,
+    accountId: cashAccount.id,
+    externalId: String(externalId),
+    direction: direction as 'INFLOW' | 'OUTFLOW',
+    category: category as 'COLLECTION' | 'PAYROLL' | 'VENDOR_PAYMENT' | 'TAX_PAYMENT',
+    status: 'SCHEDULED' as const,
+    amount: String(amount),
+    currency: 'INR',
+    description: String(description),
+    counterparty: index === 2 ? 'Razorpay' : 'Scheduled obligation',
+    occurredAt:
+      Number(day) <= 2 ? new Date(Date.UTC(2026, 8, Number(day), 10, 0, 0)) : iso(Number(day)),
+    sourceType: 'SCHEDULE',
+  }));
+  await prisma.cashMovement.createMany({
+    data: [...settlementMovements, ...operatingMovements, ...scheduledMovements],
+  });
   const transactions = Array.from({ length: 120 }, (_, index) => {
     const scenario =
       index < 100
@@ -214,6 +345,8 @@ async function main() {
       },
     ],
   });
-  console.log('Seeded Acme Commerce India: 120 transactions, 12 settlements, 14 exceptions.');
+  console.log(
+    `Seeded Acme Commerce India: 120 transactions, 12 settlements, ${settlementMovements.length + operatingMovements.length + scheduledMovements.length} cash movements, 14 exceptions.`,
+  );
 }
 main().finally(() => prisma.$disconnect());

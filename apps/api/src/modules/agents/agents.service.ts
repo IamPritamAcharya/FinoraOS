@@ -1,11 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ExceptionInvestigator } from '@finora/agents';
+import type { RequestPrincipal } from '@finora/platform';
 import { apiLogger } from '../../common/api-logger.js';
 import { AI_GATEWAY, type AiGateway } from '../../gateways/ai/ai.gateway.js';
 import { ExceptionInvestigatorAiGateway } from '../../gateways/ai/exception-investigator-ai.gateway.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
-
-const organizationId = () => process.env.DEMO_ORGANIZATION_ID ?? 'demo-org';
 
 @Injectable()
 export class AgentsService {
@@ -13,10 +12,10 @@ export class AgentsService {
     private readonly prisma: PrismaService,
     @Inject(AI_GATEWAY) private readonly ai: AiGateway,
   ) {}
-  async investigate(exceptionId: string) {
+  async investigate(principal: RequestPrincipal, exceptionId: string) {
     apiLogger.info('Exception investigation started', { exceptionId });
     const exception = await this.prisma.exception.findFirst({
-      where: { id: exceptionId, organizationId: organizationId() },
+      where: { id: exceptionId, organizationId: principal.organizationId },
       include: { evidence: true },
     });
     if (!exception) {
@@ -97,12 +96,15 @@ export class AgentsService {
     return result;
   }
 
-  async investigateByExternalId(externalId: string) {
+  async investigateByExternalId(principal: RequestPrincipal, externalId: string) {
     const exception = await this.prisma.exception.findFirst({
-      where: { externalId: externalId.toUpperCase(), organizationId: organizationId() },
+      where: { externalId: externalId.toUpperCase(), organizationId: principal.organizationId },
       select: { id: true, externalId: true },
     });
     if (!exception) return null;
-    return { externalId: exception.externalId, result: await this.investigate(exception.id) };
+    return {
+      externalId: exception.externalId,
+      result: await this.investigate(principal, exception.id),
+    };
   }
 }

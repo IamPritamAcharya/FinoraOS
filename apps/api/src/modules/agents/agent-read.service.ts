@@ -70,15 +70,255 @@ export class AgentReadService extends PrismaClient implements OnModuleInit, OnMo
     );
   }
 
+  async getCurrentUser(organizationId: string, userId: string) {
+    return this.forOrganization(organizationId, (tx) =>
+      tx.user.findFirst({
+        where: { id: userId },
+        select: { id: true, name: true, email: true },
+      }),
+    );
+  }
+
+  async paymentSummary(
+    organizationId: string,
+    input: { from?: string; to?: string; status?: string },
+  ) {
+    return this.forOrganization(organizationId, async (tx) => {
+      const where = {
+        ...(input.status ? { status: input.status as never } : {}),
+        ...(input.from || input.to
+          ? {
+              occurredAt: {
+                ...(input.from ? { gte: new Date(input.from) } : {}),
+                ...(input.to ? { lte: new Date(input.to) } : {}),
+              },
+            }
+          : {}),
+      };
+      const aggregate = await tx.transaction.aggregate({
+        where,
+        _count: true,
+        _sum: { amount: true },
+        _avg: { amount: true },
+        _max: { amount: true },
+      });
+      return {
+        from: input.from,
+        to: input.to,
+        status: input.status,
+        currency: 'INR',
+        count: aggregate._count,
+        total: aggregate._sum.amount ?? new Prisma.Decimal(0),
+        average: aggregate._avg.amount ?? new Prisma.Decimal(0),
+        largest: aggregate._max.amount ?? new Prisma.Decimal(0),
+      };
+    });
+  }
+
+  async settlementSummary(organizationId: string, input: { from?: string; to?: string }) {
+    return this.forOrganization(organizationId, async (tx) => {
+      const rows = await tx.settlement.findMany({
+        where:
+          input.from || input.to
+            ? {
+                settledAt: {
+                  ...(input.from ? { gte: new Date(input.from) } : {}),
+                  ...(input.to ? { lte: new Date(input.to) } : {}),
+                },
+              }
+            : {},
+        select: {
+          expectedAmount: true,
+          receivedAmount: true,
+          feeAmount: true,
+          gstAmount: true,
+          refundAmount: true,
+        },
+      });
+      const zero = () => new Prisma.Decimal(0);
+      const totals = rows.reduce(
+        (sum, row) => ({
+          expected: sum.expected.plus(row.expectedAmount),
+          received: sum.received.plus(row.receivedAmount),
+          fees: sum.fees.plus(row.feeAmount),
+          gst: sum.gst.plus(row.gstAmount),
+          refunds: sum.refunds.plus(row.refundAmount),
+        }),
+        { expected: zero(), received: zero(), fees: zero(), gst: zero(), refunds: zero() },
+      );
+      return {
+        ...totals,
+        unexplained: totals.expected
+          .minus(totals.received)
+          .minus(totals.fees)
+          .minus(totals.gst)
+          .minus(totals.refunds),
+        count: rows.length,
+        currency: 'INR',
+        ...input,
+      };
+    });
+  }
+
+  async invoiceSummary(organizationId: string, input: { from?: string; to?: string }) {
+    return this.forOrganization(organizationId, async (tx) => {
+      const result = await tx.invoice.aggregate({
+        where:
+          input.from || input.to
+            ? {
+                issuedAt: {
+                  ...(input.from ? { gte: new Date(input.from) } : {}),
+                  ...(input.to ? { lte: new Date(input.to) } : {}),
+                },
+              }
+            : {},
+        _count: true,
+        _sum: { amount: true },
+        _avg: { amount: true },
+      });
+      return {
+        count: result._count,
+        total: result._sum.amount ?? new Prisma.Decimal(0),
+        average: result._avg.amount ?? new Prisma.Decimal(0),
+        currency: 'INR',
+        ...input,
+      };
+    });
+  }
+
+  async taxSummary(organizationId: string, input: { matched?: boolean }) {
+    return this.forOrganization(organizationId, async (tx) => {
+      const rows = await tx.taxLine.findMany({
+        where: input.matched === undefined ? {} : { matched: input.matched },
+        select: { amount: true, matched: true },
+      });
+      return {
+        count: rows.length,
+        matched: rows.filter((row) => row.matched).length,
+        unmatched: rows.filter((row) => !row.matched).length,
+        total: rows.reduce((sum, row) => sum.plus(row.amount), new Prisma.Decimal(0)),
+        currency: 'INR',
+      };
+    });
+  }
+
+  async expenseSummary(
+    organizationId: string,
+    input: { from: string; to: string; category?: string },
+  ) {
+    return this.forOrganization(organizationId, async (tx) => {
+      const rows = await tx.cashMovement.findMany({
+        where: {
+          direction: 'OUTFLOW',
+          status: 'POSTED',
+          occurredAt: { gte: new Date(input.from), lte: new Date(input.to) },
+          ...(input.category ? { category: input.category as never } : {}),
+        },
+        select: {
+          externalId: true,
+          category: true,
+          amount: true,
+          currency: true,
+          description: true,
+          counterparty: true,
+          occurredAt: true,
+        },
+        orderBy: [{ amount: 'desc' }, { occurredAt: 'desc' }],
+        take: 100,
+      });
+      const byCategory = new Map<string, Prisma.Decimal>();
+      let total = new Prisma.Decimal(0);
+      for (const row of rows) {
+        total = total.plus(row.amount);
+        byCategory.set(
+          row.category,
+          (byCategory.get(row.category) ?? new Prisma.Decimal(0)).plus(row.amount),
+        );
+      }
+      return {
+        from: input.from,
+        to: input.to,
+        currency: rows[0]?.currency ?? 'INR',
+        total,
+        count: rows.length,
+        categories: [...byCategory.entries()]
+          .map(([category, amount]) => ({ category, amount }))
+          .sort((left, right) => right.amount.comparedTo(left.amount)),
+        largest: rows.slice(0, 5),
+      };
+    });
+  }
+
+  async findCashMovements(
+    organizationId: string,
+    input: {
+      direction?: 'INFLOW' | 'OUTFLOW';
+      category?: string;
+      status?: 'POSTED' | 'SCHEDULED';
+      from?: string;
+      to?: string;
+      minimumAmount?: string;
+      take?: number;
+    },
+  ) {
+    return this.forOrganization(organizationId, (tx) =>
+      tx.cashMovement.findMany({
+        where: {
+          ...(input.direction ? { direction: input.direction } : {}),
+          ...(input.category ? { category: input.category as never } : {}),
+          ...(input.status ? { status: input.status } : {}),
+          ...(input.from || input.to
+            ? {
+                occurredAt: {
+                  ...(input.from ? { gte: new Date(input.from) } : {}),
+                  ...(input.to ? { lte: new Date(input.to) } : {}),
+                },
+              }
+            : {}),
+          ...(input.minimumAmount ? { amount: { gte: input.minimumAmount } } : {}),
+        },
+        select: {
+          externalId: true,
+          direction: true,
+          category: true,
+          status: true,
+          amount: true,
+          currency: true,
+          description: true,
+          counterparty: true,
+          occurredAt: true,
+          sourceType: true,
+          sourceId: true,
+        },
+        orderBy: { occurredAt: 'desc' },
+        take: Math.min(input.take ?? 12, 100),
+      }),
+    );
+  }
+
   async findTransactions(
     organizationId: string,
-    input: { minimumAmount?: string; status?: string; take?: number } = {},
+    input: {
+      minimumAmount?: string;
+      status?: string;
+      from?: string;
+      to?: string;
+      take?: number;
+    } = {},
   ) {
     return this.forOrganization(organizationId, (tx) =>
       tx.transaction.findMany({
         where: {
           ...(input.minimumAmount ? { amount: { gte: input.minimumAmount } } : {}),
           ...(input.status ? { status: input.status as never } : {}),
+          ...(input.from || input.to
+            ? {
+                occurredAt: {
+                  ...(input.from ? { gte: new Date(input.from) } : {}),
+                  ...(input.to ? { lte: new Date(input.to) } : {}),
+                },
+              }
+            : {}),
         },
         select: {
           externalId: true,
@@ -89,8 +329,46 @@ export class AgentReadService extends PrismaClient implements OnModuleInit, OnMo
           settlementId: true,
         },
         orderBy: { occurredAt: 'desc' },
+        take: Math.min(input.take ?? 12, 100),
+      }),
+    );
+  }
+
+  async findSettlements(
+    organizationId: string,
+    input: { from?: string; to?: string; minimumVariance?: string; take?: number },
+  ) {
+    const rows = await this.forOrganization(organizationId, (tx) =>
+      tx.settlement.findMany({
+        where:
+          input.from || input.to
+            ? {
+                settledAt: {
+                  ...(input.from ? { gte: new Date(input.from) } : {}),
+                  ...(input.to ? { lte: new Date(input.to) } : {}),
+                },
+              }
+            : {},
+        select: {
+          externalId: true,
+          expectedAmount: true,
+          receivedAmount: true,
+          feeAmount: true,
+          gstAmount: true,
+          refundAmount: true,
+          settledAt: true,
+        },
+        orderBy: { settledAt: 'desc' },
         take: Math.min(input.take ?? 25, 100),
       }),
+    );
+    return rows.filter(
+      (row) =>
+        !input.minimumVariance ||
+        row.expectedAmount
+          .minus(row.receivedAmount)
+          .abs()
+          .greaterThanOrEqualTo(input.minimumVariance),
     );
   }
 
@@ -203,14 +481,49 @@ export class AgentReadService extends PrismaClient implements OnModuleInit, OnMo
 
   async cashForecast(organizationId: string) {
     return this.forOrganization(organizationId, async (tx) => {
-      const aggregate = await tx.settlement.aggregate({ _sum: { receivedAmount: true } });
-      const current = aggregate._sum.receivedAmount ?? new Prisma.Decimal(0);
-      return [
-        { day: 'Today', amount: current },
-        { day: 'Aug 27', amount: current.minus('140000') },
-        { day: 'Aug 29', amount: current.minus('1250000'), risk: true },
-        { day: 'Sep 02', amount: current.minus('490000') },
+      const [accounts, posted, scheduled] = await Promise.all([
+        tx.cashAccount.findMany(),
+        tx.cashMovement.findMany({ where: { status: 'POSTED' } }),
+        tx.cashMovement.findMany({
+          where: { status: 'SCHEDULED' },
+          orderBy: { occurredAt: 'asc' },
+        }),
+      ]);
+      let balance = accounts.reduce(
+        (total, account) => total.plus(account.openingBalance),
+        new Prisma.Decimal(0),
+      );
+      for (const movement of posted) {
+        balance =
+          movement.direction === 'INFLOW'
+            ? balance.plus(movement.amount)
+            : balance.minus(movement.amount);
+      }
+      const result = [
+        {
+          day: 'Today',
+          date: new Date().toISOString(),
+          amount: balance,
+          risk: balance.isNegative(),
+        },
       ];
+      for (const movement of scheduled) {
+        balance =
+          movement.direction === 'INFLOW'
+            ? balance.plus(movement.amount)
+            : balance.minus(movement.amount);
+        result.push({
+          day: movement.occurredAt.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            timeZone: 'UTC',
+          }),
+          date: movement.occurredAt.toISOString(),
+          amount: balance,
+          risk: balance.isNegative(),
+        });
+      }
+      return result;
     });
   }
 

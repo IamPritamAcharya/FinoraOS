@@ -38,6 +38,26 @@ enum TransactionStatus {
   REFUNDED
   PENDING
 }
+enum CashDirection {
+  INFLOW
+  OUTFLOW
+}
+enum CashMovementStatus {
+  POSTED
+  SCHEDULED
+  CANCELLED
+}
+enum CashMovementCategory {
+  COLLECTION
+  GATEWAY_FEE
+  GST
+  REFUND
+  VENDOR_PAYMENT
+  PAYROLL
+  RENT
+  TAX_PAYMENT
+  OTHER
+}
 
 model Organization {
   id String @id
@@ -51,6 +71,10 @@ model Organization {
   exceptions Exception[]
   auditLogs AuditLog[]
   agentRuns AgentRun[]
+  cashAccounts CashAccount[]
+  cashMovements CashMovement[]
+  chatThreads ChatThread[]
+  adjustments Adjustment[]
 }
 model User {
   id String @id
@@ -58,6 +82,7 @@ model User {
   name String
   email String @unique
   organization Organization @relation(fields: [organizationId], references: [id])
+  chatThreads ChatThread[]
 }
 model Settlement {
   id String @id
@@ -152,6 +177,7 @@ model Exception {
   reconciliationRun ReconciliationRun? @relation(fields: [reconciliationRunId], references: [id])
   evidence ExceptionEvidence[]
   agentRuns AgentRun[]
+  adjustments Adjustment[]
   @@index([organizationId, status])
 }
 model ExceptionEvidence {
@@ -198,9 +224,14 @@ model AuditLog {
 model ChatThread {
   id String @id @default(cuid())
   organizationId String
+  userId String
   title String
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user User @relation(fields: [userId], references: [id])
   messages ChatMessage[]
+  @@index([organizationId, userId, updatedAt])
 }
 model ChatMessage {
   id String @id @default(cuid())
@@ -208,6 +239,58 @@ model ChatMessage {
   role String
   content String
   payload Json?
+  status String @default("COMPLETED")
   createdAt DateTime @default(now())
   thread ChatThread @relation(fields: [threadId], references: [id])
+  @@index([threadId, createdAt])
+}
+
+model CashAccount {
+  id String @id @default(cuid())
+  organizationId String
+  name String
+  currency String @default("INR")
+  openingBalance Decimal @db.Decimal(18, 2)
+  organization Organization @relation(fields: [organizationId], references: [id])
+  movements CashMovement[]
+  @@unique([organizationId, name, currency])
+}
+
+model CashMovement {
+  id String @id @default(cuid())
+  organizationId String
+  accountId String
+  externalId String
+  direction CashDirection
+  category CashMovementCategory
+  status CashMovementStatus @default(POSTED)
+  amount Decimal @db.Decimal(18, 2)
+  currency String @default("INR")
+  description String
+  counterparty String?
+  occurredAt DateTime
+  sourceType String
+  sourceId String?
+  sourceMetadata Json?
+  organization Organization @relation(fields: [organizationId], references: [id])
+  account CashAccount @relation(fields: [accountId], references: [id])
+  @@unique([organizationId, externalId])
+  @@index([organizationId, direction, status, occurredAt])
+  @@index([organizationId, category, occurredAt])
+}
+
+model Adjustment {
+  id String @id @default(cuid())
+  organizationId String
+  exceptionId String
+  type String
+  amount Decimal @db.Decimal(18, 2)
+  currency String @default("INR")
+  details Json
+  approvedBy String
+  approvedAt DateTime
+  executedAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id])
+  exception Exception @relation(fields: [exceptionId], references: [id])
+  @@unique([organizationId, exceptionId, type])
 }

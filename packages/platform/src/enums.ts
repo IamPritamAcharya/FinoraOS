@@ -35,3 +35,26 @@ export enum RecordSource {
   INVOICE = 'INVOICE',
   TAX = 'TAX',
 }
+
+export enum CashDirection {
+  INFLOW = 'INFLOW',
+  OUTFLOW = 'OUTFLOW',
+}
+
+export enum CashMovementStatus {
+  POSTED = 'POSTED',
+  SCHEDULED = 'SCHEDULED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum CashMovementCategory {
+  COLLECTION = 'COLLECTION',
+  GATEWAY_FEE = 'GATEWAY_FEE',
+  GST = 'GST',
+  REFUND = 'REFUND',
+  VENDOR_PAYMENT = 'VENDOR_PAYMENT',
+  PAYROLL = 'PAYROLL',
+  RENT = 'RENT',
+  TAX_PAYMENT = 'TAX_PAYMENT',
+  OTHER = 'OTHER',
+}

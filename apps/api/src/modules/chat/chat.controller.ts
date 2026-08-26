@@ -1,6 +1,7 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { z } from 'zod';
 import { ChatService } from './chat.service.js';
+import { AuthService } from '../auth/auth.service.js';
 
 const ChatRequestSchema = z.object({
   message: z.string().min(1).max(1000),
@@ -13,13 +14,25 @@ const ChatRequestSchema = z.object({
     )
     .max(12)
     .default([]),
+  threadId: z.string().min(1).max(128).optional(),
 });
 
 @Controller('chat')
 export class ChatController {
-  constructor(private readonly chat: ChatService) {}
+  constructor(
+    private readonly chat: ChatService,
+    private readonly auth: AuthService,
+  ) {}
   @Post() async send(@Body() body: unknown) {
-    const { message, context } = ChatRequestSchema.parse(body);
-    return this.chat.respond(message, context);
+    const { message, context, threadId } = ChatRequestSchema.parse(body);
+    return this.chat.respond(this.auth.currentPrincipal(), message, context, threadId);
+  }
+
+  @Get('threads') threads() {
+    return this.chat.listThreads(this.auth.currentPrincipal());
+  }
+
+  @Get('threads/:id') thread(@Param('id') id: string) {
+    return this.chat.thread(this.auth.currentPrincipal(), id);
   }
 }

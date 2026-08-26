@@ -1,7 +1,7 @@
 # FinoraOS Status
 
-Last updated: 2026-08-24
-Current phase: Model-routed, RLS-backed agent read foundation complete; approval/rerun product loop follows
+Last updated: 2026-08-26
+Current phase: AI-native finance workspace integration checkpoint; runtime hardening remains
 Last verified commit: see `git log -1`
 
 ## Current state
@@ -35,22 +35,30 @@ The repository contains a functional V1 architecture and web/API implementation.
 - The Controller Agent now asks the configured AI gateway to select a Zod-validated allowlisted tool call instead of relying on phrase regexes. The catalogue includes organization users, transactions, invoices, settlements, exceptions/evidence, tax lines, cash forecast, reconciliation runs, audit events, and agent runs.
 - Controlled agent reads now execute through the separate `finora_agent_ro` role with `SELECT` only, `NOBYPASSRLS`, read-only transactions, and organization RLS policies. A missing or wrong tenant context produces zero rows; the provisioning command verifies this live.
 - Controller routing explicitly requests JSON-mode output from compatible providers. Development logs record only the selected controlled tool or a concise fallback reason—never prompt text, model output, secrets, or financial record bodies.
+- `FinanceAgent` replaces the former single-call controller with validated multi-tool planning, grounded synthesis, deterministic list responses, conversation context, and normalized date/amount inputs.
+- Agent tools now cover profile/organization, payment/settlement/invoice/tax summaries, expenses, cash movements, filtered records, exception investigation/evidence, forecast, audit, agent, and reconciliation history.
+- Chat threads/messages and controller AgentRuns persist server-side; Vercel AI SDK UI-message streams carry typed artifacts and tool activity to the chat UI.
+- Persisted cash accounts/movements drive expense summaries and forecasts. Routed Overview, Records, Reconciliation, and Exceptions pages share a persistent workspace shell.
+- Proposals can be approved or rejected. Approval validates the action, creates an idempotent audited adjustment without changing source records, resolves the exception, and attempts a reconciliation rerun.
+- Live Ollama checks passed for a two-tool organization/profile query and monthly expense/category analysis. A discovered planner filter-alias defect now has normalization coverage.
 
 ## In progress
 
-- Expose controlled reconciliation rerun, agent investigation, approval, and audit actions in the workspace.
+- Browser-level verification of typed chat streaming/history, routed finance pages, and approval/rerun controls.
 
 ## Next highest-priority tasks
 
-1. Add a controlled reconciliation-run trigger and actual run metrics/exception evidence to the web UI.
-2. Support approval → rerun → close/escalate in the UI, including visible agent/tool activity.
-3. Render structured result cards/tables for chat exception lists, cash forecast, and tax mismatches instead of the current evidence-grounded text rows.
-4. Make cash forecast/tax matching more data-driven and expand controlled chat tools to record search and reconciliation-run status.
+1. Run the complete test/build/eval suite and fix checkpoint regressions.
+2. Re-run the live filtered-transaction query and confirm every returned row respects the threshold.
+3. Browser-test chat streaming/history, records tabs, reconciliation, investigation, approval/reject, and rerun.
+4. Add integration coverage for RLS scoping, chat persistence, and approval idempotency.
 
 ## Known issues
 
 - The V1 banking source is a traceable mock-bank projection from seeded transaction metadata; a persisted bank-statement import model/connector is later work.
 - Reconciliation-match evidence is available in the pure engine output and audit logs; the narrow V1 Prisma match table does not yet store its full evidence payload separately.
+- Authentication still uses an explicitly configured demo principal; JWT/session identity is required before multi-user deployment.
+- Local Qwen routing is schema-guarded and fails closed, but needs a wider natural-language evaluation set.
 
 ## Commands last verified
 

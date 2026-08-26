@@ -65,11 +65,18 @@ async function main() {
   if ((await wait(run(['infra:up']))) !== 0) return shutdown(1);
   if ((await wait(run(['db:deploy']))) !== 0) return shutdown(1);
   if ((await wait(run(['db:agent-role']))) !== 0) return shutdown(1);
-  if (process.env.FINORA_SEED_ON_DEV !== '0' && (await wait(run(['db:seed']))) !== 0) {
+  if (process.env.FINORA_SEED_ON_DEV !== '0' && (await wait(run(['db:seed:if-empty']))) !== 0) {
     return shutdown(1);
   }
   children = [
-    runWorkspaceProcess('apps/api', ['--loader', 'ts-node/esm', '--no-warnings', 'src/main.ts']),
+    runWorkspaceProcess('apps/api', [
+      '--watch',
+      '--watch-preserve-output',
+      '--loader',
+      'ts-node/esm',
+      '--no-warnings',
+      'src/main.ts',
+    ]),
     runWorkspaceProcess('apps/web', [
       resolve(rootDirectory, 'apps/web/node_modules/next/dist/bin/next'),
       'dev',

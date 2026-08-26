@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ReconciliationService } from './reconciliation.service.js';
 
+const principal = { organizationId: 'demo-org', userId: 'demo-user' };
+
 const transaction = (id: string, scenario = 'EXACT') => ({
   id,
   organizationId: 'demo-org',
@@ -35,7 +37,7 @@ describe('ReconciliationService.run', () => {
     const prisma = prismaMock();
     const service = new ReconciliationService(prisma as never);
 
-    const result = await service.run();
+    const result = await service.run(principal);
 
     expect(prisma.transaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { organizationId: 'demo-org' } }),
@@ -57,7 +59,7 @@ describe('ReconciliationService.run', () => {
     prisma.tx.exception.create.mockRejectedValueOnce(new Error('database write failed'));
     const service = new ReconciliationService(prisma as never);
 
-    await expect(service.run()).rejects.toThrow('database write failed');
+    await expect(service.run(principal)).rejects.toThrow('database write failed');
     expect(prisma.tx.auditLog.create).not.toHaveBeenCalled();
   });
 });

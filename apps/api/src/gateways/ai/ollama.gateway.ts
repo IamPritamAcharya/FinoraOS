@@ -15,6 +15,12 @@ export class OllamaGateway implements AiGateway {
         body: JSON.stringify({
           model,
           stream: false,
+          keep_alive: '10m',
+          options: {
+            temperature: 0.1,
+            num_ctx: Number(process.env.OLLAMA_CONTEXT_LENGTH ?? 8192),
+            num_predict: input.responseFormat === 'json' ? 420 : 260,
+          },
           ...(input.responseFormat === 'json' ? { format: 'json' } : {}),
           messages: [
             { role: 'system', content: input.system },

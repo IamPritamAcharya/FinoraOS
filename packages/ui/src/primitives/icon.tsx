@@ -4,6 +4,7 @@ export type FinoraIconName =
   | 'account'
   | 'add'
   | 'chevronRight'
+  | 'check'
   | 'close'
   | 'exceptions'
   | 'finora'
@@ -24,6 +25,7 @@ export function FinoraIcon({ name, ...props }: SVGProps<SVGSVGElement> & { name:
     ),
     add: <path d="M12 5v14M5 12h14" strokeLinecap="round" />,
     chevronRight: <path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />,
+    check: <path d="m5 12.5 4.2 4.2L19 7" strokeLinecap="round" strokeLinejoin="round" />,
     close: <path d="m6 6 12 12M18 6 6 18" strokeLinecap="round" />,
     exceptions: (
       <>

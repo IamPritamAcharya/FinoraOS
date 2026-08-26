@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AgentsService } from './agents.service.js';
 
+const principal = { organizationId: 'demo-org', userId: 'demo-user' };
+
 const prismaMock = () => {
   const transactionClient = {
     exception: { update: vi.fn().mockResolvedValue({ id: 'exception-1' }) },
@@ -43,7 +45,7 @@ describe('AgentsService.investigate', () => {
     };
     const service = new AgentsService(prisma as never, ai);
 
-    const result = await service.investigate('exception-1');
+    const result = await service.investigate(principal, 'exception-1');
 
     expect(ai.complete).toHaveBeenCalledOnce();
     expect(result.status).toBe('PROPOSED');

@@ -62,6 +62,9 @@ async function main() {
       ['AgentRun', `"organizationId" = ${orgId}`],
       ['AuditLog', `"organizationId" = ${orgId}`],
       ['ChatThread', `"organizationId" = ${orgId}`],
+      ['CashAccount', `"organizationId" = ${orgId}`],
+      ['CashMovement', `"organizationId" = ${orgId}`],
+      ['Adjustment', `"organizationId" = ${orgId}`],
     ] as const;
     for (const [table, predicate] of directTenantTables) {
       await client.query(`ALTER TABLE public."${table}" ENABLE ROW LEVEL SECURITY;`);

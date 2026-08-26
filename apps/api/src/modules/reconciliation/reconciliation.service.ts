@@ -1,13 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { ExceptionStatus, money } from '@finora/platform';
+import { Prisma } from '@prisma/client';
+import {
+  ExceptionResolutionSchema,
+  ExceptionStatus,
+  money,
+  type RequestPrincipal,
+} from '@finora/platform';
 import { apiLogger } from '../../common/api-logger.js';
 import {
   runReconciliation,
   type ReconciliationException,
   type ReconciliationRecord,
 } from '@finora/reconciliation';
-const org = () => process.env.DEMO_ORGANIZATION_ID ?? 'demo-org';
 
 type SeedMetadata = {
   bankReference?: string;
@@ -34,30 +39,30 @@ const exceptionType = (item: ReconciliationException) =>
 @Injectable()
 export class ReconciliationService {
   constructor(private readonly prisma: PrismaService) {}
-  latestRun() {
+  latestRun(principal: RequestPrincipal) {
     return this.prisma.reconciliationRun.findFirst({
-      where: { organizationId: org() },
+      where: { organizationId: principal.organizationId },
       orderBy: { startedAt: 'desc' },
       include: { matches: true, exceptions: true },
     });
   }
-  exceptions() {
+  exceptions(principal: RequestPrincipal) {
     return this.prisma.exception.findMany({
-      where: { organizationId: org() },
+      where: { organizationId: principal.organizationId },
       include: { evidence: true, agentRuns: { include: { steps: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
-  async exceptionByExternalId(externalId: string) {
+  async exceptionByExternalId(principal: RequestPrincipal, externalId: string) {
     return this.prisma.exception.findFirst({
-      where: { organizationId: org(), externalId: externalId.toUpperCase() },
+      where: { organizationId: principal.organizationId, externalId: externalId.toUpperCase() },
       include: { evidence: true, agentRuns: { include: { steps: true } } },
     });
   }
-  async exceptionsForChat(minimumAmount?: string) {
+  async exceptionsForChat(principal: RequestPrincipal, minimumAmount?: string) {
     const exceptions = await this.prisma.exception.findMany({
       where: {
-        organizationId: org(),
+        organizationId: principal.organizationId,
         status: { in: ['OPEN', 'NEEDS_REVIEW', 'UNRESOLVED', 'PROPOSED'] },
       },
       orderBy: { createdAt: 'desc' },
@@ -83,18 +88,130 @@ export class ReconciliationService {
         variance: variance.toFixed(2),
       }));
   }
-  async approve(id: string) {
-    return this.prisma.exception.update({
-      where: { id },
-      data: {
-        status: ExceptionStatus.RESOLVED,
-        resolution: { approved: true, actor: 'demo.finance@finora.local' },
-      },
+  async approve(principal: RequestPrincipal, id: string) {
+    const exception = await this.prisma.exception.findFirst({
+      where: { id, organizationId: principal.organizationId },
+    });
+    if (!exception) throw new NotFoundException('Exception not found');
+    if (exception.status !== ExceptionStatus.PROPOSED || !exception.resolution) {
+      throw new BadRequestException('Only a validated proposed resolution can be approved.');
+    }
+    const parsed = ExceptionResolutionSchema.safeParse(exception.resolution);
+    if (!parsed.success) throw new BadRequestException('The stored proposal failed validation.');
+    const resolution = parsed.data;
+    const action = resolution.proposedActions?.[0];
+    if (action?.type !== 'CREATE_SETTLEMENT_FEE_ADJUSTMENT') {
+      throw new BadRequestException('This proposal requires human review and cannot be executed.');
+    }
+    const actionType = action.type;
+    const actionPayload = JSON.parse(JSON.stringify(action.payload ?? {})) as Prisma.InputJsonValue;
+    const amount = money(exception.expectedAmount.toString())
+      .minus(exception.receivedAmount.toString())
+      .abs();
+    const approved = await this.prisma.$transaction(async (tx) => {
+      const adjustment = await tx.adjustment.upsert({
+        where: {
+          organizationId_exceptionId_type: {
+            organizationId: principal.organizationId,
+            exceptionId: exception.id,
+            type: actionType,
+          },
+        },
+        update: {},
+        create: {
+          organizationId: principal.organizationId,
+          exceptionId: exception.id,
+          type: actionType,
+          amount: amount.toFixed(2),
+          currency: 'INR',
+          details: actionPayload,
+          approvedBy: principal.userId,
+          approvedAt: new Date(),
+          executedAt: new Date(),
+        },
+      });
+      const updated = await tx.exception.update({
+        where: { id: exception.id },
+        data: {
+          status: ExceptionStatus.RESOLVED,
+          resolution: JSON.parse(
+            JSON.stringify({ ...resolution, approved: true, adjustmentId: adjustment.id }),
+          ) as Prisma.InputJsonValue,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: principal.organizationId,
+          actor: principal.userId,
+          action: 'RESOLUTION_APPROVED_AND_EXECUTED',
+          entityType: 'Exception',
+          entityId: exception.id,
+          details: { adjustmentId: adjustment.id, actionType },
+        },
+      });
+      return { exception: updated, adjustment };
+    });
+    let rerun: Awaited<ReturnType<ReconciliationService['run']>> | null = null;
+    try {
+      rerun = await this.run(principal);
+      await this.prisma.auditLog.create({
+        data: {
+          organizationId: principal.organizationId,
+          actor: 'Reconciliation Engine',
+          action: 'POST_APPROVAL_RECONCILIATION_RERUN',
+          entityType: 'Exception',
+          entityId: exception.id,
+          details: { reconciliationRunId: rerun.run.id, adjustmentId: approved.adjustment.id },
+        },
+      });
+    } catch (error) {
+      apiLogger.error('Post-approval reconciliation rerun failed', {
+        exceptionId: exception.id,
+        adjustmentId: approved.adjustment.id,
+        error: error instanceof Error ? error.message : 'Unknown rerun error',
+      });
+    }
+    return { ...approved, rerun };
+  }
+
+  async reject(principal: RequestPrincipal, id: string, reason: string) {
+    const exception = await this.prisma.exception.findFirst({
+      where: { id, organizationId: principal.organizationId },
+    });
+    if (!exception) throw new NotFoundException('Exception not found');
+    if (exception.status !== ExceptionStatus.PROPOSED) {
+      throw new BadRequestException('Only a proposed resolution can be rejected.');
+    }
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.exception.update({
+        where: { id },
+        data: {
+          status: ExceptionStatus.NEEDS_REVIEW,
+          resolution: JSON.parse(
+            JSON.stringify({
+              ...(exception.resolution as object),
+              rejected: true,
+              rejectionReason: reason,
+            }),
+          ) as Prisma.InputJsonValue,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: principal.organizationId,
+          actor: principal.userId,
+          action: 'PROPOSED_RESOLUTION_REJECTED',
+          entityType: 'Exception',
+          entityId: id,
+          details: { reason },
+        },
+      });
+      return updated;
     });
   }
 
-  async run() {
-    const organizationId = org();
+  async run(principal: RequestPrincipal) {
+    const organizationId = principal.organizationId;
     apiLogger.info('Reconciliation run started', { organizationId });
     const transactions = await this.prisma.transaction.findMany({
       where: { organizationId },

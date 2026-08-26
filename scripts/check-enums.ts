@@ -1,7 +1,23 @@
 import { readFileSync } from 'node:fs';
-import { AgentType, ExceptionStatus, ExceptionType, ReconciliationStatus } from '@finora/platform';
+import {
+  AgentType,
+  CashDirection,
+  CashMovementCategory,
+  CashMovementStatus,
+  ExceptionStatus,
+  ExceptionType,
+  ReconciliationStatus,
+} from '@finora/platform';
 const schema = readFileSync(new URL('../prisma/schema.prisma', import.meta.url), 'utf8');
-const pairs = { ReconciliationStatus, ExceptionStatus, ExceptionType, AgentType };
+const pairs = {
+  ReconciliationStatus,
+  ExceptionStatus,
+  ExceptionType,
+  AgentType,
+  CashDirection,
+  CashMovementStatus,
+  CashMovementCategory,
+};
 let invalid = false;
 for (const [name, values] of Object.entries(pairs)) {
   const match = schema.match(new RegExp(`enum ${name}\\s*\\{([^}]+)\\}`));

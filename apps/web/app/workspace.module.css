@@ -279,6 +279,151 @@
   color: var(--finora-text-muted);
 }
 
+.fullSpan {
+  grid-column: 1 / -1;
+}
+.priorityGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+}
+.pageLink {
+  display: inline-flex;
+  margin-top: 16px;
+  color: var(--finora-brand);
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: none;
+}
+.forecastList {
+  display: grid;
+  gap: 6px;
+}
+.forecastList > div {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  border-radius: 8px;
+  background: var(--finora-muted);
+  padding: 10px 12px;
+}
+.forecastList span,
+.forecastList small {
+  color: var(--finora-text-muted);
+  font-size: 11px;
+}
+.forecastList strong {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.forecastList .riskRow {
+  background: #fff6e6;
+}
+.riskRow small,
+.riskRow strong {
+  color: #9b5e10;
+}
+.loadingGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.loadingGrid span {
+  height: 120px;
+  border: 1px solid var(--finora-border);
+  border-radius: var(--finora-radius);
+  background: linear-gradient(
+    90deg,
+    var(--finora-surface),
+    var(--finora-muted),
+    var(--finora-surface)
+  );
+  background-size: 200% 100%;
+  animation: loading-shimmer 1.3s ease infinite;
+}
+@keyframes loading-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+.exceptionList {
+  display: grid;
+  gap: 10px;
+}
+.exceptionRow {
+  border: 1px solid var(--finora-border);
+  border-radius: 10px;
+  background: var(--finora-surface);
+  padding: 15px;
+}
+.exceptionSummary {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+}
+.exceptionSummary strong,
+.exceptionSummary span,
+.proposal strong,
+.proposal span,
+.proposal small {
+  display: block;
+}
+.exceptionSummary strong {
+  color: var(--finora-text);
+  font-size: 13px;
+}
+.exceptionSummary span,
+.exceptionRow > p,
+.proposal span,
+.proposal small {
+  color: var(--finora-text-muted);
+  font-size: 11px;
+}
+.exceptionRow > p {
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+.proposal {
+  display: grid;
+  gap: 3px;
+  margin-top: 12px;
+  border-left: 3px solid var(--finora-brand);
+  border-radius: 0 8px 8px 0;
+  background: var(--finora-brand-subtle);
+  padding: 10px 12px;
+}
+.proposal strong {
+  font-size: 12px;
+}
+.rowActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.recordToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.recordSearch {
+  width: min(280px, 100%);
+  min-height: 36px;
+  border: 1px solid var(--finora-border);
+  border-radius: 9px;
+  background: var(--finora-surface);
+  color: var(--finora-text);
+  padding: 0 12px;
+}
+
 @media (max-width: 900px) {
   .shell {
     display: block;
@@ -294,7 +439,17 @@
   }
 
   .metrics,
-  .twoCol {
+  .twoCol,
+  .loadingGrid,
+  .priorityGrid {
     grid-template-columns: 1fr;
+  }
+
+  .recordToolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .exceptionSummary {
+    grid-template-columns: 1fr auto;
   }
 }

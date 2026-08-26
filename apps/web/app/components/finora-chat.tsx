@@ -1,150 +1,307 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { TextStreamChatTransport } from 'ai';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { DefaultChatTransport, type UIMessage } from 'ai';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { FinoraArtifact, FinoraChatPayload } from '@finora/platform';
 import { Amount, FinoraButton, FinoraIcon, FinoraIconButton, StatusBadge } from '@finora/ui';
 import styles from './finora-chat.module.css';
 
-type Data = Record<string, any>;
-type Thread = { id: string; title: string; updatedAt: number; messages: Data[] };
-const chatHistoryKey = 'finora-chat-history';
-const activeChatThreadKey = 'finora-active-chat-thread';
+type Data = Record<string, unknown>;
+type FinoraUIMessage = UIMessage<unknown, { finora: FinoraChatPayload }>;
+type ThreadSummary = { id: string; title: string; createdAt: string; updatedAt: string };
+type PersistedMessage = { id: string; role: string; content: string; payload?: Data | null };
+type PersistedThread = ThreadSummary & { messages: PersistedMessage[] };
 
+const activeChatThreadKey = 'finora-active-chat-thread';
 const suggestions = [
   {
-    title: 'Explain a settlement',
-    prompt: 'Why was settlement STL_0001 short?',
-    detail: 'Break down a variance',
+    title: 'Ask about your finances',
+    prompt: 'Summarise our expenses this month and tell me the largest category.',
+    detail: 'Analyse records across tools',
   },
   {
     title: 'Investigate an exception',
-    prompt: 'Investigate EXC_005.',
-    detail: 'Propose a safe resolution',
+    prompt: 'Investigate EXC_005 and show me the evidence.',
+    detail: 'Create a controlled proposal',
   },
   {
     title: 'Find a cash risk',
     prompt: 'What is our expected cash position this week?',
-    detail: 'See the near-term outlook',
+    detail: 'Review scheduled movements',
   },
 ];
 
-const messageText = (message: { parts: Array<{ type: string; text?: string }> }) =>
+const messageText = (message: Pick<FinoraUIMessage, 'parts'>) =>
   message.parts
-    .filter((part) => part.type === 'text')
-    .map((part) => part.text ?? '')
+    .filter(
+      (part): part is Extract<(typeof message.parts)[number], { type: 'text' }> =>
+        part.type === 'text',
+    )
+    .map((part) => part.text)
     .join('');
 
-function SettlementEvidence({
-  settlement,
-  onViewSettlement,
-}: {
-  settlement: Data;
-  onViewSettlement: () => void;
-}) {
+const messagePayload = (message: FinoraUIMessage) =>
+  message.parts.find((part) => part.type === 'data-finora')?.data;
+
+const valueRecord = (value: unknown): Data =>
+  value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as Data) : {};
+
+const persistedToUiMessage = (threadId: string, message: PersistedMessage): FinoraUIMessage => {
+  const payload = valueRecord(message.payload);
+  const data: FinoraChatPayload = {
+    threadId,
+    messageId: message.id,
+    text: message.content,
+    artifacts: Array.isArray(payload.artifacts) ? (payload.artifacts as FinoraArtifact[]) : [],
+    activity: Array.isArray(payload.activity)
+      ? (payload.activity as FinoraChatPayload['activity'])
+      : [],
+    references: Array.isArray(payload.references) ? (payload.references as string[]) : [],
+    clarified: payload.clarified === true,
+  };
+  return {
+    id: message.id,
+    role: message.role === 'assistant' ? 'assistant' : 'user',
+    parts: [
+      { type: 'text', text: message.content },
+      ...(message.role === 'assistant' ? ([{ type: 'data-finora', data }] as const) : []),
+    ],
+  };
+};
+
+const createThreadId = () => crypto.randomUUID();
+const humanize = (value: string) =>
+  value
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replaceAll('_', ' ')
+    .replace(/^./, (character) => character.toUpperCase());
+
+function ArtifactHeader({ artifact, status }: { artifact: FinoraArtifact; status?: string }) {
+  return (
+    <div className={styles.evidenceHead}>
+      <div>
+        <span className={styles.cardKicker}>{humanize(artifact.type)}</span>
+        <strong>{artifact.title}</strong>
+      </div>
+      {status && <StatusBadge status={status} />}
+    </div>
+  );
+}
+
+function ArtifactLink({ artifact }: { artifact: FinoraArtifact }) {
+  return artifact.href ? (
+    <a className={styles.artifactLink} href={artifact.href}>
+      Open in workspace <FinoraIcon name="chevronRight" />
+    </a>
+  ) : null;
+}
+
+function SettlementArtifact({ artifact, data }: { artifact: FinoraArtifact; data: Data }) {
   return (
     <section
       className={styles.evidenceCard}
-      aria-label={`Settlement evidence for ${settlement.externalId}`}
+      aria-label={`Settlement evidence for ${artifact.title}`}
     >
-      <div className={styles.evidenceHead}>
-        <div>
-          <span className={styles.cardKicker}>Settlement breakdown</span>
-          <strong>{settlement.externalId}</strong>
-        </div>
-        <StatusBadge status="MATCHED" label="Explained variance" />
-      </div>
+      <ArtifactHeader
+        artifact={artifact}
+        status={String(data.unexplained) === '0.00' ? 'MATCHED' : 'NEEDS_REVIEW'}
+      />
       <dl>
-        <div>
-          <dt>Expected</dt>
-          <dd>
-            <Amount value={settlement.expectedAmount} />
-          </dd>
-        </div>
-        <div>
-          <dt>Received</dt>
-          <dd>
-            <Amount value={settlement.receivedAmount} />
-          </dd>
-        </div>
-        <div>
-          <dt>Gateway fee</dt>
-          <dd>
-            <Amount value={settlement.feeAmount} />
-          </dd>
-        </div>
-        <div>
-          <dt>GST</dt>
-          <dd>
-            <Amount value={settlement.gstAmount} />
-          </dd>
-        </div>
-        <div>
-          <dt>Refunds</dt>
-          <dd>
-            <Amount value={settlement.refundAmount} />
-          </dd>
-        </div>
+        {[
+          ['Expected', data.expectedAmount],
+          ['Received', data.receivedAmount],
+          ['Gateway fee', data.feeAmount],
+          ['GST', data.gstAmount],
+          ['Refunds', data.refundAmount],
+          ['Unexplained', data.unexplained],
+        ].map(([label, value]) => (
+          <div key={String(label)}>
+            <dt>{String(label)}</dt>
+            <dd>
+              <Amount value={String(value ?? '0')} />
+            </dd>
+          </div>
+        ))}
       </dl>
-      <FinoraButton
-        className={styles.evidenceLink}
-        variant="ghost"
-        size="small"
-        onClick={onViewSettlement}
-      >
-        View settlement <FinoraIcon name="chevronRight" />
-      </FinoraButton>
+      <ArtifactLink artifact={artifact} />
     </section>
   );
 }
 
-function ExceptionInvestigation({
-  exception,
-  onViewException,
-}: {
-  exception: Data;
-  onViewException: () => void;
-}) {
-  const resolution = exception.resolution as Data | undefined;
-  const action = resolution?.proposedActions?.[0] as Data | undefined;
-  const actionLabel = action?.type
-    ? String(action.type).replaceAll('_', ' ').toLowerCase()
-    : 'human review';
+function ExceptionArtifact({ artifact, data }: { artifact: FinoraArtifact; data: Data }) {
+  const source = valueRecord(data.result ?? data);
+  const resolution = valueRecord(source.resolution ?? source.result ?? data.result);
+  const confidence = Number(resolution.confidence ?? source.confidence ?? 0);
   return (
     <section
       className={styles.exceptionCard}
-      aria-label={`Investigation for ${exception.externalId}`}
+      aria-label={`Exception evidence for ${artifact.title}`}
     >
-      <div className={styles.evidenceHead}>
-        <div>
-          <span className={styles.cardKicker}>Exception investigation</span>
-          <strong>{exception.externalId}</strong>
-        </div>
-        <StatusBadge status={exception.status} />
-      </div>
-      <p>{exception.reason}</p>
-      <dl>
-        <div>
-          <dt>Confidence</dt>
-          <dd>{Math.round(Number(exception.confidence) * 100)}%</dd>
-        </div>
-        <div>
-          <dt>Proposed action</dt>
-          <dd className={styles.actionLabel}>{actionLabel}</dd>
-        </div>
-      </dl>
-      <p className={styles.exceptionGuardrail}>
-        Proposal only — no financial record was changed or approved.
+      <ArtifactHeader
+        artifact={artifact}
+        status={String(source.status ?? resolution.status ?? 'OPEN')}
+      />
+      <p>
+        {String(resolution.reason ?? source.reason ?? 'Review the linked evidence before action.')}
       </p>
-      <FinoraButton
-        className={styles.evidenceLink}
-        variant="ghost"
-        size="small"
-        onClick={onViewException}
-      >
-        View exception <FinoraIcon name="chevronRight" />
-      </FinoraButton>
+      {confidence > 0 && (
+        <div className={styles.confidenceRow}>
+          <span>Agent confidence</span>
+          <strong>{Math.round(confidence * 100)}%</strong>
+        </div>
+      )}
+      <p className={styles.exceptionGuardrail}>
+        Proposal only. Approval is required before FinoraOS creates an adjustment.
+      </p>
+      <ArtifactLink artifact={artifact} />
     </section>
+  );
+}
+
+const rowsFrom = (data: Data) =>
+  Array.isArray(data.rows)
+    ? (data.rows.filter((row) => row && typeof row === 'object') as Data[])
+    : [];
+const preferredColumns = (rows: Data[]) => {
+  const preferred = [
+    'externalId',
+    'name',
+    'description',
+    'email',
+    'category',
+    'status',
+    'amount',
+    'occurredAt',
+  ];
+  const keys = [...new Set(rows.flatMap((row) => Object.keys(row)))];
+  return [
+    ...preferred.filter((key) => keys.includes(key)),
+    ...keys.filter((key) => !preferred.includes(key)),
+  ].slice(0, 5);
+};
+function displayValue(key: string, value: unknown) {
+  if (value === null || value === undefined) return '—';
+  if (key.toLowerCase().includes('amount')) return <Amount value={String(value)} />;
+  if (key.endsWith('At') && typeof value === 'string')
+    return new Intl.DateTimeFormat('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date(value));
+  if (typeof value === 'object') return 'Details';
+  return String(value).replaceAll('_', ' ');
+}
+
+function TableArtifact({ artifact, data }: { artifact: FinoraArtifact; data: Data }) {
+  const rows = rowsFrom(data).slice(0, 8);
+  const columns = preferredColumns(rows);
+  return (
+    <section className={styles.tableArtifact} aria-label={artifact.title}>
+      <ArtifactHeader artifact={artifact} />
+      {rows.length ? (
+        <div className={styles.artifactTableWrap}>
+          <table>
+            <thead>
+              <tr>
+                {columns.map((column) => (
+                  <th key={column}>{humanize(column)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr key={String(row.id ?? row.externalId ?? index)}>
+                  {columns.map((column) => (
+                    <td key={column}>{displayValue(column, row[column])}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className={styles.emptyArtifact}>No matching records.</p>
+      )}
+      <ArtifactLink artifact={artifact} />
+    </section>
+  );
+}
+
+function ForecastArtifact({ artifact, data }: { artifact: FinoraArtifact; data: Data }) {
+  return (
+    <section className={styles.metricsArtifact} aria-label={artifact.title}>
+      <ArtifactHeader artifact={artifact} />
+      <div className={styles.forecastRows}>
+        {rowsFrom(data).map((row, index) => (
+          <div key={String(row.date ?? index)} className={row.risk ? styles.forecastRisk : ''}>
+            <span>{String(row.label ?? row.date ?? '')}</span>
+            <strong>
+              <Amount value={String(row.amount ?? '0')} />
+            </strong>
+            {row.risk ? <small>Shortfall risk</small> : null}
+          </div>
+        ))}
+      </div>
+      <ArtifactLink artifact={artifact} />
+    </section>
+  );
+}
+
+function MetricsArtifact({ artifact, data }: { artifact: FinoraArtifact; data: Data }) {
+  const entries = Object.entries(data)
+    .filter(([, value]) => ['string', 'number'].includes(typeof value))
+    .slice(0, 6);
+  return (
+    <section className={styles.metricsArtifact} aria-label={artifact.title}>
+      <ArtifactHeader artifact={artifact} />
+      <div className={styles.metricRows}>
+        {entries.map(([key, value]) => (
+          <div key={key}>
+            <span>{humanize(key)}</span>
+            <strong>
+              {key.toLowerCase().includes('amount') || key === 'total' ? (
+                <Amount value={String(value)} />
+              ) : (
+                String(value)
+              )}
+            </strong>
+          </div>
+        ))}
+      </div>
+      <ArtifactLink artifact={artifact} />
+    </section>
+  );
+}
+
+function ArtifactCard({ artifact }: { artifact: FinoraArtifact }) {
+  const data = valueRecord(artifact.data);
+  if (artifact.type === 'settlement') return <SettlementArtifact artifact={artifact} data={data} />;
+  if (artifact.type === 'exception') return <ExceptionArtifact artifact={artifact} data={data} />;
+  if (artifact.type === 'forecast') return <ForecastArtifact artifact={artifact} data={data} />;
+  if (artifact.type === 'table') return <TableArtifact artifact={artifact} data={data} />;
+  return <MetricsArtifact artifact={artifact} data={data} />;
+}
+
+function Activity({ payload }: { payload?: FinoraChatPayload }) {
+  if (!payload?.activity.length) return null;
+  return (
+    <details className={styles.activity}>
+      <summary>
+        <span className={styles.activityCheck}>
+          <FinoraIcon name="check" />
+        </span>
+        {payload.activity.length} finance tool{payload.activity.length === 1 ? '' : 's'} used
+      </summary>
+      <ol>
+        {payload.activity.map((item) => (
+          <li key={item.callId}>
+            <span>{humanize(item.tool)}</span>
+            <small>{item.label}</small>
+          </li>
+        ))}
+      </ol>
+    </details>
   );
 }
 
@@ -152,106 +309,96 @@ function ResponseState() {
   return (
     <div className={styles.investigation} aria-live="polite">
       <span className={`${styles.investigationDot} ${styles.investigationDotActive}`} />
-      Finora is responding…
+      Finora is checking your finance workspace…
     </div>
   );
 }
 
-const newThreadId = () =>
-  typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `thread-${Date.now()}`;
-
-export function FinoraChat({
-  settlements,
-  exceptions,
-  onViewSettlement,
-  onViewException,
-  onInvestigationCompleted,
-}: {
-  settlements: Data[];
-  exceptions: Data[];
-  onViewSettlement: () => void;
-  onViewException: () => void;
-  onInvestigationCompleted: () => void;
-}) {
-  const transport = useMemo(() => new TextStreamChatTransport({ api: '/api/finora-chat' }), []);
-  const { messages, sendMessage, status, error, stop, setMessages } = useChat({
+export function FinoraChat({ onInvestigationCompleted }: { onInvestigationCompleted: () => void }) {
+  const threadIdRef = useRef(createThreadId());
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport<FinoraUIMessage>({
+        api: '/api/finora-chat',
+        prepareSendMessagesRequest: ({ messages }) => ({
+          body: { messages, threadId: threadIdRef.current },
+        }),
+      }),
+    [],
+  );
+  const { messages, sendMessage, status, error, stop, setMessages } = useChat<FinoraUIMessage>({
     transport,
     throttle: 40,
   });
   const [input, setInput] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyQuery, setHistoryQuery] = useState('');
-  const [threads, setThreads] = useState<Thread[]>([]);
-  const [currentThreadId, setCurrentThreadId] = useState(newThreadId);
-  const [historyReady, setHistoryReady] = useState(false);
+  const [threads, setThreads] = useState<ThreadSummary[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const initializedRef = useRef(false);
   const isWorking = status === 'submitted' || status === 'streaming';
   const currentTitle = messages.length
     ? messageText(messages.find((message) => message.role === 'user') ?? messages[0]).slice(0, 52)
     : 'New conversation';
 
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(chatHistoryKey);
-      const savedThreads = stored ? (JSON.parse(stored) as Thread[]) : [];
-      setThreads(savedThreads);
-
-      const activeThreadId = window.localStorage.getItem(activeChatThreadKey);
-      const activeThread =
-        savedThreads.find((thread) => thread.id === activeThreadId) ?? savedThreads[0];
-      if (activeThread) {
-        setCurrentThreadId(activeThread.id);
-        setMessages(activeThread.messages as typeof messages);
-      }
-    } catch {
-      // Browser history is a convenience only; finance data remains server-side.
-    }
-    setHistoryReady(true);
+  const refreshThreads = useCallback(async () => {
+    const response = await fetch('/api/finora-chat/threads', { cache: 'no-store' });
+    if (response.ok) setThreads((await response.json()) as ThreadSummary[]);
+    setHistoryLoading(false);
   }, []);
+  const loadThread = useCallback(
+    async (threadId: string, closeDrawer = true) => {
+      const response = await fetch(`/api/finora-chat/threads/${encodeURIComponent(threadId)}`, {
+        cache: 'no-store',
+      });
+      if (!response.ok) return false;
+      const thread = (await response.json()) as PersistedThread;
+      if (!thread.id || !Array.isArray(thread.messages)) return false;
+      threadIdRef.current = thread.id;
+      setMessages(thread.messages.map((message) => persistedToUiMessage(thread.id, message)));
+      localStorage.setItem(activeChatThreadKey, thread.id);
+      if (closeDrawer) setHistoryOpen(false);
+      return true;
+    },
+    [setMessages],
+  );
+
   useEffect(() => {
-    if (!historyReady || !messages.length) return;
-    setThreads((current) => {
-      const next = [
-        {
-          id: currentThreadId,
-          title: currentTitle || 'Untitled conversation',
-          updatedAt: Date.now(),
-          messages: messages as unknown as Data[],
-        },
-        ...current.filter((thread) => thread.id !== currentThreadId),
-      ].slice(0, 12);
-      try {
-        window.localStorage.setItem(chatHistoryKey, JSON.stringify(next));
-        window.localStorage.setItem(activeChatThreadKey, currentThreadId);
-      } catch {
-        /* no-op */
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    void (async () => {
+      await refreshThreads();
+      const active = localStorage.getItem(activeChatThreadKey);
+      if (active) {
+        const loaded = await loadThread(active, false);
+        if (!loaded) localStorage.removeItem(activeChatThreadKey);
       }
-      return next;
-    });
-  }, [currentThreadId, currentTitle, historyReady, messages]);
-
+    })();
+  }, [loadThread, refreshThreads]);
   useEffect(() => {
-    if (!historyReady || !messages.length) return;
-    const frame = window.requestAnimationFrame(() => {
+    const frame = requestAnimationFrame(() => {
       const viewport = scrollViewportRef.current;
-      if (viewport) viewport.scrollTop = viewport.scrollHeight;
+      if (viewport)
+        viewport.scrollTo({
+          top: viewport.scrollHeight,
+          behavior: messages.length > 2 ? 'smooth' : 'auto',
+        });
     });
-    return () => window.cancelAnimationFrame(frame);
-  }, [historyReady, isWorking, messages.length]);
-
-  const latestInvestigationReference = useMemo(() => {
-    const latestAssistantMessage = [...messages]
-      .reverse()
-      .find((message) => message.role === 'assistant');
-    return latestAssistantMessage
-      ? messageText(latestAssistantMessage).match(/\bEXC_\d{3}\b/i)?.[0]
-      : undefined;
-  }, [messages]);
-
+    return () => cancelAnimationFrame(frame);
+  }, [isWorking, messages]);
   useEffect(() => {
-    if (latestInvestigationReference) void onInvestigationCompleted();
-  }, [latestInvestigationReference, onInvestigationCompleted]);
+    if (status !== 'ready') return;
+    const payload = [...messages].reverse().map(messagePayload).find(Boolean);
+    if (payload?.threadId) {
+      threadIdRef.current = payload.threadId;
+      localStorage.setItem(activeChatThreadKey, payload.threadId);
+      void refreshThreads();
+    }
+    if (payload?.artifacts.some((artifact) => artifact.type === 'exception'))
+      void onInvestigationCompleted();
+  }, [messages, onInvestigationCompleted, refreshThreads, status]);
 
   const send = async (text = input) => {
     const value = text.trim();
@@ -260,26 +407,12 @@ export function FinoraChat({
     await sendMessage({ text: value });
   };
   const startNew = () => {
+    threadIdRef.current = createThreadId();
     setMessages([]);
     setInput('');
-    setCurrentThreadId(newThreadId());
-    try {
-      window.localStorage.removeItem(activeChatThreadKey);
-    } catch {
-      // A new blank chat has no persisted thread until its first message.
-    }
+    localStorage.removeItem(activeChatThreadKey);
     setHistoryOpen(false);
     composerRef.current?.focus();
-  };
-  const loadThread = (thread: Thread) => {
-    setMessages(thread.messages as typeof messages);
-    setCurrentThreadId(thread.id);
-    try {
-      window.localStorage.setItem(activeChatThreadKey, thread.id);
-    } catch {
-      // Browser history is optional.
-    }
-    setHistoryOpen(false);
   };
   const filteredThreads = threads.filter((thread) =>
     thread.title.toLowerCase().includes(historyQuery.trim().toLowerCase()),
@@ -289,7 +422,6 @@ export function FinoraChat({
     <section className={styles.shell}>
       <header className={styles.topbar}>
         <div className={styles.headerTitle}>
-          <img src="/brand/logo-mark.svg" alt="" />
           <span>Finora</span>
           <span className={styles.separator}>/</span>
           <strong>{currentTitle}</strong>
@@ -301,7 +433,6 @@ export function FinoraChat({
           <FinoraIconButton
             className={styles.historyButton}
             variant="secondary"
-            type="button"
             aria-label="Browse chat history"
             aria-expanded={historyOpen}
             onClick={() => setHistoryOpen((open) => !open)}
@@ -310,7 +441,6 @@ export function FinoraChat({
           </FinoraIconButton>
         </div>
       </header>
-
       <div className={styles.workspace}>
         <div className={styles.conversationColumn}>
           <div className={styles.scrollViewport} ref={scrollViewportRef}>
@@ -323,20 +453,18 @@ export function FinoraChat({
                     <img src="/brand/logo-mark.svg" alt="" />
                   </div>
                   <p className={styles.welcomeKicker}>FINORA</p>
-                  <h1 className={styles.welcomeHeading}>What can I help you reconcile?</h1>
+                  <h1 className={styles.welcomeHeading}>What can I help you investigate?</h1>
                   <p className={styles.welcomeHelper}>
-                    Ask about settlements, exceptions, cash position, or tax matching.
+                    Ask naturally. Finora selects controlled finance tools, checks the evidence, and
+                    explains what it finds.
                   </p>
                   <div className={styles.suggestionGrid}>
                     {suggestions.map((suggestion) => (
                       <FinoraButton
                         key={suggestion.title}
                         className={styles.suggestionCard}
-                        type="button"
                         variant="ghost"
-                        onClick={() => {
-                          void send(suggestion.prompt);
-                        }}
+                        onClick={() => void send(suggestion.prompt)}
                       >
                         <strong className={styles.suggestionTitle}>{suggestion.title}</strong>
                         <span className={styles.suggestionDetail}>{suggestion.detail}</span>
@@ -348,15 +476,8 @@ export function FinoraChat({
               )}
               {messages.map((message) => {
                 const text = messageText(message);
+                const payload = messagePayload(message);
                 if (!text) return null;
-                const settlement =
-                  message.role === 'assistant'
-                    ? settlements.find((item) => text.includes(item.externalId))
-                    : undefined;
-                const exception =
-                  message.role === 'assistant'
-                    ? exceptions.find((item) => text.includes(item.externalId))
-                    : undefined;
                 return (
                   <article
                     className={`${styles.message} ${message.role === 'assistant' ? styles.assistantMessage : ''}`}
@@ -372,18 +493,13 @@ export function FinoraChat({
                         {message.role === 'assistant' ? 'Finora' : 'Aarav Mehta'}
                       </p>
                       <div className={styles.messageCopy}>{text}</div>
-                      {settlement && (
-                        <SettlementEvidence
-                          settlement={settlement}
-                          onViewSettlement={onViewSettlement}
+                      {payload?.artifacts.map((artifact, index) => (
+                        <ArtifactCard
+                          key={`${message.id}-${artifact.type}-${index}`}
+                          artifact={artifact}
                         />
-                      )}
-                      {exception?.resolution && (
-                        <ExceptionInvestigation
-                          exception={exception}
-                          onViewException={onViewException}
-                        />
-                      )}
+                      ))}
+                      {message.role === 'assistant' && <Activity payload={payload} />}
                     </div>
                   </article>
                 );
@@ -391,12 +507,12 @@ export function FinoraChat({
               {isWorking && <ResponseState />}
               {error && (
                 <div className={styles.error}>
-                  Finora could not complete this request. Check the local API and try again.
+                  Finora could not complete this request. Your conversation is safe; check the API
+                  or model and try again.
                 </div>
               )}
             </div>
           </div>
-
           <form
             className={styles.composer}
             onSubmit={(event) => {
@@ -409,7 +525,7 @@ export function FinoraChat({
               ref={composerRef}
               value={input}
               rows={1}
-              placeholder="Ask Finora anything about your finances…"
+              placeholder="Ask Finora about your finances…"
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
@@ -441,12 +557,10 @@ export function FinoraChat({
             </div>
           </form>
           <p className={styles.disclaimer}>
-            Finora uses your connected financial records. Verify recommendations before taking
-            action.
+            Finora is evidence-grounded. Review proposed changes before approval.
           </p>
         </div>
       </div>
-
       <aside
         className={`${styles.drawer} ${historyOpen ? styles.drawerOpen : ''}`}
         aria-label="Chat history"
@@ -478,16 +592,15 @@ export function FinoraChat({
           {filteredThreads.length ? (
             filteredThreads.map((thread) => (
               <FinoraButton
-                className={thread.id === currentThreadId ? styles.current : ''}
+                className={thread.id === threadIdRef.current ? styles.current : ''}
                 key={thread.id}
-                type="button"
                 variant="ghost"
-                onClick={() => loadThread(thread)}
+                onClick={() => void loadThread(thread.id)}
               >
                 <strong>{thread.title}</strong>
                 <span>
                   {new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' }).format(
-                    thread.updatedAt,
+                    new Date(thread.updatedAt),
                   )}
                 </span>
                 <FinoraIcon name="chevronRight" />
@@ -498,12 +611,16 @@ export function FinoraChat({
               <span className={styles.historyEmptyIcon}>
                 <FinoraIcon name="history" />
               </span>
-              <strong>No conversations yet</strong>
-              <p>Chats started here will appear in this browser.</p>
+              <strong>{historyLoading ? 'Loading conversations…' : 'No conversations yet'}</strong>
+              <p>
+                {historyLoading
+                  ? 'Restoring your workspace.'
+                  : 'Your conversations will be saved to this workspace.'}
+              </p>
             </div>
           )}
         </div>
-        <FinoraButton className={styles.drawerNewChat} onClick={startNew}>
+        <FinoraButton className={styles.drawerNewChat} size="small" onClick={startNew}>
           <FinoraIcon name="add" /> New chat
         </FinoraButton>
       </aside>

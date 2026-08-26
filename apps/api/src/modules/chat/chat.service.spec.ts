@@ -1,158 +1,63 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ChatService } from './chat.service.js';
 
+const principal = { organizationId: 'demo-org', userId: 'demo-user' };
+
 describe('ChatService', () => {
-  it('uses the configured AI gateway for a general conversational question', async () => {
+  it('runs a multi-step tool conversation and persists the structured result', async () => {
     const ai = {
       complete: vi
         .fn()
         .mockResolvedValueOnce({
-          text: '{"tool":"general","arguments":{}}',
-          provider: 'mock',
-          model: 'mock',
+          text: JSON.stringify({ type: 'tool', call: { tool: 'getCurrentUser', arguments: {} } }),
         })
         .mockResolvedValueOnce({
-          text: 'I am Finora, your finance operations assistant.',
-          provider: 'ollama',
-          model: 'qwen3:4b-instruct-2507-q4_K_M',
+          text: JSON.stringify({
+            type: 'answer',
+            answer: 'Your email is finance@finora.local.',
+            citations: ['call-1'],
+          }),
         }),
     };
-    const agents = { investigateByExternalId: vi.fn() };
-    const service = new ChatService(
-      ai,
-      agents as never,
-      {
-        organizationSummary: vi.fn(),
-        listUsers: vi.fn(),
-        getSettlement: vi.fn(),
-        getException: vi.fn(),
-      } as never,
+    const execute = vi.fn().mockResolvedValue({
+      callId: 'call-1',
+      tool: 'getCurrentUser',
+      summary: 'You are signed in as Aarav Mehta. Your email is finance@finora.local.',
+      data: { name: 'Aarav Mehta', email: 'finance@finora.local' },
+      artifact: {
+        type: 'profile',
+        title: 'Your profile',
+        data: { name: 'Aarav Mehta', email: 'finance@finora.local' },
+      },
+    });
+    const tools = { forPrincipal: vi.fn().mockReturnValue({ execute }) };
+    const chats = {
+      getOrCreateThread: vi.fn().mockResolvedValue({ id: 'thread-1' }),
+      context: vi.fn().mockResolvedValue([]),
+      saveExchange: vi.fn().mockResolvedValue({
+        assistantMessage: { id: 'message-2' },
+        agentRun: { id: 'agent-run-1' },
+      }),
+    };
+    const result = await new ChatService(ai, tools as never, chats as never).respond(
+      principal,
+      'What is my email?',
+      [],
+      'thread-1',
     );
-
-    const result = await service.respond('Who are you?');
-
-    expect(ai.complete).toHaveBeenCalledTimes(2);
-    expect(ai.complete.mock.calls[0]?.[0]).toMatchObject({ responseFormat: 'json' });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(chats.saveExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        principal,
+        threadId: 'thread-1',
+        assistantText: 'Your email is finance@finora.local.',
+      }),
+    );
     expect(result).toMatchObject({
-      kind: 'general',
-      text: 'I am Finora, your finance operations assistant.',
+      threadId: 'thread-1',
+      messageId: 'message-2',
+      text: 'Your email is finance@finora.local.',
     });
-  });
-
-  it('routes a controlled exception reference to the investigator instead of general chat', async () => {
-    const ai = {
-      complete: vi.fn().mockResolvedValue({
-        text: '{"tool":"investigateException","arguments":{"exceptionId":"EXC_005"}}',
-      }),
-    };
-    const agents = {
-      investigateByExternalId: vi.fn().mockResolvedValue({
-        externalId: 'EXC_005',
-        result: {
-          status: 'PROPOSED',
-          confidence: 0.97,
-          reason: 'The settlement difference exactly equals fees, GST and refunds.',
-          explanation: 'The documented settlement adjustments account for the variance.',
-          proposedActions: [
-            {
-              type: 'CREATE_SETTLEMENT_FEE_ADJUSTMENT',
-              requiresApproval: true,
-              payload: { settlementId: 'STL_0005' },
-            },
-          ],
-        },
-      }),
-    };
-    const service = new ChatService(
-      ai,
-      agents as never,
-      {
-        organizationSummary: vi.fn(),
-        listUsers: vi.fn(),
-        getSettlement: vi.fn(),
-        getException: vi.fn(),
-      } as never,
-    );
-
-    const result = await service.respond('Investigate EXC_005.');
-
-    expect(agents.investigateByExternalId).toHaveBeenCalledWith('EXC_005');
-    expect(ai.complete).toHaveBeenCalledOnce();
-    expect(result).toMatchObject({
-      kind: 'exception-investigation',
-      exception: { status: 'PROPOSED' },
-    });
-  });
-
-  it('uses a prior settlement reference for a controlled follow-up without sending it to general AI', async () => {
-    const ai = {
-      complete: vi
-        .fn()
-        .mockResolvedValueOnce({
-          text: '{"tool":"getSettlement","arguments":{"settlementId":"STL_0001"}}',
-        })
-        .mockResolvedValue({
-          text: 'The recorded adjustments explain the result.',
-          provider: 'mock',
-          model: 'mock',
-        }),
-    };
-    const agents = { investigateByExternalId: vi.fn() };
-    const service = new ChatService(
-      ai,
-      agents as never,
-      {
-        organizationSummary: vi.fn(),
-        listUsers: vi.fn(),
-        getSettlement: vi.fn().mockResolvedValue({
-          externalId: 'STL_0001',
-          expectedAmount: '100000.00',
-          receivedAmount: '98230.00',
-          feeAmount: '1500.00',
-          gstAmount: '270.00',
-          refundAmount: '0.00',
-        }),
-        getException: vi.fn(),
-      } as never,
-    );
-
-    const result = await service.respond('What does the gateway fee mean?', [
-      { role: 'user', text: 'Explain STL_0001.' },
-    ]);
-
-    expect(result).toMatchObject({ kind: 'settlement', settlement: { externalId: 'STL_0001' } });
-  });
-
-  it('keeps exception read queries read-only until an explicit investigation command', async () => {
-    const ai = {
-      complete: vi.fn().mockResolvedValue({
-        text: '{"tool":"getException","arguments":{"exceptionId":"EXC_005"}}',
-      }),
-    };
-    const agents = { investigateByExternalId: vi.fn() };
-    const getException = vi.fn().mockResolvedValue({
-      externalId: 'EXC_005',
-      status: 'OPEN',
-      expectedAmount: '100000.00',
-      receivedAmount: '98230.00',
-      reason: 'Settlement difference requires investigation.',
-      resolution: null,
-    });
-    const service = new ChatService(
-      ai,
-      agents as never,
-      {
-        organizationSummary: vi.fn(),
-        listUsers: vi.fn(),
-        getSettlement: vi.fn(),
-        getException,
-      } as never,
-    );
-
-    const result = await service.respond('Why is EXC_005 unresolved?');
-
-    expect(result).toMatchObject({ kind: 'exception', exception: { externalId: 'EXC_005' } });
-    expect(agents.investigateByExternalId).not.toHaveBeenCalled();
-    expect(ai.complete).toHaveBeenCalledOnce();
+    expect(result.artifacts).toHaveLength(1);
   });
 });
