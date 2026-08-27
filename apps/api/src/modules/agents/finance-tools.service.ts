@@ -41,6 +41,37 @@ export class FinanceToolsService {
       organizationId,
     });
     switch (call.tool) {
+      case 'getWorkspaceCapabilities': {
+        const capabilities = {
+          connected: [
+            'payments',
+            'settlements',
+            'invoices',
+            'posted expenses',
+            'cash position and forecast',
+            'tax lines',
+            'reconciliation and exceptions',
+            'organization members',
+            'audit and agent activity',
+          ],
+          unavailable: ['operating budgets'],
+          requestedTopic: call.arguments.topic,
+        };
+        const budgetRequested = call.arguments.topic === 'BUDGETS';
+        return {
+          callId,
+          tool: call.tool,
+          summary: budgetRequested
+            ? 'Operating budgets are not configured in this workspace yet, so I do not have a monthly budget amount to report. I can show actual posted expenses, cash position and forecast, payments, settlements, invoices, tax lines, and reconciliation data. For the closest available view, ask me to summarise expenses this month.'
+            : `This workspace has controlled access to ${capabilities.connected.join(', ')}. Operating budgets are not configured yet.`,
+          data: capabilities,
+          artifact: {
+            type: 'metrics',
+            title: budgetRequested ? 'Budget availability' : 'Connected finance data',
+            data: capabilities,
+          },
+        };
+      }
       case 'getCurrentUser': {
         const user = await this.reads.getCurrentUser(organizationId, principal.userId);
         return {
@@ -197,7 +228,9 @@ export class FinanceToolsService {
           callId,
           tool: call.tool,
           summary: rows.length
-            ? `I found ${rows.length} payment transaction${rows.length === 1 ? '' : 's'} matching those filters.`
+            ? rows.length === 1
+              ? `${rows[0].externalId} is the latest matching payment: ${formatInr(rows[0].amount.toString())}, ${label(rows[0].status)}, recorded on ${new Date(rows[0].occurredAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}.`
+              : `I found ${rows.length} payment transactions matching those filters.`
             : 'No payment transactions matched those filters.',
           data: plain(rows),
           artifact: {
@@ -207,6 +240,37 @@ export class FinanceToolsService {
             href: '/records?tab=transactions',
           },
           references: rows.map((row) => row.externalId),
+        };
+      }
+      case 'getTransaction': {
+        const transaction = await this.reads.getTransaction(
+          organizationId,
+          call.arguments.transactionId,
+        );
+        if (!transaction) {
+          return {
+            callId,
+            tool: call.tool,
+            summary: `${call.arguments.transactionId} was not found in this organization.`,
+            data: null,
+          };
+        }
+        const data = plain(transaction);
+        return {
+          callId,
+          tool: call.tool,
+          summary: `${transaction.externalId} is a ${label(transaction.status).toLowerCase()} payment of ${formatInr(transaction.amount.toString())}, recorded on ${new Date(transaction.occurredAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}.${transaction.settlement ? ` It is linked to settlement ${transaction.settlement.externalId}.` : ' It is not linked to a settlement.'}`,
+          data,
+          artifact: {
+            type: 'table',
+            title: transaction.externalId,
+            data: { rows: [data] },
+            href: `/records?tab=transactions&id=${transaction.externalId}`,
+          },
+          references: [
+            transaction.externalId,
+            ...(transaction.settlement ? [transaction.settlement.externalId] : []),
+          ],
         };
       }
       case 'findSettlements': {

@@ -10,6 +10,93 @@ const expenseObservation: ToolObservation = {
 };
 
 describe('FinanceAgent', () => {
+  it('answers budget questions from workspace capability evidence without looping', async () => {
+    const model = { complete: vi.fn() };
+    const execute = vi.fn().mockResolvedValue({
+      callId: 'call-1',
+      tool: 'getWorkspaceCapabilities',
+      summary: 'Operating budgets are not configured in this workspace yet.',
+      data: { unavailable: ['operating budgets'] },
+    });
+    const result = await new FinanceAgent(model, { execute }).run({
+      message: 'What is our monthly operating budget?',
+      context: [
+        {
+          role: 'assistant',
+          text: 'Are you referring to a monthly operating budget or a cash flow forecast?',
+        },
+      ],
+      currentDate: '2026-08-26T00:00:00.000Z',
+    });
+    expect(execute).toHaveBeenCalledWith(
+      { tool: 'getWorkspaceCapabilities', arguments: { topic: 'BUDGETS' } },
+      'call-1',
+    );
+    expect(model.complete).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      clarified: false,
+      text: expect.stringContaining('not configured'),
+    });
+  });
+
+  it('loads an exact payment reference deterministically', async () => {
+    const model = { complete: vi.fn() };
+    const execute = vi.fn().mockResolvedValue({
+      callId: 'call-1',
+      tool: 'getTransaction',
+      summary: 'pay_00008 is a captured payment of ₹50,000.00.',
+      data: { externalId: 'pay_00008', amount: '50000.00' },
+    });
+    const result = await new FinanceAgent(model, { execute }).run({
+      message: 'whats PAY_00008',
+      currentDate: '2026-08-26T00:00:00.000Z',
+    });
+    expect(execute).toHaveBeenCalledWith(
+      { tool: 'getTransaction', arguments: { transactionId: 'pay_00008' } },
+      'call-1',
+    );
+    expect(result.text).toContain('pay_00008');
+    expect(model.complete).not.toHaveBeenCalled();
+  });
+
+  it('resolves a pronoun from only the immediately preceding controlled record', async () => {
+    const execute = vi.fn().mockResolvedValue({
+      callId: 'call-1',
+      tool: 'getTransaction',
+      summary: 'pay_00008 is a captured payment of ₹14,037.00.',
+      data: { externalId: 'pay_00008' },
+    });
+    await new FinanceAgent({ complete: vi.fn() }, { execute }).run({
+      message: 'show me everything about it',
+      context: [
+        { role: 'user', text: 'whats pay_00008' },
+        { role: 'assistant', text: 'pay_00008 is a captured payment of ₹14,037.00.' },
+      ],
+      currentDate: '2026-08-26T00:00:00.000Z',
+    });
+    expect(execute).toHaveBeenCalledWith(
+      { tool: 'getTransaction', arguments: { transactionId: 'pay_00008' } },
+      'call-1',
+    );
+  });
+
+  it('loads the newest payment for a latest-transaction request, including a typo', async () => {
+    const execute = vi.fn().mockResolvedValue({
+      callId: 'call-1',
+      tool: 'findTransactions',
+      summary: 'pay_00120 is the latest matching payment.',
+      data: [{ externalId: 'pay_00120' }],
+    });
+    await new FinanceAgent({ complete: vi.fn() }, { execute }).run({
+      message: 'tell me our last trasntion data',
+      currentDate: '2026-08-26T00:00:00.000Z',
+    });
+    expect(execute).toHaveBeenCalledWith(
+      { tool: 'findTransactions', arguments: { limit: 1 } },
+      'call-1',
+    );
+  });
+
   it('executes a finance tool and synthesizes its evidence', async () => {
     const model = {
       complete: vi
@@ -89,6 +176,28 @@ describe('FinanceAgent', () => {
     ).run({ message: 'Compare our costs.', currentDate: '2026-08-26T00:00:00.000Z' });
     expect(result).toMatchObject({ text: 'Which period should I compare?', clarified: true });
     expect(tools.execute).not.toHaveBeenCalled();
+  });
+
+  it('does not repeat an assistant clarification already present in context', async () => {
+    const execute = vi.fn().mockResolvedValue(expenseObservation);
+    const model = {
+      complete: vi
+        .fn()
+        .mockResolvedValueOnce(
+          JSON.stringify({ type: 'clarify', question: 'Which period should I compare?' }),
+        )
+        .mockResolvedValueOnce(
+          JSON.stringify({ type: 'tool', call: { tool: 'getExpenseSummary', arguments: {} } }),
+        ),
+    };
+    const result = await new FinanceAgent(model, { execute }).run({
+      message: 'Tell me about the expenses instead.',
+      context: [{ role: 'assistant', text: 'Which period should I compare?' }],
+      currentDate: '2026-08-26T00:00:00.000Z',
+    });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(result.clarified).toBe(false);
+    expect(result.text).toContain('Recorded expenses');
   });
 
   it('executes a multi-tool plan for a multi-part question', async () => {

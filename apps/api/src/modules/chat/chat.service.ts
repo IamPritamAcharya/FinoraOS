@@ -6,6 +6,18 @@ import { AI_GATEWAY, type AiGateway } from '../../gateways/ai/ai.gateway.js';
 import { FinanceToolsService } from '../agents/finance-tools.service.js';
 import { ChatRepository } from './chat.repository.js';
 
+const explicitRecord = /\b(?:pay_\d{5}|STL_\d{4}|EXC_\d{3}|INV_\d{4}|GST_\d{4})\b/i;
+const explicitFinanceTopic =
+  /\b(?:budget?|trans[a-z]*|tras[a-z]*|payments?|expenses?|spend|costs?|outflows?|settlements?|cash|forecast|tax|GST|invoices?|exceptions?|reconciliation|members?|users?|email|profile|organization)\b/i;
+const followUpReference = /\b(?:it|that|those|them|same|the former|the latter)\b/i;
+
+export const shouldUseConversationContext = (message: string) => {
+  if (explicitRecord.test(message)) return false;
+  if (followUpReference.test(message)) return true;
+  if (explicitFinanceTopic.test(message)) return false;
+  return message.trim().split(/\s+/).length <= 8;
+};
+
 @Injectable()
 export class ChatService {
   constructor(
@@ -25,11 +37,14 @@ export class ChatService {
       firstMessage: message,
     });
     const persistedContext = await this.chats.context(principal, thread.id);
-    const context = persistedContext.length ? persistedContext : clientContext.slice(-12);
+    const availableContext = persistedContext.length ? persistedContext : clientContext;
+    const useContext = shouldUseConversationContext(message);
+    const context = useContext ? availableContext.slice(-8) : [];
     apiLogger.info('Finora agent run started', {
       threadId: thread.id,
       organizationId: principal.organizationId,
       contextMessages: context.length,
+      contextMode: useContext ? 'follow-up' : 'standalone',
     });
     const currentDate = new Date().toISOString();
     const result = await new FinanceAgent(

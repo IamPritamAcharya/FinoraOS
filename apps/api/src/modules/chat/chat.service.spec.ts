@@ -1,9 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ChatService } from './chat.service.js';
+import { ChatService, shouldUseConversationContext } from './chat.service.js';
 
 const principal = { organizationId: 'demo-org', userId: 'demo-user' };
 
 describe('ChatService', () => {
+  it('uses context only for genuine follow-ups, not explicit topic changes', () => {
+    expect(shouldUseConversationContext('everything')).toBe(true);
+    expect(shouldUseConversationContext('tell me more about that')).toBe(true);
+    expect(shouldUseConversationContext('whats pay_00008')).toBe(false);
+    expect(shouldUseConversationContext('Summarise our expenses this month')).toBe(false);
+    expect(shouldUseConversationContext('what is our monthly operating budget')).toBe(false);
+  });
+
   it('runs a multi-step tool conversation and persists the structured result', async () => {
     const ai = {
       complete: vi

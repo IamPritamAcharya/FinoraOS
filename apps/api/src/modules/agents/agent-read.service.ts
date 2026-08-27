@@ -334,6 +334,22 @@ export class AgentReadService extends PrismaClient implements OnModuleInit, OnMo
     );
   }
 
+  async getTransaction(organizationId: string, externalId: string) {
+    return this.forOrganization(organizationId, (tx) =>
+      tx.transaction.findFirst({
+        where: { externalId },
+        select: {
+          externalId: true,
+          amount: true,
+          currency: true,
+          status: true,
+          occurredAt: true,
+          settlement: { select: { externalId: true } },
+        },
+      }),
+    );
+  }
+
   async findSettlements(
     organizationId: string,
     input: { from?: string; to?: string; minimumVariance?: string; take?: number },

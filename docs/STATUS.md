@@ -1,7 +1,7 @@
 # FinoraOS Status
 
-Last updated: 2026-08-26
-Current phase: AI-native finance workspace integration checkpoint; runtime hardening remains
+Last updated: 2026-08-27
+Current phase: AI-native finance workspace with hardened chat context and exact-record routing
 Last verified commit: see `git log -1`
 
 ## Current state
@@ -41,6 +41,9 @@ The repository contains a functional V1 architecture and web/API implementation.
 - Persisted cash accounts/movements drive expense summaries and forecasts. Routed Overview, Records, Reconciliation, and Exceptions pages share a persistent workspace shell.
 - Proposals can be approved or rejected. Approval validates the action, creates an idempotent audited adjustment without changing source records, resolves the exception, and attempts a reconciliation rerun.
 - Live Ollama checks passed for a two-tool organization/profile query and monthly expense/category analysis. A discovered planner filter-alias defect now has normalization coverage.
+- Chat no longer lets an old clarification override a new finance topic. Explicit topics/record IDs run standalone, short follow-ups retain only bounded recent context, and immediately referenced payment/settlement/exception IDs resolve deterministically.
+- Exact `pay_#####` lookup and latest-payment lookup now use organization-scoped read tools. Budget questions return an honest capability result because operating budgets are not connected in V1, rather than entering a repeated clarification loop.
+- Repeated model clarifications and requests for a period already supplied are rejected and replanned. The originally reported budget/payment/expense conversation and exact-record pronoun follow-up were replayed successfully against local Ollama and PostgreSQL.
 
 ## In progress
 
@@ -48,7 +51,7 @@ The repository contains a functional V1 architecture and web/API implementation.
 
 ## Next highest-priority tasks
 
-1. Run the complete test/build/eval suite and fix checkpoint regressions.
+1. Add a natural-language chat evaluation corpus covering topic switches, relative periods, typos, record references and multi-tool questions.
 2. Re-run the live filtered-transaction query and confirm every returned row respects the threshold.
 3. Browser-test chat streaming/history, records tabs, reconciliation, investigation, approval/reject, and rerun.
 4. Add integration coverage for RLS scoping, chat persistence, and approval idempotency.
@@ -59,6 +62,7 @@ The repository contains a functional V1 architecture and web/API implementation.
 - Reconciliation-match evidence is available in the pure engine output and audit logs; the narrow V1 Prisma match table does not yet store its full evidence payload separately.
 - Authentication still uses an explicitly configured demo principal; JWT/session identity is required before multi-user deployment.
 - Local Qwen routing is schema-guarded and fails closed, but needs a wider natural-language evaluation set.
+- Operating budgets are intentionally not connected in V1; Finora reports this explicitly and offers actual-expense/cash alternatives.
 
 ## Commands last verified
 

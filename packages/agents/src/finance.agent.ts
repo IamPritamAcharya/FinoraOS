@@ -48,6 +48,23 @@ const normalizeAmountFilter = (value: unknown) => {
 };
 
 export const FinanceToolCallSchema = z.discriminatedUnion('tool', [
+  z.object({
+    tool: z.literal('getWorkspaceCapabilities'),
+    arguments: z.object({
+      topic: z
+        .enum([
+          'BUDGETS',
+          'PAYMENTS',
+          'SETTLEMENTS',
+          'EXPENSES',
+          'CASH',
+          'TAX',
+          'RECONCILIATION',
+          'USERS',
+        ])
+        .optional(),
+    }),
+  }),
   z.object({ tool: z.literal('getCurrentUser'), arguments: z.object({}) }),
   z.object({ tool: z.literal('getOrganizationSummary'), arguments: z.object({}) }),
   z.object({
@@ -124,6 +141,15 @@ export const FinanceToolCallSchema = z.discriminatedUnion('tool', [
         limit: optionalLimit,
       }),
     ),
+  }),
+  z.object({
+    tool: z.literal('getTransaction'),
+    arguments: z.object({
+      transactionId: z
+        .string()
+        .regex(/^pay_\d{5}$/i)
+        .transform((value) => value.toLowerCase()),
+    }),
   }),
   z.object({
     tool: z.literal('findSettlements'),
@@ -217,6 +243,7 @@ export interface FinanceToolExecutor {
 }
 
 const toolGuide = `Available tools:
+- getWorkspaceCapabilities: whether a finance area is connected and which evidence is available. Use this before discussing budgets or an unavailable data area.
 - getCurrentUser: the signed-in user's profile, including their email.
 - getOrganizationSummary: counts of members and finance records.
 - getPaymentSummary: payment volume, count and average for a period/status.
@@ -226,6 +253,7 @@ const toolGuide = `Available tools:
 - listOrganizationUsers: member names and emails.
 - getExpenseSummary: deterministic posted outflow total and category breakdown for an explicit date range.
 - findCashMovements: inflows/outflows with category, status, date and amount filters.
+- getTransaction: one exact payment transaction by pay_##### reference.
 - findTransactions / findSettlements: filtered source records; customer payments are not expenses.
 - findInvoices: invoice records.
 - getSettlement: one settlement and its fee/GST/refund breakdown.
@@ -242,7 +270,7 @@ If evidence is required, return {"type":"tool","call":{"tool":"...","arguments":
 For multi-part questions, return all independent reads together as {"type":"tools","calls":[{"tool":"...","arguments":{}},{"tool":"...","arguments":{}}]}.
 After tools return evidence, return {"type":"answer","answer":"natural concise answer","citations":["call-1"]}.
 If a necessary detail is genuinely missing, return {"type":"clarify","question":"one concise question"}.
-Never invent values or claim a tool failed when it returned data. Prefer finance language over database language. Use summary tools for totals and find tools for record lists. Use getExpenseSummary for expenses/spend/costs/outflows, not findTransactions. Use getCurrentUser for "my" profile questions. Use conversation context for follow-ups and resolve pronouns from the latest referenced record. You may call several tools before answering comparisons or multi-part questions. Never write SQL or create unlisted tools. Never investigate or mutate unless explicitly requested.
+Never invent values or claim a tool failed when it returned data. Prefer finance language over database language. Use summary tools for totals and find tools for record lists. Use getExpenseSummary for expenses/spend/costs/outflows, not findTransactions. Use getCurrentUser for "my" profile questions. The current user message is authoritative. Conversation context is reference material only: ignore an old clarification when the current message names a new topic, period, or record. Never ask again for a detail already supplied, and never repeat a previous clarification. "Last" and "latest" mean the newest matching record and do not require a date range. Use conversation context for genuinely short follow-ups and resolve pronouns from the latest referenced record. You may call several tools before answering comparisons or multi-part questions. Never write SQL or create unlisted tools. Never investigate or mutate unless explicitly requested.
 ${toolGuide}`;
 
 const extractObject = (value: string) => {
@@ -315,6 +343,52 @@ const answerIsGrounded = (answer: string, observations: ToolObservation[], userM
   return numericTokens(answer).every((token) => evidence.includes(token.replace(/[₹\s,]/g, '')));
 };
 
+const normalizedQuestion = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+const deterministicFastLane = (message: string): FinanceToolCall | undefined => {
+  const transactionId = message.match(/\bpay_\d{5}\b/i)?.[0];
+  if (transactionId) {
+    return FinanceToolCallSchema.parse({
+      tool: 'getTransaction',
+      arguments: { transactionId },
+    });
+  }
+  const exceptionId = message.match(/\bEXC_\d{3}\b/i)?.[0]?.toUpperCase();
+  if (exceptionId) {
+    return /\binvestigat\w*\b/i.test(message)
+      ? { tool: 'investigateException', arguments: { exceptionId } }
+      : { tool: 'getException', arguments: { exceptionId } };
+  }
+  const settlementId = message.match(/\bSTL_\d{4}\b/i)?.[0]?.toUpperCase();
+  if (settlementId) return { tool: 'getSettlement', arguments: { settlementId } };
+  if (/\bbudget?\b/i.test(message)) {
+    return { tool: 'getWorkspaceCapabilities', arguments: { topic: 'BUDGETS' } };
+  }
+  if (
+    /\b(last|latest|most\s+recent)\b/i.test(message) &&
+    /\b(trans[a-z]*|tras[a-z]*|payments?)\b/i.test(message)
+  ) {
+    return { tool: 'findTransactions', arguments: { limit: 1 } };
+  }
+  return undefined;
+};
+
+const latestControlledReference = (context: FinanceChatContext[]) => {
+  for (const item of context.slice(-2).reverse()) {
+    const reference = item.text.match(/\b(?:pay_\d{5}|STL_\d{4}|EXC_\d{3})\b/i)?.[0];
+    if (reference) return reference;
+  }
+  return undefined;
+};
+
+const suppliedPeriod = (message: string) =>
+  /\b(this|last|current|previous)\s+(week|month|quarter|year)\b/i.test(message) ||
+  /\b\d{4}-\d{2}(?:-\d{2})?\b/.test(message);
+
 export class FinanceAgent {
   constructor(
     private readonly model: FinanceAgentModel,
@@ -332,6 +406,50 @@ export class FinanceAgent {
     const seen = new Set<string>();
     let lastFailure: FinanceAgentResult['fallbackReason'];
     let diagnostics: string[] | undefined;
+    let routingFeedback: string | undefined;
+
+    const contextualReference = /\b(it|that|those|them|same)\b|^\s*(everything|more|yes)\b/i.test(
+      input.message,
+    )
+      ? latestControlledReference(input.context ?? [])
+      : undefined;
+    const fastLane = deterministicFastLane(
+      contextualReference ? `${input.message} ${contextualReference}` : input.message,
+    );
+    if (fastLane) {
+      const callId = 'call-1';
+      try {
+        const observation = await this.tools.execute(fastLane, callId);
+        return {
+          text: observation.summary,
+          observations: [observation],
+          activity: [
+            {
+              callId,
+              tool: fastLane.tool,
+              status: 'COMPLETED',
+              label: observation.summary,
+            },
+          ],
+          clarified: false,
+        };
+      } catch {
+        return {
+          text: 'I could not safely load that finance record right now. Please try again.',
+          observations: [],
+          activity: [
+            {
+              callId,
+              tool: fastLane.tool,
+              status: 'FAILED',
+              label: `${fastLane.tool} could not be completed`,
+            },
+          ],
+          clarified: false,
+          fallbackReason: 'MODEL_ERROR',
+        };
+      }
+    }
 
     for (let step = 0; step < this.maxSteps; step += 1) {
       let decision: z.infer<typeof AgentDecisionSchema>;
@@ -343,6 +461,7 @@ export class FinanceAgent {
             currentDate: input.currentDate,
             userMessage: input.message,
             conversation: (input.context ?? []).slice(-12),
+            routingFeedback,
             observations: observations.map(({ callId, tool, summary, data }) => ({
               callId,
               tool,
@@ -366,6 +485,20 @@ export class FinanceAgent {
       }
 
       if (decision.type === 'clarify') {
+        const repeated = (input.context ?? []).some(
+          (item) =>
+            item.role === 'assistant' &&
+            normalizedQuestion(item.text) === normalizedQuestion(decision.question),
+        );
+        const ignoresSuppliedPeriod =
+          suppliedPeriod(input.message) && /\b(period|date|range|when)\b/i.test(decision.question);
+        if (repeated || ignoresSuppliedPeriod) {
+          routingFeedback = repeated
+            ? 'That clarification was already asked. Do not repeat it. Use the current user message to choose the best safe tool, or state that the requested data is unavailable.'
+            : 'The current user message already supplies a period. Do not ask for it again; use the matching summary tool.';
+          lastFailure = 'INVALID_DECISION';
+          continue;
+        }
         return { text: decision.question, observations, activity, clarified: true };
       }
       if (decision.type === 'answer') {
@@ -383,7 +516,11 @@ export class FinanceAgent {
         break;
       }
 
-      const calls = decision.type === 'tools' ? decision.calls : [decision.call];
+      const plannedCalls = decision.type === 'tools' ? decision.calls : [decision.call];
+      const calls =
+        !/\bbudget?\b/i.test(input.message) && plannedCalls.length > 1
+          ? plannedCalls.filter((call) => call.tool !== 'getWorkspaceCapabilities')
+          : plannedCalls;
       for (const call of calls) {
         const signature = JSON.stringify(call);
         if (seen.has(signature)) continue;
