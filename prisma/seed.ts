@@ -14,25 +14,73 @@ async function main() {
     update: {},
     create: { id: orgId, name: 'Acme Commerce India' },
   });
-  await prisma.user.upsert({
-    where: { email: 'finance@finora.local' },
-    update: {},
-    create: {
+  const demoUsers = [
+    {
       id: 'demo-user',
-      organizationId: orgId,
       name: 'Aarav Mehta',
       email: 'finance@finora.local',
+      role: 'FINANCE_CONTROLLER' as const,
+      identityProviderId: '11111111-1111-4111-8111-111111111111',
+      slackUserId: 'U_FINANCE_01',
     },
-  });
+    {
+      id: 'demo-admin',
+      name: 'Ananya Rao',
+      email: 'admin@finora.local',
+      role: 'ENTERPRISE_ADMIN' as const,
+      identityProviderId: '22222222-2222-4222-8222-222222222222',
+      slackUserId: 'U_ADMIN_01',
+    },
+    {
+      id: 'demo-employee-priya',
+      name: 'Priya Sharma',
+      email: 'priya@finora.local',
+      role: 'EMPLOYEE' as const,
+      identityProviderId: '33333333-3333-4333-8333-333333333333',
+      slackUserId: 'U_EMPLOYEE_01',
+    },
+    {
+      id: 'demo-employee-rohan',
+      name: 'Rohan Desai',
+      email: 'rohan@finora.local',
+      role: 'EMPLOYEE' as const,
+      identityProviderId: '44444444-4444-4444-8444-444444444444',
+      slackUserId: 'U_EMPLOYEE_02',
+    },
+  ];
+  for (const user of demoUsers) {
+    await prisma.user.upsert({
+      where: { email: user.email },
+      update: {
+        name: user.name,
+        role: user.role,
+        identityProviderId: user.identityProviderId,
+        slackUserId: user.slackUserId,
+      },
+      create: { ...user, organizationId: orgId },
+    });
+  }
   if (process.argv.includes('--if-empty')) {
-    const existingRecords = await prisma.transaction.count({ where: { organizationId: orgId } });
-    if (existingRecords > 0) {
+    const [existingRecords, existingNodes] = await Promise.all([
+      prisma.transaction.count({ where: { organizationId: orgId } }),
+      prisma.organizationNode.count({ where: { organizationId: orgId } }),
+    ]);
+    if (existingRecords > 0 && existingNodes > 0) {
       console.log(`Seed skipped: ${existingRecords} demo transactions already exist.`);
       return;
     }
   }
+  await prisma.automationJobRun.deleteMany();
+  await prisma.automationJob.deleteMany();
+  await prisma.notification.deleteMany();
+  await prisma.receiptRequest.deleteMany();
+  await prisma.financialDocument.deleteMany();
+  await prisma.expenseClaim.deleteMany();
+  await prisma.budget.deleteMany();
+  await prisma.approvalPolicy.deleteMany();
   await prisma.agentStep.deleteMany();
   await prisma.agentRun.deleteMany();
+  await prisma.agentSkill.deleteMany();
   await prisma.chatMessage.deleteMany();
   await prisma.chatThread.deleteMany();
   await prisma.adjustment.deleteMany();
@@ -47,6 +95,151 @@ async function main() {
   await prisma.settlement.deleteMany();
   await prisma.cashMovement.deleteMany();
   await prisma.cashAccount.deleteMany();
+  await prisma.integrationConnection.deleteMany();
+  await prisma.organizationNode.deleteMany();
+
+  await prisma.integrationConnection.createMany({
+    data: [
+      {
+        id: 'integration-mock-razorpay',
+        organizationId: orgId,
+        type: 'PAYMENT',
+        provider: 'MOCK_PAYMENT',
+        status: 'CONNECTED',
+        displayName: 'Razorpay sandbox projection',
+        externalAccountId: 'acc_demo_razorpay',
+        credentialRef: 'env:RAZORPAY_KEY_ID',
+        config: { mode: 'test', simulated: true },
+        lastSyncAt: iso(24),
+      },
+      {
+        id: 'integration-mock-bank',
+        organizationId: orgId,
+        type: 'BANKING',
+        provider: 'MOCK_BANKING',
+        status: 'CONNECTED',
+        displayName: 'Mock operating bank',
+        externalAccountId: 'bank_demo_operating',
+        config: { simulated: true },
+        lastSyncAt: iso(24),
+      },
+      {
+        id: 'integration-slack',
+        organizationId: orgId,
+        type: 'MESSAGING',
+        provider: 'SLACK',
+        status: 'DISCONNECTED',
+        displayName: 'Slack receipt collection',
+        credentialRef: 'env:SLACK_BOT_TOKEN',
+        config: { requiredScopes: ['chat:write', 'files:read', 'im:history'] },
+      },
+      {
+        id: 'integration-erp',
+        organizationId: orgId,
+        type: 'ERP',
+        provider: 'GENERIC_ERP',
+        status: 'DISCONNECTED',
+        displayName: 'ERP connector',
+        credentialRef: 'vault:erp/demo',
+      },
+    ],
+  });
+
+  await prisma.organizationNode.createMany({
+    data: [
+      {
+        id: 'node-company',
+        organizationId: orgId,
+        type: 'COMPANY',
+        name: 'Acme Commerce India',
+        code: 'ACME-IN',
+      },
+      {
+        id: 'node-mumbai',
+        organizationId: orgId,
+        parentId: 'node-company',
+        type: 'OFFICE',
+        name: 'Mumbai Office',
+        code: 'OFF-MUM',
+      },
+      {
+        id: 'node-finance',
+        organizationId: orgId,
+        parentId: 'node-mumbai',
+        type: 'DEPARTMENT',
+        name: 'Finance',
+        code: 'DEPT-FIN',
+      },
+      {
+        id: 'node-operations',
+        organizationId: orgId,
+        parentId: 'node-mumbai',
+        type: 'DEPARTMENT',
+        name: 'Operations',
+        code: 'DEPT-OPS',
+      },
+      {
+        id: 'node-priya',
+        organizationId: orgId,
+        parentId: 'node-operations',
+        memberUserId: 'demo-employee-priya',
+        type: 'EMPLOYEE',
+        name: 'Priya Sharma',
+        code: 'EMP-PRIYA',
+      },
+      {
+        id: 'node-rohan',
+        organizationId: orgId,
+        parentId: 'node-operations',
+        memberUserId: 'demo-employee-rohan',
+        type: 'EMPLOYEE',
+        name: 'Rohan Desai',
+        code: 'EMP-ROHAN',
+      },
+    ],
+  });
+
+  await prisma.budget.createMany({
+    data: [
+      {
+        id: 'budget-finance-aug',
+        organizationId: orgId,
+        nodeId: 'node-finance',
+        createdById: 'demo-admin',
+        name: 'Finance operations · August 2026',
+        amount: '1200000.00',
+        currency: 'INR',
+        periodStart: new Date(Date.UTC(2026, 7, 1)),
+        periodEnd: new Date(Date.UTC(2026, 7, 31, 23, 59, 59)),
+        status: 'ACTIVE',
+      },
+      {
+        id: 'budget-operations-aug',
+        organizationId: orgId,
+        nodeId: 'node-operations',
+        createdById: 'demo-admin',
+        name: 'Operations · August 2026',
+        amount: '1800000.00',
+        currency: 'INR',
+        periodStart: new Date(Date.UTC(2026, 7, 1)),
+        periodEnd: new Date(Date.UTC(2026, 7, 31, 23, 59, 59)),
+        status: 'ACTIVE',
+      },
+      {
+        id: 'budget-priya-travel-aug',
+        organizationId: orgId,
+        nodeId: 'node-priya',
+        createdById: 'demo-user',
+        name: 'Priya travel · August 2026',
+        category: 'OTHER',
+        amount: '45000.00',
+        currency: 'INR',
+        periodStart: new Date(Date.UTC(2026, 7, 1)),
+        periodEnd: new Date(Date.UTC(2026, 7, 31, 23, 59, 59)),
+        status: 'ACTIVE',
+      },
+    ],
+  });
   const settlements = Array.from({ length: 12 }, (_, index) => {
     const expected = 142000 + index * 17350;
     const fees = 2450 + index * 110;
@@ -185,6 +378,262 @@ async function main() {
   await prisma.cashMovement.createMany({
     data: [...settlementMovements, ...operatingMovements, ...scheduledMovements],
   });
+  await prisma.expenseClaim.createMany({
+    data: [
+      {
+        id: 'expense-1',
+        organizationId: orgId,
+        externalId: 'EXP_0001',
+        claimantUserId: 'demo-employee-priya',
+        nodeId: 'node-priya',
+        budgetId: 'budget-priya-travel-aug',
+        approvedById: 'demo-user',
+        status: 'APPROVED',
+        amount: '8500.00',
+        currency: 'INR',
+        merchant: 'IndiGo',
+        category: 'OTHER',
+        incurredAt: iso(5),
+        description: 'Customer visit flight to Bengaluru',
+        sourceType: 'WEB',
+        submittedAt: iso(6),
+        approvedAt: iso(7),
+      },
+      {
+        id: 'expense-2',
+        organizationId: orgId,
+        externalId: 'EXP_0002',
+        claimantUserId: 'demo-employee-priya',
+        nodeId: 'node-priya',
+        budgetId: 'budget-priya-travel-aug',
+        status: 'RECEIPT_REQUIRED',
+        amount: '2400.00',
+        currency: 'INR',
+        merchant: 'City Cabs',
+        category: 'OTHER',
+        incurredAt: iso(8),
+        description: 'Airport transfer',
+        sourceType: 'BANK_IMPORT',
+      },
+      {
+        id: 'expense-3',
+        organizationId: orgId,
+        externalId: 'EXP_0003',
+        claimantUserId: 'demo-employee-rohan',
+        nodeId: 'node-rohan',
+        budgetId: 'budget-operations-aug',
+        status: 'SUBMITTED',
+        amount: '6800.00',
+        currency: 'INR',
+        merchant: 'Copper Chimney',
+        category: 'OTHER',
+        incurredAt: iso(10),
+        description: 'Client operations review dinner',
+        sourceType: 'SLACK',
+        submittedAt: iso(11),
+      },
+      {
+        id: 'expense-4',
+        organizationId: orgId,
+        externalId: 'EXP_0004',
+        claimantUserId: 'demo-employee-rohan',
+        nodeId: 'node-rohan',
+        budgetId: 'budget-operations-aug',
+        status: 'RECEIPT_REQUIRED',
+        amount: '14999.00',
+        currency: 'INR',
+        merchant: 'FieldOps Software',
+        category: 'VENDOR_PAYMENT',
+        incurredAt: iso(13),
+        description: 'Monthly field operations subscription',
+        sourceType: 'BANK_IMPORT',
+      },
+    ],
+  });
+  await prisma.financialDocument.createMany({
+    data: [
+      {
+        id: 'document-receipt-1',
+        organizationId: orgId,
+        expenseClaimId: 'expense-1',
+        uploadedById: 'demo-employee-priya',
+        type: 'RECEIPT',
+        status: 'EXTRACTED',
+        fileName: 'indigo-receipt.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 184320,
+        storageKey: 'demo/receipts/indigo-receipt.pdf',
+        sha256: 'demo-sha256-india-flight-receipt-0001',
+        extractedData: { merchant: 'IndiGo', amount: '8500.00', currency: 'INR' },
+      },
+      {
+        id: 'document-receipt-3',
+        organizationId: orgId,
+        expenseClaimId: 'expense-3',
+        uploadedById: 'demo-employee-rohan',
+        connectionId: 'integration-slack',
+        type: 'RECEIPT',
+        status: 'EXTRACTED',
+        fileName: 'client-dinner.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 928144,
+        storageKey: 'demo/receipts/client-dinner.jpg',
+        sha256: 'demo-sha256-client-dinner-receipt-0003',
+        sourceExternalId: 'F_SLACK_DEMO_003',
+        extractedData: { merchant: 'Copper Chimney', amount: '6800.00', currency: 'INR' },
+      },
+    ],
+  });
+  await prisma.receiptRequest.createMany({
+    data: [
+      {
+        id: 'receipt-request-2',
+        organizationId: orgId,
+        expenseClaimId: 'expense-2',
+        employeeUserId: 'demo-employee-priya',
+        status: 'SENT',
+        channel: 'SLACK',
+        dueAt: iso(28),
+        nextAttemptAt: iso(27),
+        attempts: 1,
+        lastSentAt: iso(24),
+        externalThreadId: 'D_PRIYA_DEMO:1724500000.000001',
+      },
+      {
+        id: 'receipt-request-4',
+        organizationId: orgId,
+        expenseClaimId: 'expense-4',
+        employeeUserId: 'demo-employee-rohan',
+        status: 'PENDING',
+        channel: 'IN_APP',
+        dueAt: iso(29),
+        nextAttemptAt: iso(27),
+      },
+    ],
+  });
+  await prisma.notification.createMany({
+    data: [
+      {
+        organizationId: orgId,
+        userId: 'demo-employee-priya',
+        type: 'RECEIPT_REQUEST',
+        channel: 'SLACK',
+        status: 'SENT',
+        title: 'Receipt needed for ₹2,400 cab expense',
+        body: 'Upload the City Cabs receipt so Finance can close EXP_0002.',
+        actionUrl: '/expenses?id=EXP_0002',
+        entityType: 'ExpenseClaim',
+        entityId: 'expense-2',
+        sentAt: iso(24),
+      },
+      {
+        organizationId: orgId,
+        userId: 'demo-employee-rohan',
+        type: 'RECEIPT_REQUEST',
+        channel: 'IN_APP',
+        status: 'PENDING',
+        title: 'Receipt needed for FieldOps Software',
+        body: 'Attach the ₹14,999 invoice or receipt for EXP_0004.',
+        actionUrl: '/expenses?id=EXP_0004',
+        entityType: 'ExpenseClaim',
+        entityId: 'expense-4',
+      },
+      {
+        organizationId: orgId,
+        userId: 'demo-user',
+        type: 'EXCEPTION_REVIEW',
+        channel: 'IN_APP',
+        status: 'PENDING',
+        title: 'Four exceptions need finance review',
+        body: 'The deterministic run left four ambiguous records for approval.',
+        actionUrl: '/exceptions',
+        entityType: 'ReconciliationRun',
+      },
+    ],
+  });
+  await prisma.agentSkill.createMany({
+    data: [
+      {
+        id: 'skill-receipt-chaser',
+        organizationId: orgId,
+        createdById: 'demo-user',
+        name: 'Receipt follow-up',
+        description: 'Draft concise, evidence-linked receipt reminders for employees.',
+        instructions:
+          'Use only the supplied expense claim and receipt-request evidence. Never invent a merchant, amount, deadline or recipient.',
+        allowedTools: ['getExpenseClaim', 'getReceiptRequest', 'proposeReceiptReminder'],
+        status: 'ACTIVE',
+      },
+      {
+        id: 'skill-vendor-invoice-review',
+        organizationId: orgId,
+        createdById: 'demo-user',
+        name: 'Vendor invoice review',
+        description: 'Compare an invoice with tax lines and linked cash evidence.',
+        instructions:
+          'Flag conflicting references or amounts for human review. Exact totals remain deterministic.',
+        allowedTools: ['getInvoice', 'getTaxLines', 'findCashMovements'],
+        status: 'ACTIVE',
+      },
+    ],
+  });
+  await prisma.approvalPolicy.createMany({
+    data: [
+      {
+        id: 'policy-low-value-expense',
+        organizationId: orgId,
+        nodeId: 'node-operations',
+        name: 'Low-value documented expenses',
+        actionType: 'APPROVE_EXPENSE',
+        amountLimit: '5000.00',
+        currency: 'INR',
+        minimumConfidence: '0.980',
+        requiresReceipt: true,
+        autoApprove: false,
+        enabled: true,
+        createdById: 'demo-admin',
+      },
+      {
+        id: 'policy-settlement-adjustment',
+        organizationId: orgId,
+        name: 'Settlement fee adjustments',
+        actionType: 'CREATE_SETTLEMENT_FEE_ADJUSTMENT',
+        amountLimit: '25000.00',
+        currency: 'INR',
+        minimumConfidence: '0.950',
+        requiresReceipt: false,
+        autoApprove: false,
+        enabled: true,
+        createdById: 'demo-admin',
+      },
+    ],
+  });
+  await prisma.automationJob.createMany({
+    data: [
+      {
+        id: 'job-receipt-reminders',
+        organizationId: orgId,
+        connectionId: 'integration-slack',
+        type: 'RECEIPT_REMINDER',
+        name: 'Missing receipt reminders',
+        cronExpression: '0 10 * * 1-5',
+        enabled: true,
+        status: 'IDLE',
+        nextRunAt: iso(27),
+        payload: { maxAttempts: 3, escalationAfterDays: 5 },
+      },
+      {
+        id: 'job-nightly-reconciliation',
+        organizationId: orgId,
+        type: 'RECONCILIATION',
+        name: 'Nightly reconciliation',
+        cronExpression: '0 2 * * *',
+        enabled: true,
+        status: 'IDLE',
+        nextRunAt: iso(27),
+      },
+    ],
+  });
   const transactions = Array.from({ length: 120 }, (_, index) => {
     const scenario =
       index < 100
@@ -227,13 +676,20 @@ async function main() {
     })),
   });
   await prisma.taxLine.createMany({
-    data: Array.from({ length: 18 }, (_, index) => ({
-      organizationId: orgId,
-      externalId: `GST_${String(index + 1).padStart(4, '0')}`,
-      amount: (4860 + index * 774).toFixed(2),
-      taxRate: '18.00',
-      matched: index % 6 !== 0,
-    })),
+    data: Array.from({ length: 18 }, (_, index) => {
+      const matched = index % 6 !== 0;
+      return {
+        organizationId: orgId,
+        externalId: `GST_${String(index + 1).padStart(4, '0')}`,
+        amount: (4860 + index * 774).toFixed(2),
+        taxRate: '18.00',
+        matched,
+        matchStatus: matched ? ('MATCHED' as const) : ('NEEDS_REVIEW' as const),
+        taxType: 'GST',
+        taxPeriod: '2026-08',
+        sourceMetadata: { source: 'mock-erp', deterministicSeed: true },
+      };
+    }),
   });
   const run = await prisma.reconciliationRun.create({
     data: {
@@ -346,7 +802,7 @@ async function main() {
     ],
   });
   console.log(
-    `Seeded Acme Commerce India: 120 transactions, 12 settlements, ${settlementMovements.length + operatingMovements.length + scheduledMovements.length} cash movements, 14 exceptions.`,
+    `Seeded Acme Commerce India: 4 users, 3 budgets, 4 expenses, 120 transactions, 12 settlements, ${settlementMovements.length + operatingMovements.length + scheduledMovements.length} cash movements, 14 exceptions.`,
   );
 }
 main().finally(() => prisma.$disconnect());

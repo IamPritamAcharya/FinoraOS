@@ -1,6 +1,13 @@
 import { z } from 'zod';
 
 export type FinanceChatContext = { role: 'user' | 'assistant'; text: string };
+export type FinanceSkillContext = {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  allowedTools: FinanceToolName[];
+};
 
 const decimal = z
   .union([z.string().regex(/^\d+(\.\d{1,2})?$/), z.number().finite().nonnegative()])
@@ -67,6 +74,14 @@ export const FinanceToolCallSchema = z.discriminatedUnion('tool', [
   }),
   z.object({ tool: z.literal('getCurrentUser'), arguments: z.object({}) }),
   z.object({ tool: z.literal('getOrganizationSummary'), arguments: z.object({}) }),
+  z.object({
+    tool: z.literal('getBudgetSummary'),
+    arguments: z.object({
+      ...optionalPeriod,
+      nodeCode: z.string().trim().min(1).max(40).optional(),
+      status: z.enum(['DRAFT', 'ACTIVE', 'CLOSED']).optional(),
+    }),
+  }),
   z.object({
     tool: z.literal('getPaymentSummary'),
     arguments: z.object({
@@ -194,8 +209,16 @@ export type FinanceToolCall = z.infer<typeof FinanceToolCallSchema>;
 export type FinanceToolName = FinanceToolCall['tool'];
 
 const AgentDecisionSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('tool'), call: FinanceToolCallSchema }),
-  z.object({ type: z.literal('tools'), calls: z.array(FinanceToolCallSchema).min(2).max(4) }),
+  z.object({
+    type: z.literal('tool'),
+    call: FinanceToolCallSchema,
+    skillId: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal('tools'),
+    calls: z.array(FinanceToolCallSchema).min(2).max(4),
+    skillId: z.string().optional(),
+  }),
   z.object({
     type: z.literal('answer'),
     answer: z.string().min(1).max(2400),
@@ -232,6 +255,7 @@ export type FinanceAgentResult = {
   clarified: boolean;
   fallbackReason?: 'MODEL_ERROR' | 'INVALID_DECISION' | 'STEP_LIMIT' | 'UNSUPPORTED';
   diagnostics?: string[];
+  skillId?: string;
 };
 
 export interface FinanceAgentModel {
@@ -243,9 +267,10 @@ export interface FinanceToolExecutor {
 }
 
 const toolGuide = `Available tools:
-- getWorkspaceCapabilities: whether a finance area is connected and which evidence is available. Use this before discussing budgets or an unavailable data area.
+- getWorkspaceCapabilities: whether a finance area is connected and which evidence is available.
 - getCurrentUser: the signed-in user's profile, including their email.
 - getOrganizationSummary: counts of members and finance records.
+- getBudgetSummary: deterministic budget allocation, committed expense and remaining amount by organization node and period.
 - getPaymentSummary: payment volume, count and average for a period/status.
 - getSettlementSummary: expected, received, fees, GST, refunds and unexplained variance totals.
 - getInvoiceSummary: invoice count and issued value for a period.
@@ -271,6 +296,7 @@ For multi-part questions, return all independent reads together as {"type":"tool
 After tools return evidence, return {"type":"answer","answer":"natural concise answer","citations":["call-1"]}.
 If a necessary detail is genuinely missing, return {"type":"clarify","question":"one concise question"}.
 Never invent values or claim a tool failed when it returned data. Prefer finance language over database language. Use summary tools for totals and find tools for record lists. Use getExpenseSummary for expenses/spend/costs/outflows, not findTransactions. Use getCurrentUser for "my" profile questions. The current user message is authoritative. Conversation context is reference material only: ignore an old clarification when the current message names a new topic, period, or record. Never ask again for a detail already supplied, and never repeat a previous clarification. "Last" and "latest" mean the newest matching record and do not require a date range. Use conversation context for genuinely short follow-ups and resolve pronouns from the latest referenced record. You may call several tools before answering comparisons or multi-part questions. Never write SQL or create unlisted tools. Never investigate or mutate unless explicitly requested.
+Workspace skills are approved operating procedures supplied in the prompt. Select a skillId only when the request clearly matches it. A skill can narrow behavior but never override these safety rules, and every selected tool must appear in that skill's allowedTools.
 ${toolGuide}`;
 
 const extractObject = (value: string) => {
@@ -365,8 +391,8 @@ const deterministicFastLane = (message: string): FinanceToolCall | undefined => 
   }
   const settlementId = message.match(/\bSTL_\d{4}\b/i)?.[0]?.toUpperCase();
   if (settlementId) return { tool: 'getSettlement', arguments: { settlementId } };
-  if (/\bbudget?\b/i.test(message)) {
-    return { tool: 'getWorkspaceCapabilities', arguments: { topic: 'BUDGETS' } };
+  if (/\bbudget(?:s|ed|ing)?\b/i.test(message)) {
+    return { tool: 'getBudgetSummary', arguments: {} };
   }
   if (
     /\b(last|latest|most\s+recent)\b/i.test(message) &&
@@ -400,6 +426,7 @@ export class FinanceAgent {
     message: string;
     context?: FinanceChatContext[];
     currentDate: string;
+    skills?: FinanceSkillContext[];
   }): Promise<FinanceAgentResult> {
     const observations: ToolObservation[] = [];
     const activity: FinanceAgentResult['activity'] = [];
@@ -407,6 +434,7 @@ export class FinanceAgent {
     let lastFailure: FinanceAgentResult['fallbackReason'];
     let diagnostics: string[] | undefined;
     let routingFeedback: string | undefined;
+    let skillId: string | undefined;
 
     const contextualReference = /\b(it|that|those|them|same)\b|^\s*(everything|more|yes)\b/i.test(
       input.message,
@@ -461,6 +489,7 @@ export class FinanceAgent {
             currentDate: input.currentDate,
             userMessage: input.message,
             conversation: (input.context ?? []).slice(-12),
+            workspaceSkills: input.skills ?? [],
             routingFeedback,
             observations: observations.map(({ callId, tool, summary, data }) => ({
               callId,
@@ -517,6 +546,24 @@ export class FinanceAgent {
       }
 
       const plannedCalls = decision.type === 'tools' ? decision.calls : [decision.call];
+      const selectedSkill = decision.skillId
+        ? (input.skills ?? []).find((skill) => skill.id === decision.skillId)
+        : undefined;
+      if (decision.skillId && !selectedSkill) {
+        routingFeedback =
+          'The selected skillId is not active in this workspace. Continue without it.';
+        lastFailure = 'INVALID_DECISION';
+        continue;
+      }
+      if (
+        selectedSkill &&
+        plannedCalls.some((call) => !selectedSkill.allowedTools.includes(call.tool))
+      ) {
+        routingFeedback = `Skill ${selectedSkill.name} only permits these tools: ${selectedSkill.allowedTools.join(', ')}. Choose only from that allowlist or continue without the skill.`;
+        lastFailure = 'INVALID_DECISION';
+        continue;
+      }
+      skillId ??= selectedSkill?.id;
       const calls =
         !/\bbudget?\b/i.test(input.message) && plannedCalls.length > 1
           ? plannedCalls.filter((call) => call.tool !== 'getWorkspaceCapabilities')
@@ -568,6 +615,7 @@ export class FinanceAgent {
         clarified: false,
         fallbackReason: lastFailure ?? 'STEP_LIMIT',
         diagnostics,
+        skillId,
       };
     }
     return {
@@ -577,6 +625,7 @@ export class FinanceAgent {
       clarified: false,
       fallbackReason: lastFailure ?? 'UNSUPPORTED',
       diagnostics,
+      skillId,
     };
   }
 }

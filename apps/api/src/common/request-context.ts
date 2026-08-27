@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import type { RequestPrincipal } from '@finora/platform';
 
-type RequestContext = { requestId: string };
+type RequestContext = { requestId: string; principal?: RequestPrincipal };
 
 const storage = new AsyncLocalStorage<RequestContext>();
 

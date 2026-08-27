@@ -10,3 +10,4 @@ generated
 postgres-data
 DONOTCOMMIT/
 DONOTCOMMIT
+.data/

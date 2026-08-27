@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { formatInr, money, type RequestPrincipal } from '@finora/platform';
+import {
+  WorkspacePermission,
+  formatInr,
+  hasWorkspacePermission,
+  money,
+  type RequestPrincipal,
+} from '@finora/platform';
 import {
   type FinanceToolCall,
   type FinanceToolExecutor,
@@ -28,6 +34,21 @@ export class FinanceToolsService {
     return { execute: (call, callId) => this.executeFor(principal, call, callId, asOf) };
   }
 
+  async activeSkills(principal: RequestPrincipal) {
+    if (!hasWorkspacePermission(principal, WorkspacePermission.VIEW_ORGANIZATION_FINANCE)) {
+      return [];
+    }
+    return this.reads.activeSkills(principal.organizationId) as Promise<
+      Array<{
+        id: string;
+        name: string;
+        description: string;
+        instructions: string;
+        allowedTools: FinanceToolCall['tool'][];
+      }>
+    >;
+  }
+
   private async executeFor(
     principal: RequestPrincipal,
     call: FinanceToolCall,
@@ -40,6 +61,19 @@ export class FinanceToolsService {
       callId,
       organizationId,
     });
+    if (
+      !hasWorkspacePermission(principal, WorkspacePermission.VIEW_ORGANIZATION_FINANCE) &&
+      call.tool !== 'getCurrentUser' &&
+      call.tool !== 'getWorkspaceCapabilities'
+    ) {
+      return {
+        callId,
+        tool: call.tool,
+        summary:
+          'Your workspace role can only access your own finance data. Organization-wide finance evidence was not queried.',
+        data: { denied: true, permission: WorkspacePermission.VIEW_ORGANIZATION_FINANCE },
+      };
+    }
     switch (call.tool) {
       case 'getWorkspaceCapabilities': {
         const capabilities = {
@@ -54,7 +88,7 @@ export class FinanceToolsService {
             'organization members',
             'audit and agent activity',
           ],
-          unavailable: ['operating budgets'],
+          unavailable: [],
           requestedTopic: call.arguments.topic,
         };
         const budgetRequested = call.arguments.topic === 'BUDGETS';
@@ -62,8 +96,8 @@ export class FinanceToolsService {
           callId,
           tool: call.tool,
           summary: budgetRequested
-            ? 'Operating budgets are not configured in this workspace yet, so I do not have a monthly budget amount to report. I can show actual posted expenses, cash position and forecast, payments, settlements, invoices, tax lines, and reconciliation data. For the closest available view, ask me to summarise expenses this month.'
-            : `This workspace has controlled access to ${capabilities.connected.join(', ')}. Operating budgets are not configured yet.`,
+            ? 'Operating budgets are available through the deterministic budget summary tool.'
+            : `This workspace has controlled access to ${capabilities.connected.join(', ')} and organization budgets.`,
           data: capabilities,
           artifact: {
             type: 'metrics',
@@ -92,6 +126,23 @@ export class FinanceToolsService {
           summary: `This organization has ${summary.users} member${summary.users === 1 ? '' : 's'}, ${summary.transactions} payment records, ${summary.settlements} settlements, ${summary.invoices} invoices, and ${summary.exceptions} reconciliation exceptions.`,
           data: summary,
           artifact: { type: 'metrics', title: 'Organization summary', data: summary },
+        };
+      }
+      case 'getBudgetSummary': {
+        const result = await this.reads.budgetSummary(organizationId, call.arguments);
+        return {
+          callId,
+          tool: call.tool,
+          summary: result.count
+            ? `${result.count} budget${result.count === 1 ? '' : 's'} allocate ${formatInr(result.allocated.toString())}. ${formatInr(result.committed.toString())} is committed, leaving ${formatInr(result.remaining.toString())}.`
+            : 'No budgets matched that node, period, or status.',
+          data: plain(result),
+          artifact: {
+            type: 'table',
+            title: 'Organization budgets',
+            data: { rows: plain(result.rows) },
+            href: '/organization',
+          },
         };
       }
       case 'getPaymentSummary': {

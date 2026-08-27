@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/next.mjs dev",
+    "build": "node scripts/next.mjs build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
@@ -17,6 +17,7 @@
     "@fontsource-variable/manrope": "5.2.8",
     "ai": "7.0.77",
     "next": "16.3.2",
+    "next-auth": "4.24.15",
     "react": "19.1.2",
     "react-dom": "19.1.2",
     "react-hot-toast": "2.4.1"

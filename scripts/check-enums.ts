@@ -7,6 +7,21 @@ import {
   ExceptionStatus,
   ExceptionType,
   ReconciliationStatus,
+  AgentSkillStatus,
+  AutomationJobStatus,
+  AutomationJobType,
+  BudgetStatus,
+  DocumentStatus,
+  ExpenseClaimStatus,
+  IntegrationProvider,
+  IntegrationStatus,
+  IntegrationType,
+  NotificationChannel,
+  NotificationStatus,
+  OrganizationNodeType,
+  ReceiptRequestStatus,
+  TaxMatchStatus,
+  WorkspaceRole,
 } from '@finora/platform';
 const schema = readFileSync(new URL('../prisma/schema.prisma', import.meta.url), 'utf8');
 const pairs = {
@@ -17,6 +32,21 @@ const pairs = {
   CashDirection,
   CashMovementStatus,
   CashMovementCategory,
+  WorkspaceRole,
+  OrganizationNodeType,
+  BudgetStatus,
+  ExpenseClaimStatus,
+  DocumentStatus,
+  ReceiptRequestStatus,
+  AgentSkillStatus,
+  NotificationChannel,
+  NotificationStatus,
+  IntegrationType,
+  IntegrationProvider,
+  IntegrationStatus,
+  AutomationJobType,
+  AutomationJobStatus,
+  TaxMatchStatus,
 };
 let invalid = false;
 for (const [name, values] of Object.entries(pairs)) {

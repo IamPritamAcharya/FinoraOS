@@ -47,11 +47,19 @@ export class ChatService {
       contextMode: useContext ? 'follow-up' : 'standalone',
     });
     const currentDate = new Date().toISOString();
+    const skills = await this.tools.activeSkills(principal);
+    let gateway: { provider: string; model: string; fallbackFrom?: string } | undefined;
     const result = await new FinanceAgent(
-      { complete: async (input) => (await this.ai.complete(input)).text },
+      {
+        complete: async (input) => {
+          const completion = await this.ai.complete(input);
+          gateway = completion;
+          return completion.text;
+        },
+      },
       this.tools.forPrincipal(principal, currentDate),
       5,
-    ).run({ message, context, currentDate });
+    ).run({ message, context, currentDate, skills });
     const artifacts = result.observations.flatMap((item) => (item.artifact ? [item.artifact] : []));
     const references = [...new Set(result.observations.flatMap((item) => item.references ?? []))];
     const payload = {
@@ -68,6 +76,8 @@ export class ChatService {
       assistantText: result.text,
       payload,
       activity: result.activity,
+      skillId: result.skillId,
+      gateway,
     });
     apiLogger.info('Finora agent run completed', {
       threadId: thread.id,
@@ -76,6 +86,7 @@ export class ChatService {
       fallbackReason: result.fallbackReason,
       diagnostics: result.diagnostics,
       clarified: result.clarified,
+      skillId: result.skillId,
     });
     return {
       threadId: thread.id,

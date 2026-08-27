@@ -6,6 +6,14 @@
   padding: 14px;
 }
 
+.authLoading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  color: var(--finora-text-muted);
+  font-size: 13px;
+}
+
 .content {
   width: 100%;
   max-width: 1440px;

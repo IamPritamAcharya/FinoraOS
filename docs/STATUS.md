@@ -1,85 +1,76 @@
 # FinoraOS Status
 
 Last updated: 2026-08-27
-Current phase: AI-native finance workspace with hardened chat context and exact-record routing
+Current phase: Finance-hub V1 with enterprise identity and controlled automation
 Last verified commit: see `git log -1`
 
 ## Current state
 
-The repository contains a functional V1 architecture and web/API implementation. Chat is the default primary operating surface. Finora now owns the UI system in `packages/ui`; do not add an external component system or route-level generic UI primitives. `pnpm dev` owns the local Docker lifecycle, applies migrations, refreshes the reproducible demo seed, and starts the web/API. A real terminal Ctrl+C test confirmed it removes the Compose services and network.
+FinoraOS has a working Track 04 flagship loop and a broader finance-hub foundation. The deterministic engine processes a 240-record evaluation fixture with 108 correct matches, 12 honest exceptions, and zero false auto-matches. Ambiguous exceptions can be investigated through the configured AI gateway, persisted as typed proposals, reviewed by a human, audited, and rerun without modifying raw imported data.
+
+The application now has Keycloak login/RBAC, hierarchical organization nodes and budgets, employee expense/receipt workflows, custom bounded agent skills, agent/audit visibility, notifications, scheduled receipt reminders, integration/policy control surfaces, and a Razorpay test-mode adapter. PostgreSQL row-level security remains the tenant boundary for agent reads.
 
 ## Completed
 
-- pnpm/Turbo workspace; pinned Node/pnpm, Docker Compose, environment example and hooks.
-- Shared enums/schemas/logger/money helper and Prisma enum drift check.
-- Synthetic 120-transaction / 12-settlement / 14-exception seed model and evaluation harness.
-- Finance, reconciliation, controlled AI/chat and exception-agent API boundaries.
-- FinoraOS visual identity, SVG assets, branded responsive workspace.
-- Finora UI package owns tokens and shared primitives; the web app no longer uses Razorpay Blade at runtime.
-- Web styles are scoped by boundary: global foundations, workspace route, sidebar, and chat. Shared buttons and icons live in `packages/ui`.
-- Pure `@finora/reconciliation` package with explicit exact-reference, settlement-relationship, date-window, and composite-score stages; ambiguity is never auto-matched.
-- `POST /api/reconciliation/runs` maps organization-scoped seeded finance records into mock-bank counterparts, runs the shared engine, persists a run/matches/exceptions/evidence/audit event inside a transaction, and returns the real result.
-- Engine evaluation now runs the exact package over a checked-in 240-record synthetic fixture: 108 expected correct matches, 12 exceptions, and zero false auto-matches.
-- Vercel AI SDK chat state is integrated through a same-origin Next transport that calls Finora's controlled Nest chat endpoint.
-- Real local Qwen/Ollama smoke test passed. Settlement chat returns deterministic INR evidence; the model can add only a validated, number-free qualitative note.
-- `pnpm dev` uses persistent signal handlers because pnpm forwards interactive Ctrl+C twice; containers are reliably brought down after either signal.
-- Root README is now a Buildathon-ready project entry point with setup, demo, safety, architecture, evaluation and command guidance, plus a committed FinoraOS banner asset.
-- API-key-first AI selection: Gemini, Groq, and OpenRouter can be configured; otherwise local Ollama is selected. Hosted completion failures retry through Ollama. Mock remains an explicit test/CI provider.
-- Exception investigation is now routed through the same configured API gateway as settlement chat; agent output remains guarded and cannot determine amounts or resolution state.
-- Structured Pino logs now cover request completion with correlation IDs, AI selection/completion/fallback, deterministic reconciliation metrics, and exception-investigation lifecycle. Credentials and prompts are not logged.
-- General Finora conversation now calls the configured gateway rather than repeating a static fallback; settlement math and record-specific answers remain deterministic and controlled.
-- Chat now recognizes a controlled exception reference such as `Investigate EXC_005.`, invokes the existing Exception Investigator through the configured AI gateway, and renders its typed proposal in chat. The operation writes only derived agent/proposal/audit records in one database transaction; it never changes raw imported records or approves/closes an exception.
-- The deterministic Controller Agent now routes bounded conversation context to approved settlement lookup, exception lookup/investigation, exception list, cash forecast, and tax-mismatch tools. Follow-up settlement questions reuse a prior controlled ID; generic model requests never receive database access or conversation evidence.
-- Finance overview and forecast aggregation now use the shared Decimal money helper instead of `Number(...)` arithmetic.
-- `pnpm dev` now provisions the separate local `finora_agent_ro` PostgreSQL role before seeding; `pnpm db:agent-role` is available for manual role provisioning.
-- The Controller Agent now asks the configured AI gateway to select a Zod-validated allowlisted tool call instead of relying on phrase regexes. The catalogue includes organization users, transactions, invoices, settlements, exceptions/evidence, tax lines, cash forecast, reconciliation runs, audit events, and agent runs.
-- Controlled agent reads now execute through the separate `finora_agent_ro` role with `SELECT` only, `NOBYPASSRLS`, read-only transactions, and organization RLS policies. A missing or wrong tenant context produces zero rows; the provisioning command verifies this live.
-- Controller routing explicitly requests JSON-mode output from compatible providers. Development logs record only the selected controlled tool or a concise fallback reason—never prompt text, model output, secrets, or financial record bodies.
-- `FinanceAgent` replaces the former single-call controller with validated multi-tool planning, grounded synthesis, deterministic list responses, conversation context, and normalized date/amount inputs.
-- Agent tools now cover profile/organization, payment/settlement/invoice/tax summaries, expenses, cash movements, filtered records, exception investigation/evidence, forecast, audit, agent, and reconciliation history.
-- Chat threads/messages and controller AgentRuns persist server-side; Vercel AI SDK UI-message streams carry typed artifacts and tool activity to the chat UI.
-- Persisted cash accounts/movements drive expense summaries and forecasts. Routed Overview, Records, Reconciliation, and Exceptions pages share a persistent workspace shell.
-- Proposals can be approved or rejected. Approval validates the action, creates an idempotent audited adjustment without changing source records, resolves the exception, and attempts a reconciliation rerun.
-- Live Ollama checks passed for a two-tool organization/profile query and monthly expense/category analysis. A discovered planner filter-alias defect now has normalization coverage.
-- Chat no longer lets an old clarification override a new finance topic. Explicit topics/record IDs run standalone, short follow-ups retain only bounded recent context, and immediately referenced payment/settlement/exception IDs resolve deterministically.
-- Exact `pay_#####` lookup and latest-payment lookup now use organization-scoped read tools. Budget questions return an honest capability result because operating budgets are not connected in V1, rather than entering a repeated clarification loop.
-- Repeated model clarifications and requests for a period already supplied are rejected and replanned. The originally reported budget/payment/expense conversation and exact-record pronoun follow-up were replayed successfully against local Ollama and PostgreSQL.
+- pnpm/Turbo workspace with graceful `pnpm dev` Docker lifecycle and preflight port checks.
+- PostgreSQL/Redis/Keycloak Compose stack; Prisma 7 config, migrations, reproducible seed, shared enums, Decimal money rules, and enum synchronization.
+- Pure deterministic reconciliation package and transactional run/match/exception/evidence/audit persistence.
+- Ollama/Qwen plus hosted provider abstraction, controlled multi-tool planning, grounded answers, persisted chat, typed proposals, approval/rejection, adjustment records, and reruns.
+- `finora_agent_ro` with SELECT-only grants, read-only transactions, `NOBYPASSRLS`, and organization RLS. Provisioning proves no rows are visible without a valid tenant.
+- Keycloak/NextAuth login with Employee, Finance Controller, and Enterprise Admin identities. Nest verifies JWT issuer/audience and maps `sub + organization_id` to a database membership and database-owned role.
+- Role/permission contracts for finance, expenses, budgets, organization management, skills, audit, approvals, and integrations. Existing finance/reconciliation operations enforce them.
+- Finance-hub models: organization nodes, budgets, expense claims, financial documents, receipt requests, agent skills, notifications, integration connections, automation jobs/runs, approval policies, and richer tax metadata.
+- Organization hierarchy UI with active budget utilization and audited node-scoped budget creation.
+- Employee/finance expense queue with real bounded PDF/image receipt upload through a document-storage gateway. Local files are ignored under `.data/documents`.
+- Agent control UI with skill creation/activation, strict tool allowlists, active-skill controller context, skill-linked runs, model/tool history, and financial audit events.
+- User-scoped notifications inbox and operations UI for connectors, jobs, job outcomes, and approval policies.
+- Scheduled/manual receipt reminders. Mock delivery works locally; the Slack adapter uses `chat.postMessage` when configured.
+- Razorpay sandbox-only adapter for payments, settlements, refunds, fees, tax, and UTR. Live-mode keys are rejected.
+- Responsive routes for Finora, Overview, Records, Reconciliation, Exceptions, Organization, Expenses, Agent control, Notifications, and Operations.
+- Local Keycloak realm import/health, NextAuth provider discovery and PKCE redirect, branded login, unauthenticated API 401, migration/seed, RLS verification, graceful shutdown, and production web build smoke-tested.
 
 ## In progress
 
-- Browser-level verification of typed chat streaming/history, routed finance pages, and approval/rerun controls.
+No partial code task is intentionally left in progress at this checkpoint.
 
 ## Next highest-priority tasks
 
-1. Add a natural-language chat evaluation corpus covering topic switches, relative periods, typos, record references and multi-tool questions.
-2. Re-run the live filtered-transaction query and confirm every returned row respects the threshold.
-3. Browser-test chat streaming/history, records tabs, reconciliation, investigation, approval/reject, and rerun.
-4. Add integration coverage for RLS scoping, chat persistence, and approval idempotency.
+1. Slack Events API signature verification, durable idempotent ingestion, file download, and receipt-request/thread matching.
+2. Razorpay/banking connector sync orchestration with cursors, webhooks, provenance, retry, and backoff.
+3. Production object storage plus OCR/extraction and a document review queue.
+4. Richer tax matching/evaluation and deterministic forecast scenarios.
+5. Playwright role/isolation coverage for employee, finance, and admin journeys.
 
 ## Known issues
 
-- The V1 banking source is a traceable mock-bank projection from seeded transaction metadata; a persisted bank-statement import model/connector is later work.
-- Reconciliation-match evidence is available in the pure engine output and audit logs; the narrow V1 Prisma match table does not yet store its full evidence payload separately.
-- Authentication still uses an explicitly configured demo principal; JWT/session identity is required before multi-user deployment.
-- Local Qwen routing is schema-guarded and fails closed, but needs a wider natural-language evaluation set.
-- Operating budgets are intentionally not connected in V1; Finora reports this explicitly and offers actual-expense/cash alternatives.
+- Slack outbound reminders are adapter-ready; inbound Slack receipt capture is not implemented.
+- Razorpay test-mode reads work; scheduled persistence/sync and webhook ingestion are not connected.
+- Banking and ERP entries are explicit mock/disconnected control-plane records, not production integrations.
+- Local receipt storage has no malware scanning, OCR, remote object store, or download endpoint.
+- Keycloak runs in `start-dev` with embedded storage; production requires TLS, a durable database, secret rotation, and deployment hardening.
+- Custom skills guide only allowlisted read tools. They cannot grant permissions, run SQL, or mutate finance records.
+- Autonomous closure is disabled (`autoApprove=false`); the policy evaluator remains later work.
+- Tax and forecasting are deterministic baselines, not complete compliance or treasury systems.
 
 ## Commands last verified
 
+- `pnpm check:enums`
 - `pnpm lint`
 - `pnpm typecheck`
-- `pnpm build`
-- `pnpm --filter @finora/web build`
-- `pnpm check:enums`
-- `pnpm test`
+- `pnpm test` (47 tests)
 - `pnpm eval:reconciliation`
-- `pnpm db:migrate --name init`
+- `pnpm build`
+- `pnpm format:check`
+- `pnpm db:deploy`
 - `pnpm seed`
+- `pnpm db:agent-role`
+- PostgreSQL/Redis/Keycloak healthy Compose startup and graceful shutdown
+- `pnpm dev` startup and Ctrl+C shutdown
 
 ## Environment notes
 
-`pnpm@10.16.0` is installed for the current user and pinned in the repository. `.env` remains untracked. Use `AI_PROVIDER=auto` for hosted-key-first selection with Ollama fallback; restart the API after environment changes. `pnpm db:generate` must be run after a fresh dependency install before API type-checking, because Prisma generation is intentionally not an automatic package-install build script.
+`pnpm@10.16.0` is pinned. `.env` is untracked. `.env.example` enables local Keycloak and mock messaging/payment connectors. `AI_PROVIDER=auto` uses a configured hosted provider first and otherwise local Ollama. Keycloak runs at `http://localhost:8080`, web at `http://localhost:3000`, and API at `http://localhost:3001/api`.
 
 ## Demo status
 
-Acme Commerce India is seeded with 120 transactions, 12 settlements, 18 invoices/tax lines, and 14 exceptions.
+Acme Commerce India is seeded with 4 users, an office/department/employee node tree, 3 active budgets, 4 expense claims, receipt requests/documents/notifications, 2 custom skills, approval policies, automation jobs, 120 transactions, 12 settlements, 49 cash movements, invoices/tax lines, and 14 operational exceptions.

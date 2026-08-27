@@ -12,6 +12,7 @@ enum ReconciliationStatus {
   RESOLVED
   NEEDS_REVIEW
 }
+
 enum ExceptionStatus {
   OPEN
   PROPOSED
@@ -19,12 +20,14 @@ enum ExceptionStatus {
   NEEDS_REVIEW
   UNRESOLVED
 }
+
 enum ExceptionType {
   SETTLEMENT_MISMATCH
   MISSING_BANK_RECORD
   AMBIGUOUS_MATCH
   TAX_MISMATCH
 }
+
 enum AgentType {
   CONTROLLER
   RECONCILIATION
@@ -33,20 +36,24 @@ enum AgentType {
   TAX
   FORECAST
 }
+
 enum TransactionStatus {
   CAPTURED
   REFUNDED
   PENDING
 }
+
 enum CashDirection {
   INFLOW
   OUTFLOW
 }
+
 enum CashMovementStatus {
   POSTED
   SCHEDULED
   CANCELLED
 }
+
 enum CashMovementCategory {
   COLLECTION
   GATEWAY_FEE
@@ -59,238 +66,651 @@ enum CashMovementCategory {
   OTHER
 }
 
+enum WorkspaceRole {
+  EMPLOYEE
+  FINANCE_OPERATOR
+  FINANCE_CONTROLLER
+  ENTERPRISE_ADMIN
+  AUDITOR
+}
+
+enum OrganizationNodeType {
+  COMPANY
+  LEGAL_ENTITY
+  OFFICE
+  DEPARTMENT
+  TEAM
+  COST_CENTER
+  EMPLOYEE
+}
+
+enum BudgetStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum ExpenseClaimStatus {
+  DRAFT
+  RECEIPT_REQUIRED
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  REIMBURSED
+}
+
+enum DocumentStatus {
+  UPLOADED
+  PROCESSING
+  EXTRACTED
+  NEEDS_REVIEW
+  REJECTED
+}
+
+enum ReceiptRequestStatus {
+  PENDING
+  SENT
+  RECEIVED
+  OVERDUE
+  CANCELLED
+}
+
+enum AgentSkillStatus {
+  DRAFT
+  ACTIVE
+  DISABLED
+}
+
+enum NotificationChannel {
+  IN_APP
+  SLACK
+  EMAIL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+enum IntegrationType {
+  PAYMENT
+  BANKING
+  ERP
+  MESSAGING
+  DOCUMENT_STORAGE
+}
+
+enum IntegrationProvider {
+  RAZORPAY
+  MOCK_PAYMENT
+  MOCK_BANKING
+  GENERIC_ERP
+  SLACK
+  LOCAL_DOCUMENTS
+}
+
+enum IntegrationStatus {
+  DISCONNECTED
+  CONNECTED
+  ERROR
+}
+
+enum AutomationJobType {
+  RECEIPT_REMINDER
+  INTEGRATION_SYNC
+  DOCUMENT_PROCESSING
+  RECONCILIATION
+  TAX_MATCH
+  FORECAST_REFRESH
+}
+
+enum AutomationJobStatus {
+  IDLE
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum TaxMatchStatus {
+  MATCHED
+  AMBIGUOUS
+  UNMATCHED
+  NEEDS_REVIEW
+}
+
 model Organization {
-  id String @id
-  name String
-  users User[]
-  transactions Transaction[]
-  settlements Settlement[]
-  invoices Invoice[]
-  taxLines TaxLine[]
+  id                 String                  @id
+  name               String
+  users              User[]
+  transactions       Transaction[]
+  settlements        Settlement[]
+  invoices           Invoice[]
+  taxLines           TaxLine[]
   reconciliationRuns ReconciliationRun[]
-  exceptions Exception[]
-  auditLogs AuditLog[]
-  agentRuns AgentRun[]
-  cashAccounts CashAccount[]
-  cashMovements CashMovement[]
-  chatThreads ChatThread[]
-  adjustments Adjustment[]
+  exceptions         Exception[]
+  auditLogs          AuditLog[]
+  agentRuns          AgentRun[]
+  cashAccounts       CashAccount[]
+  cashMovements      CashMovement[]
+  chatThreads        ChatThread[]
+  adjustments        Adjustment[]
+  nodes              OrganizationNode[]
+  budgets            Budget[]
+  expenseClaims      ExpenseClaim[]
+  documents          FinancialDocument[]
+  receiptRequests    ReceiptRequest[]
+  agentSkills        AgentSkill[]
+  notifications      Notification[]
+  integrations       IntegrationConnection[]
+  automationJobs     AutomationJob[]
+  approvalPolicies   ApprovalPolicy[]
 }
+
 model User {
-  id String @id
-  organizationId String
-  name String
-  email String @unique
-  organization Organization @relation(fields: [organizationId], references: [id])
-  chatThreads ChatThread[]
+  id                    String              @id
+  organizationId        String
+  name                  String
+  email                 String              @unique
+  identityProviderId    String?             @unique
+  role                  WorkspaceRole       @default(EMPLOYEE)
+  slackUserId           String?
+  organization          Organization        @relation(fields: [organizationId], references: [id])
+  chatThreads           ChatThread[]
+  organizationNode      OrganizationNode?   @relation("OrganizationNodeMember")
+  createdBudgets        Budget[]            @relation("BudgetCreator")
+  expenseClaims         ExpenseClaim[]      @relation("ExpenseClaimant")
+  approvedExpenseClaims ExpenseClaim[]      @relation("ExpenseApprover")
+  uploadedDocuments     FinancialDocument[] @relation("DocumentUploader")
+  receiptRequests       ReceiptRequest[]
+  createdSkills         AgentSkill[]        @relation("AgentSkillCreator")
+  notifications         Notification[]
 }
+
 model Settlement {
-  id String @id
+  id             String        @id
   organizationId String
-  externalId String
-  expectedAmount Decimal @db.Decimal(18, 2)
-  receivedAmount Decimal @db.Decimal(18, 2)
-  feeAmount Decimal @db.Decimal(18, 2)
-  gstAmount Decimal @db.Decimal(18, 2)
-  refundAmount Decimal @db.Decimal(18, 2)
-  settledAt DateTime
-  organization Organization @relation(fields: [organizationId], references: [id])
-  transactions Transaction[]
+  externalId     String
+  expectedAmount Decimal       @db.Decimal(18, 2)
+  receivedAmount Decimal       @db.Decimal(18, 2)
+  feeAmount      Decimal       @db.Decimal(18, 2)
+  gstAmount      Decimal       @db.Decimal(18, 2)
+  refundAmount   Decimal       @db.Decimal(18, 2)
+  settledAt      DateTime
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  transactions   Transaction[]
+
   @@unique([organizationId, externalId])
 }
+
 model Transaction {
-  id String @id
+  id             String            @id
   organizationId String
-  externalId String
-  amount Decimal @db.Decimal(18, 2)
-  currency String @default("INR")
-  status TransactionStatus @default(CAPTURED)
-  occurredAt DateTime
-  settlementId String?
+  externalId     String
+  amount         Decimal           @db.Decimal(18, 2)
+  currency       String            @default("INR")
+  status         TransactionStatus @default(CAPTURED)
+  occurredAt     DateTime
+  settlementId   String?
   sourceMetadata Json?
-  organization Organization @relation(fields: [organizationId], references: [id])
-  settlement Settlement? @relation(fields: [settlementId], references: [id])
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  settlement     Settlement?       @relation(fields: [settlementId], references: [id])
+
   @@unique([organizationId, externalId])
 }
+
 model Invoice {
-  id String @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
-  externalId String
-  amount Decimal @db.Decimal(18, 2)
-  currency String @default("INR")
-  issuedAt DateTime
-  organization Organization @relation(fields: [organizationId], references: [id])
+  externalId     String
+  amount         Decimal      @db.Decimal(18, 2)
+  currency       String       @default("INR")
+  issuedAt       DateTime
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
   @@unique([organizationId, externalId])
 }
+
 model TaxLine {
-  id String @id @default(cuid())
-  organizationId String
-  externalId String
-  invoiceId String?
-  amount Decimal @db.Decimal(18, 2)
-  taxRate Decimal @db.Decimal(5, 2)
-  matched Boolean @default(false)
-  organization Organization @relation(fields: [organizationId], references: [id])
+  id                String         @id @default(cuid())
+  organizationId    String
+  externalId        String
+  invoiceId         String?
+  amount            Decimal        @db.Decimal(18, 2)
+  taxRate           Decimal        @db.Decimal(5, 2)
+  matched           Boolean        @default(false)
+  matchStatus       TaxMatchStatus @default(UNMATCHED)
+  taxType           String         @default("GST")
+  taxPeriod         String?
+  counterpartyTaxId String?
+  sourceMetadata    Json?
+  organization      Organization   @relation(fields: [organizationId], references: [id])
+
   @@unique([organizationId, externalId])
 }
+
 model ReconciliationRun {
-  id String @id @default(cuid())
-  organizationId String
-  status String
-  startedAt DateTime @default(now())
-  completedAt DateTime?
-  recordsProcessed Int
+  id                   String                @id @default(cuid())
+  organizationId       String
+  status               String
+  startedAt            DateTime              @default(now())
+  completedAt          DateTime?
+  recordsProcessed     Int
   deterministicMatches Int
-  exceptionsGenerated Int
-  agentResolved Int
-  needsReview Int
-  unresolved Int
-  organization Organization @relation(fields: [organizationId], references: [id])
-  matches ReconciliationMatch[]
-  exceptions Exception[]
+  exceptionsGenerated  Int
+  agentResolved        Int
+  needsReview          Int
+  unresolved           Int
+  organization         Organization          @relation(fields: [organizationId], references: [id])
+  matches              ReconciliationMatch[]
+  exceptions           Exception[]
 }
+
 model ReconciliationMatch {
-  id String @id @default(cuid())
+  id                  String               @id @default(cuid())
   reconciliationRunId String
-  transactionId String?
-  settlementId String?
-  status ReconciliationStatus
-  confidence Decimal @db.Decimal(4, 3)
-  reason String
-  reconciliationRun ReconciliationRun @relation(fields: [reconciliationRunId], references: [id])
+  transactionId       String?
+  settlementId        String?
+  status              ReconciliationStatus
+  confidence          Decimal              @db.Decimal(4, 3)
+  reason              String
+  reconciliationRun   ReconciliationRun    @relation(fields: [reconciliationRunId], references: [id])
 }
+
 model Exception {
-  id String @id
-  organizationId String
+  id                  String              @id
+  organizationId      String
   reconciliationRunId String?
-  externalId String @unique
-  type ExceptionType
-  status ExceptionStatus
-  expectedAmount Decimal @db.Decimal(18, 2)
-  receivedAmount Decimal @db.Decimal(18, 2)
-  confidence Decimal @db.Decimal(4, 3)
-  reason String
-  resolution Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  organization Organization @relation(fields: [organizationId], references: [id])
-  reconciliationRun ReconciliationRun? @relation(fields: [reconciliationRunId], references: [id])
-  evidence ExceptionEvidence[]
-  agentRuns AgentRun[]
-  adjustments Adjustment[]
+  externalId          String              @unique
+  type                ExceptionType
+  status              ExceptionStatus
+  expectedAmount      Decimal             @db.Decimal(18, 2)
+  receivedAmount      Decimal             @db.Decimal(18, 2)
+  confidence          Decimal             @db.Decimal(4, 3)
+  reason              String
+  resolution          Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  organization        Organization        @relation(fields: [organizationId], references: [id])
+  reconciliationRun   ReconciliationRun?  @relation(fields: [reconciliationRunId], references: [id])
+  evidence            ExceptionEvidence[]
+  agentRuns           AgentRun[]
+  adjustments         Adjustment[]
+
   @@index([organizationId, status])
 }
+
 model ExceptionEvidence {
-  id String @id @default(cuid())
+  id          String    @id @default(cuid())
   exceptionId String
-  label String
+  label       String
   referenceId String?
-  payload Json
-  exception Exception @relation(fields: [exceptionId], references: [id])
+  payload     Json
+  exception   Exception @relation(fields: [exceptionId], references: [id])
 }
+
 model AgentRun {
-  id String @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
-  exceptionId String?
-  agentType AgentType
-  status String
-  input Json
-  output Json?
-  startedAt DateTime @default(now())
-  completedAt DateTime?
-  organization Organization @relation(fields: [organizationId], references: [id])
-  exception Exception? @relation(fields: [exceptionId], references: [id])
-  steps AgentStep[]
+  exceptionId    String?
+  agentType      AgentType
+  status         String
+  input          Json
+  output         Json?
+  startedAt      DateTime     @default(now())
+  completedAt    DateTime?
+  skillId        String?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  exception      Exception?   @relation(fields: [exceptionId], references: [id])
+  skill          AgentSkill?  @relation(fields: [skillId], references: [id])
+  steps          AgentStep[]
 }
+
 model AgentStep {
-  id String @id @default(cuid())
+  id         String   @id @default(cuid())
   agentRunId String
-  label String
-  payload Json?
-  createdAt DateTime @default(now())
-  agentRun AgentRun @relation(fields: [agentRunId], references: [id])
+  label      String
+  payload    Json?
+  createdAt  DateTime @default(now())
+  agentRun   AgentRun @relation(fields: [agentRunId], references: [id])
 }
+
 model AuditLog {
-  id String @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
-  actor String
-  action String
-  entityType String
-  entityId String?
-  details Json?
-  createdAt DateTime @default(now())
-  organization Organization @relation(fields: [organizationId], references: [id])
+  actor          String
+  action         String
+  entityType     String
+  entityId       String?
+  details        Json?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
 }
+
 model ChatThread {
-  id String @id @default(cuid())
+  id             String        @id @default(cuid())
   organizationId String
-  userId String
-  title String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  organization Organization @relation(fields: [organizationId], references: [id])
-  user User @relation(fields: [userId], references: [id])
-  messages ChatMessage[]
+  userId         String
+  title          String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  user           User          @relation(fields: [userId], references: [id])
+  messages       ChatMessage[]
+
   @@index([organizationId, userId, updatedAt])
 }
+
 model ChatMessage {
-  id String @id @default(cuid())
-  threadId String
-  role String
-  content String
-  payload Json?
-  status String @default("COMPLETED")
-  createdAt DateTime @default(now())
-  thread ChatThread @relation(fields: [threadId], references: [id])
+  id        String     @id @default(cuid())
+  threadId  String
+  role      String
+  content   String
+  payload   Json?
+  status    String     @default("COMPLETED")
+  createdAt DateTime   @default(now())
+  thread    ChatThread @relation(fields: [threadId], references: [id])
+
   @@index([threadId, createdAt])
 }
 
 model CashAccount {
-  id String @id @default(cuid())
+  id             String         @id @default(cuid())
   organizationId String
-  name String
-  currency String @default("INR")
-  openingBalance Decimal @db.Decimal(18, 2)
-  organization Organization @relation(fields: [organizationId], references: [id])
-  movements CashMovement[]
+  name           String
+  currency       String         @default("INR")
+  openingBalance Decimal        @db.Decimal(18, 2)
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  movements      CashMovement[]
+
   @@unique([organizationId, name, currency])
 }
 
 model CashMovement {
-  id String @id @default(cuid())
+  id             String               @id @default(cuid())
   organizationId String
-  accountId String
-  externalId String
-  direction CashDirection
-  category CashMovementCategory
-  status CashMovementStatus @default(POSTED)
-  amount Decimal @db.Decimal(18, 2)
-  currency String @default("INR")
-  description String
-  counterparty String?
-  occurredAt DateTime
-  sourceType String
-  sourceId String?
+  accountId      String
+  externalId     String
+  direction      CashDirection
+  category       CashMovementCategory
+  status         CashMovementStatus   @default(POSTED)
+  amount         Decimal              @db.Decimal(18, 2)
+  currency       String               @default("INR")
+  description    String
+  counterparty   String?
+  occurredAt     DateTime
+  sourceType     String
+  sourceId       String?
   sourceMetadata Json?
-  organization Organization @relation(fields: [organizationId], references: [id])
-  account CashAccount @relation(fields: [accountId], references: [id])
+  organization   Organization         @relation(fields: [organizationId], references: [id])
+  account        CashAccount          @relation(fields: [accountId], references: [id])
+
   @@unique([organizationId, externalId])
   @@index([organizationId, direction, status, occurredAt])
   @@index([organizationId, category, occurredAt])
 }
 
 model Adjustment {
-  id String @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
-  exceptionId String
-  type String
-  amount Decimal @db.Decimal(18, 2)
-  currency String @default("INR")
-  details Json
-  approvedBy String
-  approvedAt DateTime
-  executedAt DateTime @default(now())
-  organization Organization @relation(fields: [organizationId], references: [id])
-  exception Exception @relation(fields: [exceptionId], references: [id])
+  exceptionId    String
+  type           String
+  amount         Decimal      @db.Decimal(18, 2)
+  currency       String       @default("INR")
+  details        Json
+  approvedBy     String
+  approvedAt     DateTime
+  executedAt     DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  exception      Exception    @relation(fields: [exceptionId], references: [id])
+
   @@unique([organizationId, exceptionId, type])
+}
+
+model OrganizationNode {
+  id               String               @id @default(cuid())
+  organizationId   String
+  parentId         String?
+  memberUserId     String?              @unique
+  type             OrganizationNodeType
+  name             String
+  code             String
+  active           Boolean              @default(true)
+  metadata         Json?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  organization     Organization         @relation(fields: [organizationId], references: [id])
+  parent           OrganizationNode?    @relation("OrganizationNodeTree", fields: [parentId], references: [id])
+  children         OrganizationNode[]   @relation("OrganizationNodeTree")
+  memberUser       User?                @relation("OrganizationNodeMember", fields: [memberUserId], references: [id])
+  budgets          Budget[]
+  expenseClaims    ExpenseClaim[]
+  approvalPolicies ApprovalPolicy[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, parentId])
+}
+
+model Budget {
+  id             String                @id @default(cuid())
+  organizationId String
+  nodeId         String
+  createdById    String
+  name           String
+  category       CashMovementCategory?
+  amount         Decimal               @db.Decimal(18, 2)
+  currency       String                @default("INR")
+  periodStart    DateTime
+  periodEnd      DateTime
+  status         BudgetStatus          @default(DRAFT)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  organization   Organization          @relation(fields: [organizationId], references: [id])
+  node           OrganizationNode      @relation(fields: [nodeId], references: [id])
+  createdBy      User                  @relation("BudgetCreator", fields: [createdById], references: [id])
+  expenseClaims  ExpenseClaim[]
+
+  @@index([organizationId, periodStart, periodEnd])
+  @@index([nodeId, status])
+}
+
+model ExpenseClaim {
+  id              String               @id @default(cuid())
+  organizationId  String
+  externalId      String
+  claimantUserId  String
+  nodeId          String
+  budgetId        String?
+  approvedById    String?
+  status          ExpenseClaimStatus   @default(DRAFT)
+  amount          Decimal              @db.Decimal(18, 2)
+  currency        String               @default("INR")
+  merchant        String
+  category        CashMovementCategory @default(OTHER)
+  incurredAt      DateTime
+  description     String
+  sourceType      String               @default("WEB")
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  organization    Organization         @relation(fields: [organizationId], references: [id])
+  claimant        User                 @relation("ExpenseClaimant", fields: [claimantUserId], references: [id])
+  approvedBy      User?                @relation("ExpenseApprover", fields: [approvedById], references: [id])
+  node            OrganizationNode     @relation(fields: [nodeId], references: [id])
+  budget          Budget?              @relation(fields: [budgetId], references: [id])
+  documents       FinancialDocument[]
+  receiptRequests ReceiptRequest[]
+
+  @@unique([organizationId, externalId])
+  @@index([organizationId, claimantUserId, status])
+  @@index([nodeId, incurredAt])
+}
+
+model FinancialDocument {
+  id               String                 @id @default(cuid())
+  organizationId   String
+  expenseClaimId   String?
+  uploadedById     String?
+  connectionId     String?
+  type             String
+  status           DocumentStatus         @default(UPLOADED)
+  fileName         String
+  mimeType         String
+  sizeBytes        Int
+  storageKey       String
+  sha256           String
+  sourceExternalId String?
+  extractedData    Json?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  organization     Organization           @relation(fields: [organizationId], references: [id])
+  expenseClaim     ExpenseClaim?          @relation(fields: [expenseClaimId], references: [id])
+  uploadedBy       User?                  @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  connection       IntegrationConnection? @relation(fields: [connectionId], references: [id])
+
+  @@unique([organizationId, sha256])
+  @@index([organizationId, status, createdAt])
+}
+
+model ReceiptRequest {
+  id               String               @id @default(cuid())
+  organizationId   String
+  expenseClaimId   String
+  employeeUserId   String
+  status           ReceiptRequestStatus @default(PENDING)
+  channel          NotificationChannel  @default(IN_APP)
+  dueAt            DateTime
+  nextAttemptAt    DateTime
+  attempts         Int                  @default(0)
+  lastSentAt       DateTime?
+  externalThreadId String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  organization     Organization         @relation(fields: [organizationId], references: [id])
+  expenseClaim     ExpenseClaim         @relation(fields: [expenseClaimId], references: [id])
+  employee         User                 @relation(fields: [employeeUserId], references: [id])
+
+  @@index([organizationId, status, nextAttemptAt])
+}
+
+model AgentSkill {
+  id             String           @id @default(cuid())
+  organizationId String
+  createdById    String
+  name           String
+  description    String
+  instructions   String
+  allowedTools   String[]
+  status         AgentSkillStatus @default(DRAFT)
+  version        Int              @default(1)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  createdBy      User             @relation("AgentSkillCreator", fields: [createdById], references: [id])
+  agentRuns      AgentRun[]
+
+  @@unique([organizationId, name, version])
+  @@index([organizationId, status])
+}
+
+model Notification {
+  id             String              @id @default(cuid())
+  organizationId String
+  userId         String
+  type           String
+  channel        NotificationChannel @default(IN_APP)
+  status         NotificationStatus  @default(PENDING)
+  title          String
+  body           String
+  actionUrl      String?
+  entityType     String?
+  entityId       String?
+  sentAt         DateTime?
+  readAt         DateTime?
+  createdAt      DateTime            @default(now())
+  organization   Organization        @relation(fields: [organizationId], references: [id])
+  user           User                @relation(fields: [userId], references: [id])
+
+  @@index([organizationId, userId, status, createdAt])
+}
+
+model IntegrationConnection {
+  id                String              @id @default(cuid())
+  organizationId    String
+  type              IntegrationType
+  provider          IntegrationProvider
+  status            IntegrationStatus   @default(DISCONNECTED)
+  displayName       String
+  externalAccountId String?
+  credentialRef     String?
+  config            Json?
+  lastSyncAt        DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  organization      Organization        @relation(fields: [organizationId], references: [id])
+  documents         FinancialDocument[]
+  automationJobs    AutomationJob[]
+
+  @@unique([organizationId, provider, externalAccountId])
+  @@index([organizationId, type, status])
+}
+
+model AutomationJob {
+  id             String                 @id @default(cuid())
+  organizationId String
+  connectionId   String?
+  type           AutomationJobType
+  name           String
+  cronExpression String?
+  enabled        Boolean                @default(true)
+  status         AutomationJobStatus    @default(IDLE)
+  nextRunAt      DateTime?
+  lastRunAt      DateTime?
+  payload        Json?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  organization   Organization           @relation(fields: [organizationId], references: [id])
+  connection     IntegrationConnection? @relation(fields: [connectionId], references: [id])
+  runs           AutomationJobRun[]
+
+  @@index([organizationId, enabled, nextRunAt])
+}
+
+model AutomationJobRun {
+  id          String              @id @default(cuid())
+  jobId       String
+  status      AutomationJobStatus
+  startedAt   DateTime            @default(now())
+  completedAt DateTime?
+  attempted   Int                 @default(0)
+  succeeded   Int                 @default(0)
+  failed      Int                 @default(0)
+  output      Json?
+  job         AutomationJob       @relation(fields: [jobId], references: [id])
+
+  @@index([jobId, startedAt])
+}
+
+model ApprovalPolicy {
+  id                String            @id @default(cuid())
+  organizationId    String
+  nodeId            String?
+  name              String
+  actionType        String
+  amountLimit       Decimal?          @db.Decimal(18, 2)
+  currency          String            @default("INR")
+  minimumConfidence Decimal?          @db.Decimal(4, 3)
+  requiresReceipt   Boolean           @default(false)
+  autoApprove       Boolean           @default(false)
+  enabled           Boolean           @default(true)
+  createdById       String
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  organization      Organization      @relation(fields: [organizationId], references: [id])
+  node              OrganizationNode? @relation(fields: [nodeId], references: [id])
+
+  @@index([organizationId, actionType, enabled])
 }

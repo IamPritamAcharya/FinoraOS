@@ -8,6 +8,11 @@ export const workspaceViews = [
   'Records',
   'Reconciliation',
   'Exceptions',
+  'Organization',
+  'Expenses',
+  'Intelligence',
+  'Notifications',
+  'Operations',
 ] as const;
 export type WorkspaceView = (typeof workspaceViews)[number];
 
@@ -17,16 +22,31 @@ const navigationItems: Array<{ label: string; view: WorkspaceView; icon: FinoraI
   { label: 'Records', view: 'Records', icon: 'records' },
   { label: 'Reconciliation', view: 'Reconciliation', icon: 'reconciliation' },
   { label: 'Exceptions', view: 'Exceptions', icon: 'exceptions' },
+  { label: 'Organization', view: 'Organization', icon: 'organization' },
+  { label: 'Expenses', view: 'Expenses', icon: 'expenses' },
+  { label: 'Agent control', view: 'Intelligence', icon: 'intelligence' },
+  { label: 'Notifications', view: 'Notifications', icon: 'notifications' },
+  { label: 'Operations', view: 'Operations', icon: 'operations' },
 ];
+
+const employeeViews = new Set<WorkspaceView>(['Chat', 'Expenses', 'Notifications']);
 
 export function AppSidebar({
   activeView,
   onNavigate,
+  account,
+  onAccountClick,
 }: {
   activeView: WorkspaceView;
   onNavigate: (view: WorkspaceView) => void;
+  account?: { name: string; detail: string; role?: string };
+  onAccountClick?: () => void;
 }) {
-  const activeIndex = navigationItems.findIndex((item) => item.view === activeView);
+  const visibleItems =
+    account?.role === 'EMPLOYEE'
+      ? navigationItems.filter((item) => employeeViews.has(item.view))
+      : navigationItems;
+  const activeIndex = visibleItems.findIndex((item) => item.view === activeView);
   const navStyle = { '--active-index': activeIndex } as CSSProperties;
 
   return (
@@ -37,7 +57,7 @@ export function AppSidebar({
       </a>
       <nav className={styles.nav} aria-label="Primary navigation" style={navStyle}>
         <span className={styles.indicator} aria-hidden="true" />
-        {navigationItems.map(({ label, view, icon }, index) => (
+        {visibleItems.map(({ label, view, icon }, index) => (
           <FinoraButton
             key={view}
             type="button"
@@ -56,14 +76,15 @@ export function AppSidebar({
       <FinoraButton
         className={styles.account}
         variant="ghost"
-        aria-label="Acme Commerce India account"
+        aria-label={`${account?.name ?? 'Acme Commerce India'} account`}
+        onClick={onAccountClick}
       >
         <span className={styles.accountIcon}>
           <FinoraIcon name="account" />
         </span>
         <span className={styles.accountLabel}>
-          <strong>Acme Commerce India</strong>
-          <small>Finance workspace</small>
+          <strong>{account?.name ?? 'Acme Commerce India'}</strong>
+          <small>{account?.detail ?? 'Finance workspace'}</small>
         </span>
       </FinoraButton>
     </aside>

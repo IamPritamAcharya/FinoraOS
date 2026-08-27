@@ -18,6 +18,8 @@ describe('ChatService', () => {
         .fn()
         .mockResolvedValueOnce({
           text: JSON.stringify({ type: 'tool', call: { tool: 'getCurrentUser', arguments: {} } }),
+          provider: 'mock' as const,
+          model: 'deterministic-mock',
         })
         .mockResolvedValueOnce({
           text: JSON.stringify({
@@ -25,6 +27,8 @@ describe('ChatService', () => {
             answer: 'Your email is finance@finora.local.',
             citations: ['call-1'],
           }),
+          provider: 'mock' as const,
+          model: 'deterministic-mock',
         }),
     };
     const execute = vi.fn().mockResolvedValue({
@@ -38,7 +42,10 @@ describe('ChatService', () => {
         data: { name: 'Aarav Mehta', email: 'finance@finora.local' },
       },
     });
-    const tools = { forPrincipal: vi.fn().mockReturnValue({ execute }) };
+    const tools = {
+      forPrincipal: vi.fn().mockReturnValue({ execute }),
+      activeSkills: vi.fn().mockResolvedValue([]),
+    };
     const chats = {
       getOrCreateThread: vi.fn().mockResolvedValue({ id: 'thread-1' }),
       context: vi.fn().mockResolvedValue([]),

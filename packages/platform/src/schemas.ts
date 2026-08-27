@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ExceptionStatus, ExceptionType } from './enums.js';
+import { ExceptionStatus, ExceptionType, WorkspacePermission, WorkspaceRole } from './enums.js';
 
 export const MoneySchema = z.object({
   amount: z.string().regex(/^-?\d+(\.\d{1,2})?$/, 'Use a decimal string'),
@@ -26,9 +26,45 @@ export type ExceptionResolution = z.infer<typeof ExceptionResolutionSchema>;
 export const RequestPrincipalSchema = z.object({
   organizationId: z.string().min(1),
   userId: z.string().min(1),
+  role: z.nativeEnum(WorkspaceRole).optional(),
 });
 
 export type RequestPrincipal = z.infer<typeof RequestPrincipalSchema>;
+
+const rolePermissions: Record<WorkspaceRole, readonly WorkspacePermission[]> = {
+  [WorkspaceRole.EMPLOYEE]: [
+    WorkspacePermission.VIEW_OWN_FINANCE,
+    WorkspacePermission.SUBMIT_EXPENSE,
+  ],
+  [WorkspaceRole.FINANCE_OPERATOR]: [
+    WorkspacePermission.VIEW_OWN_FINANCE,
+    WorkspacePermission.VIEW_ORGANIZATION_FINANCE,
+    WorkspacePermission.SUBMIT_EXPENSE,
+    WorkspacePermission.REVIEW_EXPENSE,
+    WorkspacePermission.VIEW_AGENT_AUDIT,
+  ],
+  [WorkspaceRole.FINANCE_CONTROLLER]: [
+    WorkspacePermission.VIEW_OWN_FINANCE,
+    WorkspacePermission.VIEW_ORGANIZATION_FINANCE,
+    WorkspacePermission.SUBMIT_EXPENSE,
+    WorkspacePermission.REVIEW_EXPENSE,
+    WorkspacePermission.MANAGE_BUDGET,
+    WorkspacePermission.MANAGE_AGENT_SKILL,
+    WorkspacePermission.VIEW_AGENT_AUDIT,
+    WorkspacePermission.APPROVE_FINANCE_ACTION,
+  ],
+  [WorkspaceRole.ENTERPRISE_ADMIN]: Object.values(WorkspacePermission),
+  [WorkspaceRole.AUDITOR]: [
+    WorkspacePermission.VIEW_OWN_FINANCE,
+    WorkspacePermission.VIEW_ORGANIZATION_FINANCE,
+    WorkspacePermission.VIEW_AGENT_AUDIT,
+  ],
+};
+
+export const hasWorkspacePermission = (
+  principal: RequestPrincipal,
+  permission: WorkspacePermission,
+) => rolePermissions[principal.role ?? WorkspaceRole.EMPLOYEE].includes(permission);
 
 export const FinoraArtifactSchema = z.object({
   type: z.enum(['metrics', 'table', 'settlement', 'exception', 'forecast', 'profile']),

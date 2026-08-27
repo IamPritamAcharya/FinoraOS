@@ -65,6 +65,16 @@ async function main() {
       ['CashAccount', `"organizationId" = ${orgId}`],
       ['CashMovement', `"organizationId" = ${orgId}`],
       ['Adjustment', `"organizationId" = ${orgId}`],
+      ['OrganizationNode', `"organizationId" = ${orgId}`],
+      ['Budget', `"organizationId" = ${orgId}`],
+      ['ExpenseClaim', `"organizationId" = ${orgId}`],
+      ['FinancialDocument', `"organizationId" = ${orgId}`],
+      ['ReceiptRequest', `"organizationId" = ${orgId}`],
+      ['AgentSkill', `"organizationId" = ${orgId}`],
+      ['Notification', `"organizationId" = ${orgId}`],
+      ['IntegrationConnection', `"organizationId" = ${orgId}`],
+      ['AutomationJob', `"organizationId" = ${orgId}`],
+      ['ApprovalPolicy', `"organizationId" = ${orgId}`],
     ] as const;
     for (const [table, predicate] of directTenantTables) {
       await client.query(`ALTER TABLE public."${table}" ENABLE ROW LEVEL SECURITY;`);
@@ -78,6 +88,7 @@ async function main() {
       ['ReconciliationMatch', 'ReconciliationRun', 'reconciliationRunId', 'id'],
       ['AgentStep', 'AgentRun', 'agentRunId', 'id'],
       ['ChatMessage', 'ChatThread', 'threadId', 'id'],
+      ['AutomationJobRun', 'AutomationJob', 'jobId', 'id'],
     ] as const;
     for (const [table, parentTable, foreignKey, parentKey] of relatedTenantTables) {
       await client.query(`ALTER TABLE public."${table}" ENABLE ROW LEVEL SECURITY;`);

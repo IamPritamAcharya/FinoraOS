@@ -58,6 +58,8 @@ export class ChatRepository {
     assistantText: string;
     payload: unknown;
     activity: Array<{ callId: string; tool: string; status: string; label: string }>;
+    skillId?: string;
+    gateway?: { provider: string; model: string; fallbackFrom?: string };
   }) {
     return this.prisma.$transaction(async (tx) => {
       const userMessage = await tx.chatMessage.create({
@@ -68,9 +70,14 @@ export class ChatRepository {
           organizationId: input.principal.organizationId,
           agentType: 'CONTROLLER',
           status: 'COMPLETED',
-          input: { threadId: input.threadId, messageId: userMessage.id },
+          input: {
+            threadId: input.threadId,
+            messageId: userMessage.id,
+            gateway: input.gateway,
+          },
           output: json(input.payload),
           completedAt: new Date(),
+          skillId: input.skillId,
           steps: {
             create: input.activity.map((item) => ({
               label: item.label,

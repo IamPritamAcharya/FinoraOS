@@ -60,7 +60,7 @@ The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, cl
 
 | Capability                   | What it does now                                                                                                                                                                                                                               |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Finance workspace            | Branded overview, Finora chat, records, reconciliation, and exceptions views over seeded backend data.                                                                                                                                         |
+| Finance workspace            | Role-aware Finora, overview, records, reconciliation, exceptions, organization, expenses, agent control, notifications, and operations routes over seeded backend data.                                                                        |
 | Deterministic reconciliation | Exact-reference, settlement-relationship, date-window, and explicit composite-score matching. Ambiguous cases are never forced into a match.                                                                                                   |
 | Exception persistence        | Reconciliation runs persist matches, exceptions, exception evidence, metrics, and audit events transactionally.                                                                                                                                |
 | Settlement Q&A               | Ask Finora about `STL_0001`; amounts and variance are calculated deterministically, then a configured AI gateway may provide a constrained qualitative explanation.                                                                            |
@@ -68,19 +68,26 @@ The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, cl
 | Controlled chat controller   | The configured model selects one Zod-validated tool from an explicit catalogue: organization users, transactions, invoices, settlements, exceptions/evidence, tax lines, forecast, reconciliation runs, audit events, or agent runs—never SQL. |
 | General Finora conversation  | Greetings, product-identity, and navigation questions use the configured model under a no-invented-finance-data system guardrail.                                                                                                              |
 | AI providers                 | API-key-first gateway selection for Gemini, Groq, and OpenRouter; local Ollama fallback; explicit mock only for tests.                                                                                                                         |
-| Synthetic demo               | Reproducible Acme Commerce India data: 120 transactions, 12 settlements, invoices/tax lines, and seeded exceptions.                                                                                                                            |
+| Identity and tenancy         | Keycloak OIDC, NextAuth sessions, database-backed workspace roles, API permission checks, and PostgreSQL RLS for the agent's read-only identity.                                                                                               |
+| Finance-hub workflows        | Organization nodes and budgets, employee expense claims, bounded receipt uploads, user notifications, approval policies, scheduled receipt reminders, and agent/audit inspection.                                                              |
+| Custom agent skills          | Admin-created guidance can select only an explicit allowlist of existing organization-scoped read tools; it cannot add SQL, credentials, permissions, or write access.                                                                         |
+| Provider gateways            | Mock-first banking/payment/messaging boundaries, Slack outbound reminders, and a Razorpay sandbox-only read adapter.                                                                                                                           |
+| Synthetic demo               | Reproducible Acme Commerce India data: 4 users, node hierarchy, 3 budgets, 4 expenses, 120 transactions, 12 settlements, 49 cash movements, invoices/tax lines, and 14 exceptions.                                                             |
 | Evaluation harness           | Runs the same shared reconciliation package against checked-in input and ground truth.                                                                                                                                                         |
 
 ### Honest V1 boundaries
 
-- Banking and payment connections are traceable mock adapters; no real money movement is performed.
+- No real money movement is performed. Razorpay supports test-mode reads only; persistence/sync and webhooks are not yet connected. Banking and ERP entries are explicit mock/disconnected integrations.
+- Slack can send configured receipt reminders, but inbound Slack events and file capture are not implemented.
+- Local receipt storage is a development adapter without malware scanning, OCR, remote object storage, or an authorized download endpoint.
 - AI output is constrained to qualitative explanations. Deterministic finance logic remains authoritative, and an unavailable hosted provider falls back to local Ollama.
-- Chat history is browser-local for the demo; server-side thread persistence is V1.x work.
+- Chat threads, messages, controller decisions, tool steps, and agent runs are persisted and scoped to the authenticated organization/user.
+- The bundled Keycloak realm runs with `start-dev`; production needs TLS, durable Keycloak storage, managed secrets, and deployment hardening.
 - This is not a production payment system, tax-compliance product, or claim of regulatory certification.
 
 ## Demo workflow
 
-1. Open **Finora** at `http://localhost:3000`.
+1. Open `http://localhost:3000`, sign in as the finance controller, and open **Finora**.
 2. Ask: `Why was settlement STL_0001 short?`
 3. See the deterministic settlement breakdown: expected amount, received amount, gateway fee, GST, refund, and the explained variance.
 4. Ask: `Investigate EXC_005.` See the AI-assisted qualitative explanation and typed proposal. This creates no financial adjustment and requires a later approval step.
@@ -88,9 +95,10 @@ The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, cl
 6. Ask: `Show unresolved exceptions above ₹25,000.`, `What is our expected cash position this week?`, or `Which GST lines failed to match?`
 7. Open **Reconciliation** to inspect the latest measured run.
 8. Open **Exceptions** to inspect the queue and its supporting reasons.
-9. Run the evaluation harness to demonstrate batch-level accuracy—not a cherry-picked result.
+9. Open **Organization**, **Expenses**, **Agent control**, **Notifications**, and **Operations** to inspect the broader finance-hub foundation.
+10. Run the evaluation harness to demonstrate batch-level accuracy—not a cherry-picked result.
 
-The app supports normal route navigation. Chat threads restore from browser storage so a finance user can check another workspace view and continue the same conversation.
+The app supports normal route navigation. Server-persisted chat threads remain available when a finance user checks another workspace view and returns.
 
 ## Quick start
 
@@ -119,10 +127,11 @@ pnpm db:generate
 pnpm dev
 ```
 
-`pnpm dev` starts PostgreSQL and Redis, applies committed migrations, refreshes the reproducible demo seed, then launches:
+`pnpm dev` checks ports, starts PostgreSQL, Redis, and Keycloak, waits for health, applies committed migrations, provisions the agent read-only role and RLS policies, refreshes the reproducible demo seed, then launches:
 
 - Web: `http://localhost:3000`
 - API: `http://localhost:3001/api`
+- Keycloak: `http://localhost:8080`
 
 Press `Ctrl+C` to stop the web/API processes and gracefully bring down the Docker services. To keep infrastructure alive after stopping development servers:
 
@@ -139,6 +148,19 @@ pnpm seed
 pnpm dev:web
 pnpm dev:api
 ```
+
+### Demo identities
+
+All seeded users use the development-only password `FinoraDemo2026!`.
+
+| Role               | Username         | Primary access                                                               |
+| ------------------ | ---------------- | ---------------------------------------------------------------------------- |
+| Enterprise Admin   | `admin`          | Organization, budgets, skills, audit, policies, jobs, and integrations.      |
+| Finance Controller | `finance`        | Organization-wide finance, reconciliation, exceptions, expenses, and Finora. |
+| Employee           | `employee`       | Personal Finora context, expenses, receipt upload, and notifications.        |
+| Employee           | `employee.rohan` | Personal Finora context, expenses, receipt upload, and notifications.        |
+
+These accounts and secrets are local demo fixtures. Do not reuse them outside development.
 
 ## AI providers: hosted key first, local fallback
 
@@ -197,7 +219,7 @@ Finora invokes the existing Exception Investigator with controlled evidence. It 
 pnpm db:agent-role
 ```
 
-The model never receives this connection URL or SQL access. It chooses only from the typed tool catalogue, and the API supplies the trusted organization context. V1 uses the seeded demo organization; JWT-derived organization context is the next authentication milestone.
+The model never receives this connection URL or SQL access. It chooses only from the typed tool catalogue. The API verifies the Keycloak token, resolves `sub + organization_id` to an active database membership, applies database-owned permissions, and supplies that trusted organization context to every tool.
 
 The API emits compact human-readable logs in development and structured JSON logs in production for gateway selection, completions, hosted-to-local fallback, request completion, reconciliation runs, and exception investigations. Prompts, API keys, authorization headers, and credentials are never logged.
 
@@ -240,6 +262,7 @@ packages/ui              Finora design tokens, primitives, finance presentation
 prisma                   PostgreSQL schema, migrations and reproducible seed
 datasets                 Checked-in synthetic inputs and expected ground truth
 evals                    Batch-level accuracy and exception metrics
+infra                    Local Keycloak realm and development infrastructure assets
 ```
 
 ### Provider and safety boundaries
@@ -258,10 +281,11 @@ Business modules do not import vendor SDKs directly. Agents do not import Prisma
 | ----------------------------------- | --------------------------------------------------------------------------------- |
 | `pnpm dev`                          | Start infrastructure, migrate, seed, start web/API; shut down services on Ctrl+C. |
 | `pnpm dev:keep-infra`               | Same as `dev`, but retains Docker services on exit.                               |
-| `pnpm infra:up` / `pnpm infra:down` | Start or stop PostgreSQL and Redis.                                               |
+| `pnpm infra:up` / `pnpm infra:down` | Start or stop PostgreSQL, Redis, and Keycloak.                                    |
 | `pnpm db:generate`                  | Generate the Prisma client after a fresh install or schema change.                |
 | `pnpm db:migrate`                   | Create and apply a development migration.                                         |
 | `pnpm db:deploy`                    | Apply committed migrations.                                                       |
+| `pnpm db:agent-role`                | Provision and verify the SELECT-only, RLS-protected agent database role.          |
 | `pnpm seed`                         | Refresh the deterministic Acme Commerce India demo data.                          |
 | `pnpm check`                        | Format check, lint, typecheck, and tests.                                         |
 | `pnpm check:enums`                  | Verify Prisma and shared platform enum values do not drift.                       |

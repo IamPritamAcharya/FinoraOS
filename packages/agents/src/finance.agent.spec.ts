@@ -10,13 +10,13 @@ const expenseObservation: ToolObservation = {
 };
 
 describe('FinanceAgent', () => {
-  it('answers budget questions from workspace capability evidence without looping', async () => {
+  it('answers budget questions from deterministic budget evidence without looping', async () => {
     const model = { complete: vi.fn() };
     const execute = vi.fn().mockResolvedValue({
       callId: 'call-1',
-      tool: 'getWorkspaceCapabilities',
-      summary: 'Operating budgets are not configured in this workspace yet.',
-      data: { unavailable: ['operating budgets'] },
+      tool: 'getBudgetSummary',
+      summary: '3 budgets allocate ₹30,45,000.00 with ₹28,97,000.00 remaining.',
+      data: { count: 3, allocated: '3045000.00', remaining: '2897000.00' },
     });
     const result = await new FinanceAgent(model, { execute }).run({
       message: 'What is our monthly operating budget?',
@@ -28,14 +28,11 @@ describe('FinanceAgent', () => {
       ],
       currentDate: '2026-08-26T00:00:00.000Z',
     });
-    expect(execute).toHaveBeenCalledWith(
-      { tool: 'getWorkspaceCapabilities', arguments: { topic: 'BUDGETS' } },
-      'call-1',
-    );
+    expect(execute).toHaveBeenCalledWith({ tool: 'getBudgetSummary', arguments: {} }, 'call-1');
     expect(model.complete).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       clarified: false,
-      text: expect.stringContaining('not configured'),
+      text: expect.stringContaining('3 budgets'),
     });
   });
 
@@ -129,6 +126,66 @@ describe('FinanceAgent', () => {
     expect(tools.execute).toHaveBeenCalledOnce();
     expect(result.text).toContain('₹8,97,350.00');
     expect(result.observations).toHaveLength(1);
+  });
+
+  it('applies an active workspace skill only within its tool allowlist', async () => {
+    const skill = {
+      id: 'skill-1',
+      name: 'Month-end variance review',
+      description: 'Review settlement variance evidence.',
+      instructions: 'Load the settlement summary before explaining the month-end variance.',
+      allowedTools: ['getSettlementSummary' as const],
+    };
+    const execute = vi.fn().mockResolvedValue({
+      callId: 'call-1',
+      tool: 'getSettlementSummary',
+      summary: 'Settlement variance is fully explained.',
+      data: { unexplained: '0.00' },
+    });
+    const model = {
+      complete: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          type: 'tool',
+          skillId: 'skill-1',
+          call: { tool: 'getSettlementSummary', arguments: {} },
+        }),
+      ),
+    };
+    const result = await new FinanceAgent(model, { execute }, 1).run({
+      message: 'Run our month-end variance review.',
+      currentDate: '2026-08-26T00:00:00.000Z',
+      skills: [skill],
+    });
+    expect(result.skillId).toBe('skill-1');
+    expect(execute).toHaveBeenCalledOnce();
+  });
+
+  it('does not let a workspace skill call a tool outside its allowlist', async () => {
+    const execute = vi.fn();
+    const model = {
+      complete: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          type: 'tool',
+          skillId: 'skill-1',
+          call: { tool: 'findAuditEvents', arguments: {} },
+        }),
+      ),
+    };
+    const result = await new FinanceAgent(model, { execute }, 1).run({
+      message: 'Use the settlement procedure.',
+      currentDate: '2026-08-26T00:00:00.000Z',
+      skills: [
+        {
+          id: 'skill-1',
+          name: 'Settlement procedure',
+          description: 'Review settlement evidence.',
+          instructions: 'Load settlement totals.',
+          allowedTools: ['getSettlementSummary'],
+        },
+      ],
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(result.fallbackReason).toBe('INVALID_DECISION');
   });
 
   it('rejects an invented amount and falls back to deterministic evidence', async () => {

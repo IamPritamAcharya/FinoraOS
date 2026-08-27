@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createUIMessageStream, createUIMessageStreamResponse, type UIMessage } from 'ai';
 import { FinoraChatPayloadSchema, type FinoraChatPayload } from '@finora/platform';
+import { authorizationHeaders } from '../../lib/server-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,9 +39,10 @@ export async function POST(request: NextRequest) {
     process.env.FINORA_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
   const stream = createUIMessageStream<FinoraUIMessage>({
     execute: async ({ writer }) => {
+      const authHeaders = await authorizationHeaders(request);
       const response = await fetch(`${api}/chat`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           message,
           threadId: payload.threadId,

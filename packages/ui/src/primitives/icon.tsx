@@ -9,7 +9,12 @@ export type FinoraIconName =
   | 'exceptions'
   | 'finora'
   | 'history'
+  | 'intelligence'
+  | 'notifications'
   | 'overview'
+  | 'organization'
+  | 'expenses'
+  | 'operations'
   | 'reconciliation'
   | 'records'
   | 'search'
@@ -46,12 +51,53 @@ export function FinoraIcon({ name, ...props }: SVGProps<SVGSVGElement> & { name:
         strokeLinejoin="round"
       />
     ),
+    intelligence: (
+      <>
+        <path d="M8 5.5h8a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-7a3 3 0 0 1 3-3Z" />
+        <path d="M9 12h6M12 9v6M8 2.5v3M16 2.5v3M8 18.5v3M16 18.5v3" strokeLinecap="round" />
+      </>
+    ),
+    notifications: (
+      <>
+        <path
+          d="M6.5 16.5h11l-1.2-2.2V10a4.3 4.3 0 0 0-8.6 0v4.3l-1.2 2.2Z"
+          strokeLinejoin="round"
+        />
+        <path d="M10 19.2a2.2 2.2 0 0 0 4 0" strokeLinecap="round" />
+      </>
+    ),
     overview: (
       <>
         <rect x="4.5" y="4.5" width="6" height="6" rx="1" />
         <rect x="13.5" y="4.5" width="6" height="6" rx="1" />
         <rect x="4.5" y="13.5" width="6" height="6" rx="1" />
         <rect x="13.5" y="13.5" width="6" height="6" rx="1" />
+      </>
+    ),
+    organization: (
+      <>
+        <rect x="9" y="3.5" width="6" height="5" rx="1" />
+        <rect x="3.5" y="15.5" width="6" height="5" rx="1" />
+        <rect x="14.5" y="15.5" width="6" height="5" rx="1" />
+        <path d="M12 8.5v3.5M6.5 15.5V12h11v3.5" strokeLinecap="round" />
+      </>
+    ),
+    expenses: (
+      <>
+        <path
+          d="M6 3.5h12v17l-2.2-1.4-2 1.4-1.8-1.4-1.8 1.4-2-1.4L6 20.5v-17Z"
+          strokeLinejoin="round"
+        />
+        <path d="M9 8h6M9 12h6M9 16h3" strokeLinecap="round" />
+      </>
+    ),
+    operations: (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path
+          d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M18 6l-1.4 1.4M7.4 16.6 6 18"
+          strokeLinecap="round"
+        />
       </>
     ),
     reconciliation: (

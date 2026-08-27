@@ -1,6 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { FinanceService } from './finance.service.js';
 import { AuthService } from '../auth/auth.service.js';
+import { WorkspacePermission } from '@finora/platform';
 @Controller('finance')
 export class FinanceController {
   constructor(
@@ -8,24 +9,31 @@ export class FinanceController {
     private readonly auth: AuthService,
   ) {}
   @Get('overview') overview() {
-    return this.finance.overview(this.auth.currentPrincipal());
+    return this.finance.overview(this.auth.require(WorkspacePermission.VIEW_ORGANIZATION_FINANCE));
   }
   @Get('transactions') transactions(@Query('q') q?: string) {
-    return this.finance.transactions(this.auth.currentPrincipal(), q);
+    return this.finance.transactions(
+      this.auth.require(WorkspacePermission.VIEW_ORGANIZATION_FINANCE),
+      q,
+    );
   }
   @Get('settlements') settlements() {
-    return this.finance.settlements(this.auth.currentPrincipal());
+    return this.finance.settlements(
+      this.auth.require(WorkspacePermission.VIEW_ORGANIZATION_FINANCE),
+    );
   }
   @Get('invoices') invoices() {
-    return this.finance.invoices(this.auth.currentPrincipal());
+    return this.finance.invoices(this.auth.require(WorkspacePermission.VIEW_ORGANIZATION_FINANCE));
   }
   @Get('cash-movements') cashMovements() {
-    return this.finance.cashMovements(this.auth.currentPrincipal());
+    return this.finance.cashMovements(
+      this.auth.require(WorkspacePermission.VIEW_ORGANIZATION_FINANCE),
+    );
   }
   @Get('tax-lines') taxLines() {
-    return this.finance.taxLines(this.auth.currentPrincipal());
+    return this.finance.taxLines(this.auth.require(WorkspacePermission.VIEW_ORGANIZATION_FINANCE));
   }
   @Get('forecast') forecast() {
-    return this.finance.forecast(this.auth.currentPrincipal());
+    return this.finance.forecast(this.auth.require(WorkspacePermission.VIEW_ORGANIZATION_FINANCE));
   }
 }

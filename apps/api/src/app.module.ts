@@ -6,6 +6,7 @@ import { FinanceModule } from './modules/finance/finance.module.js';
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module.js';
 import { AgentsModule } from './modules/agents/agents.module.js';
 import { ChatModule } from './modules/chat/chat.module.js';
+import { WorkspaceModule } from './modules/workspace/workspace.module.js';
 @Module({
   imports: [
     PrismaModule,
@@ -15,6 +16,7 @@ import { ChatModule } from './modules/chat/chat.module.js';
     ReconciliationModule,
     AgentsModule,
     ChatModule,
+    WorkspaceModule,
   ],
 })
 export class AppModule {}

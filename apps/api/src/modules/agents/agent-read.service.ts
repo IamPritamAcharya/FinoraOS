@@ -60,6 +60,89 @@ export class AgentReadService extends PrismaClient implements OnModuleInit, OnMo
     });
   }
 
+  async activeSkills(organizationId: string) {
+    return this.forOrganization(organizationId, (tx) =>
+      tx.agentSkill.findMany({
+        where: { status: 'ACTIVE' },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          instructions: true,
+          allowedTools: true,
+        },
+        orderBy: { name: 'asc' },
+        take: 25,
+      }),
+    );
+  }
+
+  async budgetSummary(
+    organizationId: string,
+    input: { from?: string; to?: string; nodeCode?: string; status?: string },
+  ) {
+    return this.forOrganization(organizationId, async (tx) => {
+      const budgets = await tx.budget.findMany({
+        where: {
+          ...(input.status ? { status: input.status as never } : {}),
+          ...(input.nodeCode ? { node: { code: input.nodeCode.toUpperCase() } } : {}),
+          ...(input.from || input.to
+            ? {
+                periodStart: { ...(input.to ? { lte: new Date(input.to) } : {}) },
+                periodEnd: { ...(input.from ? { gte: new Date(input.from) } : {}) },
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          amount: true,
+          currency: true,
+          periodStart: true,
+          periodEnd: true,
+          node: { select: { name: true, code: true, type: true } },
+          expenseClaims: {
+            where: { status: { notIn: ['DRAFT', 'REJECTED'] } },
+            select: { amount: true, status: true },
+          },
+        },
+        orderBy: [{ periodStart: 'desc' }, { name: 'asc' }],
+        take: 100,
+      });
+      const rows = budgets.map((budget) => {
+        const committed = budget.expenseClaims.reduce(
+          (sum, expense) => sum.plus(expense.amount),
+          new Prisma.Decimal(0),
+        );
+        const approved = budget.expenseClaims
+          .filter((expense) => expense.status === 'APPROVED' || expense.status === 'REIMBURSED')
+          .reduce((sum, expense) => sum.plus(expense.amount), new Prisma.Decimal(0));
+        return {
+          id: budget.id,
+          name: budget.name,
+          status: budget.status,
+          amount: budget.amount,
+          committed,
+          approved,
+          remaining: budget.amount.minus(committed),
+          currency: budget.currency,
+          periodStart: budget.periodStart,
+          periodEnd: budget.periodEnd,
+          node: budget.node,
+        };
+      });
+      return {
+        count: rows.length,
+        allocated: rows.reduce((sum, row) => sum.plus(row.amount), new Prisma.Decimal(0)),
+        committed: rows.reduce((sum, row) => sum.plus(row.committed), new Prisma.Decimal(0)),
+        remaining: rows.reduce((sum, row) => sum.plus(row.remaining), new Prisma.Decimal(0)),
+        currency: rows[0]?.currency ?? 'INR',
+        rows,
+      };
+    });
+  }
+
   async listUsers(organizationId: string, take = 25) {
     return this.forOrganization(organizationId, (tx) =>
       tx.user.findMany({

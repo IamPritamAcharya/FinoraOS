@@ -5,29 +5,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { money } from '@finora/platform';
 import { Amount, FinoraButton, StatusBadge } from '@finora/ui';
 import styles from '../workspace.module.css';
+import { finoraRequest as request } from '../lib/api';
 
 type Data = Record<string, unknown>;
 type FinanceView = 'overview' | 'records' | 'reconciliation' | 'exceptions';
 type RecordTab = 'transactions' | 'settlements' | 'invoices' | 'tax-lines' | 'cash-movements';
-const api = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
-
-async function request(path: string, init?: RequestInit) {
-  const response = await fetch(`${api}${path}`, {
-    ...init,
-    headers: { 'content-type': 'application/json', ...init?.headers },
-    cache: 'no-store',
-  });
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { message?: string | string[] };
-    throw new Error(
-      Array.isArray(body.message)
-        ? body.message.join(', ')
-        : (body.message ?? 'FinoraOS API is unavailable.'),
-    );
-  }
-  return response.json() as Promise<unknown>;
-}
-
 function PageHeader({
   title,
   eyebrow = 'FINANCE OPERATIONS',
