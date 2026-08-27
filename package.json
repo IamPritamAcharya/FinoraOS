@@ -13,6 +13,7 @@
     "dev:keep-infra": "FINORA_KEEP_INFRA=1 node scripts/dev.mjs",
     "dev:web": "pnpm --filter @finora/web dev",
     "dev:api": "pnpm --filter @finora/api dev",
+    "auth:configure": "node scripts/configure-keycloak.mjs",
     "build": "turbo build --concurrency=2",
     "lint": "turbo lint --concurrency=2",
     "lint:fix": "turbo lint:fix --concurrency=2",

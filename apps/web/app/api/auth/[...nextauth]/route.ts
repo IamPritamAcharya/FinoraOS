@@ -8,6 +8,11 @@ const workspaceRoles = [
   'ENTERPRISE_ADMIN',
   'AUDITOR',
 ];
+const configuredSessionMaxAge = Number(process.env.AUTH_SESSION_MAX_AGE_SECONDS ?? 8 * 60 * 60);
+const sessionMaxAge =
+  Number.isSafeInteger(configuredSessionMaxAge) && configuredSessionMaxAge > 0
+    ? configuredSessionMaxAge
+    : 8 * 60 * 60;
 
 const roleFromAccessToken = (accessToken?: string) => {
   if (!accessToken) return undefined;
@@ -62,9 +67,11 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.KEYCLOAK_CLIENT_ID ?? 'finora-web',
       clientSecret: process.env.KEYCLOAK_CLIENT_SECRET ?? 'finora-web-dev-secret',
       issuer: process.env.KEYCLOAK_ISSUER ?? 'http://localhost:8080/realms/finora',
+      authorization: { params: { prompt: 'login' } },
     }),
   ],
-  session: { strategy: 'jwt' },
+  session: { strategy: 'jwt', maxAge: sessionMaxAge },
+  jwt: { maxAge: sessionMaxAge },
   callbacks: {
     async jwt({ token, account, profile }) {
       if (account) {
@@ -73,6 +80,7 @@ export const authOptions: NextAuthOptions = {
         return {
           ...token,
           accessToken: account.access_token,
+          idToken: account.id_token,
           refreshToken: account.refresh_token,
           accessTokenExpires: (account.expires_at ?? 0) * 1000,
           role:

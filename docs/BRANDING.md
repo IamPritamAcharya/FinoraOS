@@ -6,7 +6,7 @@
 
 Three distinct concepts were explored: (1) an interlocking reconciliation loop, (2) a verification ledger/check construction, and (3) a dual-stroke **F** that also implies a controlled closing path. We selected concept 3: the solid F represents a finance control plane; the lighter return stroke represents traceable completion rather than an AI sparkle. It remains legible at 16px and works as a restrained enterprise mark.
 
-Assets live in `apps/web/public/brand/`. Use the FinoraOS blue mark on light surfaces and `logo-mark-dark.svg` on dark surfaces. Do not recolour it with arbitrary gradients, add a rupee/robot motif, or recreate it from text.
+Assets live in `apps/web/public/brand/`; the enterprise-login variant lives in `infra/keycloak/themes/finora/login/`. Use the FinoraOS blue mark on light surfaces and `logo-mark-dark.svg` on dark surfaces. Do not recolour it with arbitrary gradients, add a rupee/robot motif, or recreate it from text.
 
 ## Typography and palette
 

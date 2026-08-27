@@ -17,7 +17,7 @@ The application now has Keycloak login/RBAC, hierarchical organization nodes and
 - Pure deterministic reconciliation package and transactional run/match/exception/evidence/audit persistence.
 - Ollama/Qwen plus hosted provider abstraction, controlled multi-tool planning, grounded answers, persisted chat, typed proposals, approval/rejection, adjustment records, and reruns.
 - `finora_agent_ro` with SELECT-only grants, read-only transactions, `NOBYPASSRLS`, and organization RLS. Provisioning proves no rows are visible without a valid tenant.
-- Keycloak/NextAuth login with Employee, Finance Controller, and Enterprise Admin identities. Nest verifies JWT issuer/audience and maps `sub + organization_id` to a database membership and database-owned role.
+- Keycloak/NextAuth login with Employee, Finance Controller, and Enterprise Admin identities. Nest verifies JWT issuer/audience and maps `sub + organization_id` to a database membership and database-owned role. The Finora-themed OIDC screen, coordinated provider logout, forced account re-authentication, and explicit 5-minute/30-minute/8-hour token/session limits are configured idempotently on development startup.
 - Role/permission contracts for finance, expenses, budgets, organization management, skills, audit, approvals, and integrations. Existing finance/reconciliation operations enforce them.
 - Finance-hub models: organization nodes, budgets, expense claims, financial documents, receipt requests, agent skills, notifications, integration connections, automation jobs/runs, approval policies, and richer tax metadata.
 - Organization hierarchy UI with active budget utilization and audited node-scoped budget creation.
@@ -57,13 +57,14 @@ No partial code task is intentionally left in progress at this checkpoint.
 - `pnpm check:enums`
 - `pnpm lint`
 - `pnpm typecheck`
-- `pnpm test` (47 tests)
+- `pnpm test` (48 tests)
 - `pnpm eval:reconciliation`
 - `pnpm build`
 - `pnpm format:check`
 - `pnpm db:deploy`
 - `pnpm seed`
 - `pnpm db:agent-role`
+- `pnpm auth:configure`
 - PostgreSQL/Redis/Keycloak healthy Compose startup and graceful shutdown
 - `pnpm dev` startup and Ctrl+C shutdown
 

@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { FinoraButton, FinoraIcon, type FinoraIconName } from '@finora/ui';
 import styles from './app-sidebar.module.css';
 
@@ -35,19 +35,29 @@ export function AppSidebar({
   activeView,
   onNavigate,
   account,
-  onAccountClick,
+  onSignOut,
 }: {
   activeView: WorkspaceView;
   onNavigate: (view: WorkspaceView) => void;
   account?: { name: string; detail: string; role?: string };
-  onAccountClick?: () => void;
+  onSignOut?: () => void;
 }) {
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const visibleItems =
     account?.role === 'EMPLOYEE'
       ? navigationItems.filter((item) => employeeViews.has(item.view))
       : navigationItems;
   const activeIndex = visibleItems.findIndex((item) => item.view === activeView);
   const navStyle = { '--active-index': activeIndex } as CSSProperties;
+  useEffect(() => {
+    if (!accountOpen) return;
+    const closeMenu = (event: MouseEvent) => {
+      if (!accountMenuRef.current?.contains(event.target as Node)) setAccountOpen(false);
+    };
+    document.addEventListener('mousedown', closeMenu);
+    return () => document.removeEventListener('mousedown', closeMenu);
+  }, [accountOpen]);
 
   return (
     <aside className={styles.sidebar}>
@@ -73,20 +83,42 @@ export function AppSidebar({
           </FinoraButton>
         ))}
       </nav>
-      <FinoraButton
-        className={styles.account}
-        variant="ghost"
-        aria-label={`${account?.name ?? 'Acme Commerce India'} account`}
-        onClick={onAccountClick}
-      >
-        <span className={styles.accountIcon}>
-          <FinoraIcon name="account" />
-        </span>
-        <span className={styles.accountLabel}>
-          <strong>{account?.name ?? 'Acme Commerce India'}</strong>
-          <small>{account?.detail ?? 'Finance workspace'}</small>
-        </span>
-      </FinoraButton>
+      <div className={styles.accountWrap} ref={accountMenuRef}>
+        {accountOpen && (
+          <div className={styles.accountMenu} role="menu">
+            <div className={styles.accountMenuIdentity}>
+              <strong>{account?.name ?? 'Acme Commerce India'}</strong>
+              <span>{account?.detail ?? 'Finance workspace'}</span>
+            </div>
+            <FinoraButton
+              className={styles.signOut}
+              variant="ghost"
+              role="menuitem"
+              onClick={onSignOut}
+            >
+              <FinoraIcon name="logout" />
+              <span>Sign out</span>
+            </FinoraButton>
+          </div>
+        )}
+        <FinoraButton
+          className={styles.account}
+          variant="ghost"
+          aria-label={`${account?.name ?? 'Acme Commerce India'} account menu`}
+          aria-haspopup="menu"
+          aria-expanded={accountOpen}
+          onClick={() => setAccountOpen((open) => !open)}
+        >
+          <span className={styles.accountIcon}>
+            <FinoraIcon name="account" />
+          </span>
+          <span className={styles.accountLabel}>
+            <strong>{account?.name ?? 'Acme Commerce India'}</strong>
+            <small>{account?.detail ?? 'Finance workspace'}</small>
+          </span>
+          <FinoraIcon className={styles.accountChevron} name="chevronRight" />
+        </FinoraButton>
+      </div>
     </aside>
   );
 }

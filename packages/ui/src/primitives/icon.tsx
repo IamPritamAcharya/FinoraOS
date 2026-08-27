@@ -10,6 +10,7 @@ export type FinoraIconName =
   | 'finora'
   | 'history'
   | 'intelligence'
+  | 'logout'
   | 'notifications'
   | 'overview'
   | 'organization'
@@ -55,6 +56,12 @@ export function FinoraIcon({ name, ...props }: SVGProps<SVGSVGElement> & { name:
       <>
         <path d="M8 5.5h8a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-7a3 3 0 0 1 3-3Z" />
         <path d="M9 12h6M12 9v6M8 2.5v3M16 2.5v3M8 18.5v3M16 18.5v3" strokeLinecap="round" />
+      </>
+    ),
+    logout: (
+      <>
+        <path d="M10 5H6.5A2.5 2.5 0 0 0 4 7.5v9A2.5 2.5 0 0 0 6.5 19H10" />
+        <path d="M14 8l4 4-4 4M18 12H9" strokeLinecap="round" strokeLinejoin="round" />
       </>
     ),
     notifications: (

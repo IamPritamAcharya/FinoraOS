@@ -5,6 +5,12 @@
   "registrationAllowed": false,
   "resetPasswordAllowed": true,
   "loginWithEmailAllowed": true,
+  "loginTheme": "finora",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 28800,
+  "clientSessionIdleTimeout": 1800,
+  "clientSessionMaxLifespan": 28800,
   "roles": {
     "realm": [
       { "name": "EMPLOYEE" },
@@ -25,6 +31,9 @@
       "directAccessGrantsEnabled": false,
       "redirectUris": ["http://localhost:3000/api/auth/callback/keycloak"],
       "webOrigins": ["http://localhost:3000"],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:3000/login"
+      },
       "protocol": "openid-connect",
       "protocolMappers": [
         {

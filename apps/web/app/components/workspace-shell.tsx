@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect } from 'react';
-import { signOut, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { usePathname, useRouter } from 'next/navigation';
 import { AppSidebar, type WorkspaceView } from './app-sidebar';
 import styles from '../workspace.module.css';
+import { logoutFromFinora } from '../lib/auth-client';
 
 const viewForPath = (pathname: string): WorkspaceView => {
   if (pathname === '/') return 'Chat';
@@ -25,6 +26,11 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
       router.replace('/login');
     }
   }, [keycloakEnabled, pathname, router, status]);
+  useEffect(() => {
+    if (keycloakEnabled && session?.error === 'RefreshAccessTokenError') {
+      void logoutFromFinora();
+    }
+  }, [keycloakEnabled, session?.error]);
   if (pathname === '/login') return children;
   if (keycloakEnabled && status !== 'authenticated') {
     return <main className={styles.authLoading}>Securing your FinoraOS workspace…</main>;
@@ -43,7 +49,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
               }
             : undefined
         }
-        onAccountClick={keycloakEnabled ? () => void signOut({ callbackUrl: '/login' }) : undefined}
+        onSignOut={keycloakEnabled ? () => void logoutFromFinora() : undefined}
       />
       <section
         className={

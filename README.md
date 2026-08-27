@@ -162,6 +162,19 @@ All seeded users use the development-only password `FinoraDemo2026!`.
 
 These accounts and secrets are local demo fixtures. Do not reuse them outside development.
 
+### Sessions, account switching, and logout
+
+FinoraOS uses the standard OIDC authorization-code flow. The username and password are handled by Keycloak, while NextAuth keeps an encrypted HTTP-only application session and refreshes short-lived access tokens. The API independently verifies every bearer token and resolves the authenticated subject and organization to a database membership.
+
+- Access token lifetime: **5 minutes**.
+- Inactivity timeout: **30 minutes**.
+- Absolute session maximum: **8 hours**.
+- NextAuth application-session maximum: **8 hours**.
+
+Click the account at the bottom of the sidebar and choose **Sign out**. FinoraOS clears its own session, sends Keycloak an OIDC RP-initiated logout request with the ID-token hint, ends the SSO session, and returns to `/login`. The next **Continue with enterprise login** explicitly requests fresh credentials, so it cannot silently restore the previous demo user.
+
+Authentication still crosses the Keycloak authorization endpoint—that is the intended security boundary—but the endpoint uses the checked-in FinoraOS login theme instead of the stock Keycloak interface. `pnpm dev` runs `pnpm auth:configure` idempotently so existing development volumes receive current theme, logout, and session settings.
+
 ## AI providers: hosted key first, local fallback
 
 FinoraOS defaults to `AI_PROVIDER=auto`. In that mode it chooses the first configured hosted key in this order—Gemini, Groq, OpenRouter—and falls back to local Ollama when no key exists. If a hosted completion fails, the request is retried through Ollama. `AI_PROVIDER=mock` is reserved for deterministic tests and CI.
@@ -281,6 +294,7 @@ Business modules do not import vendor SDKs directly. Agents do not import Prisma
 | ----------------------------------- | --------------------------------------------------------------------------------- |
 | `pnpm dev`                          | Start infrastructure, migrate, seed, start web/API; shut down services on Ctrl+C. |
 | `pnpm dev:keep-infra`               | Same as `dev`, but retains Docker services on exit.                               |
+| `pnpm auth:configure`               | Apply and verify the Finora Keycloak theme, logout URL, and session lifetimes.    |
 | `pnpm infra:up` / `pnpm infra:down` | Start or stop PostgreSQL, Redis, and Keycloak.                                    |
 | `pnpm db:generate`                  | Generate the Prisma client after a fresh install or schema change.                |
 | `pnpm db:migrate`                   | Create and apply a development migration.                                         |

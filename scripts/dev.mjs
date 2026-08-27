@@ -84,7 +84,8 @@ process.on('SIGTERM', () => void shutdown());
 
 async function main() {
   if (process.argv.includes('--services-only')) {
-    process.exit(await wait(run(['infra:up'])));
+    if ((await wait(run(['infra:up']))) !== 0) process.exit(1);
+    process.exit(await wait(run(['auth:configure'])));
   }
   try {
     await assertPortAvailable(3000, 'Web');
@@ -94,6 +95,7 @@ async function main() {
     process.exit(1);
   }
   if ((await wait(run(['infra:up']))) !== 0) return shutdown(1);
+  if ((await wait(run(['auth:configure']))) !== 0) return shutdown(1);
   if ((await wait(run(['db:deploy']))) !== 0) return shutdown(1);
   if ((await wait(run(['db:agent-role']))) !== 0) return shutdown(1);
   if (process.env.FINORA_SEED_ON_DEV !== '0' && (await wait(run(['db:seed:if-empty']))) !== 0) {

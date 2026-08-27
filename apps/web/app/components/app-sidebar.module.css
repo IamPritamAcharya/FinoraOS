@@ -122,18 +122,104 @@
   transform: scale(0.98);
 }
 
+.accountWrap {
+  position: relative;
+  margin-top: auto;
+}
+
 .account {
   display: flex;
   width: 100%;
   align-items: center;
   justify-content: flex-start;
   gap: 10px;
-  margin-top: auto;
+  margin-top: 0;
   border-top: 1px solid var(--finora-border);
   border-radius: 0;
   color: var(--finora-text);
   padding: 14px 10px 4px;
   text-align: left;
+}
+
+.accountChevron {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  color: var(--finora-text-muted);
+  transform: rotate(-90deg);
+  transition: transform 160ms ease;
+}
+
+.account[aria-expanded='true'] .accountChevron {
+  transform: rotate(90deg);
+}
+
+.accountMenu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  left: 0;
+  z-index: 10;
+  overflow: hidden;
+  border: 1px solid var(--finora-border);
+  border-radius: 11px;
+  background: var(--finora-surface);
+  box-shadow: 0 16px 36px rgb(23 43 77 / 14%);
+  padding: 7px;
+  animation: account-menu-in 150ms ease-out both;
+}
+
+.accountMenuIdentity {
+  padding: 8px 9px 10px;
+}
+
+.accountMenuIdentity strong,
+.accountMenuIdentity span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountMenuIdentity strong {
+  color: var(--finora-text);
+  font-size: 12px;
+}
+
+.accountMenuIdentity span {
+  margin-top: 2px;
+  color: var(--finora-text-muted);
+  font-size: 10px;
+}
+
+.signOut {
+  display: flex;
+  width: 100%;
+  justify-content: flex-start;
+  gap: 8px;
+  border-top: 1px solid var(--finora-border);
+  border-radius: 6px;
+  color: var(--finora-danger);
+  padding: 9px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.signOut svg {
+  width: 15px;
+  height: 15px;
+}
+
+@keyframes account-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .account:hover {
@@ -188,8 +274,25 @@
     border-radius: 12px;
   }
 
+  .accountWrap {
+    display: block;
+    margin-left: auto;
+  }
+
   .account {
+    border-top: 0;
+    padding: 5px;
+  }
+
+  .accountLabel,
+  .accountChevron {
     display: none;
+  }
+
+  .accountMenu {
+    right: 0;
+    left: auto;
+    width: 190px;
   }
 
   .nav {
