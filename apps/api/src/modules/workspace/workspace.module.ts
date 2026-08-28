@@ -7,6 +7,7 @@ import { WorkspaceService } from './workspace.service.js';
 import { WorkspaceScheduler } from './workspace.scheduler.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { PaymentGatewayModule } from '../../gateways/payment/payment-gateway.module.js';
+import { AiGatewayModule } from '../../gateways/ai/ai-gateway.module.js';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { PaymentGatewayModule } from '../../gateways/payment/payment-gateway.mod
     DocumentStorageGatewayModule,
     AuthModule,
     PaymentGatewayModule,
+    AiGatewayModule,
   ],
   controllers: [WorkspaceController],
   providers: [WorkspaceService, WorkspaceScheduler],

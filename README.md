@@ -69,7 +69,7 @@ The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, cl
 | General Finora conversation  | Greetings, product-identity, and navigation questions use the configured model under a no-invented-finance-data system guardrail.                                                                                                              |
 | AI providers                 | API-key-first gateway selection for Gemini, Groq, and OpenRouter; local Ollama fallback; explicit mock only for tests.                                                                                                                         |
 | Identity and tenancy         | Keycloak OIDC, NextAuth sessions, database-backed workspace roles, API permission checks, and PostgreSQL RLS for the agent's read-only identity.                                                                                               |
-| Finance-hub workflows        | Organization nodes and budgets, employee expense claims, bounded receipt uploads, user notifications, approval policies, scheduled receipt reminders, and agent/audit inspection.                                                              |
+| Finance-hub workflows        | Editable organization tree/canvas, budgets, deterministic hard/category spend controls, audited invoice/expense CSV imports, categorized receipts, targeted limit notifications, approval policies, reminders, and agent/audit inspection.     |
 | Custom agent skills          | Admin-created guidance can select only an explicit allowlist of existing organization-scoped read tools; it cannot add SQL, credentials, permissions, or write access.                                                                         |
 | Provider gateways            | Mock-first banking/payment/messaging boundaries, Slack outbound reminders, and a Razorpay sandbox-only read adapter.                                                                                                                           |
 | Synthetic demo               | Reproducible Acme Commerce India data: 4 users, node hierarchy, 3 budgets, 4 expenses, 120 transactions, 12 settlements, 49 cash movements, invoices/tax lines, and 14 exceptions.                                                             |
@@ -95,7 +95,7 @@ The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, cl
 6. Ask: `Show unresolved exceptions above ₹25,000.`, `What is our expected cash position this week?`, or `Which GST lines failed to match?`
 7. Open **Reconciliation** to inspect the latest measured run.
 8. Open **Exceptions** to inspect the queue and its supporting reasons.
-9. Open **Organization**, **Expenses**, **Agent control**, **Notifications**, and **Operations** to inspect the broader finance-hub foundation.
+9. Open **Organization** to edit nodes or use the canvas, set a hard/category limit, then use **Records → Import records** with `datasets/synthetic/import-expenses.csv` or `import-invoices.csv`. Hard breaches are rejected; category overages notify Finance and the node owner.
 10. Run the evaluation harness to demonstrate batch-level accuracy—not a cherry-picked result.
 
 The app supports normal route navigation. Server-persisted chat threads remain available when a finance user checks another workspace view and returns.

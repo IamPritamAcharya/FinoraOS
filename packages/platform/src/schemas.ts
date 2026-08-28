@@ -49,6 +49,8 @@ const rolePermissions: Record<WorkspaceRole, readonly WorkspacePermission[]> = {
     WorkspacePermission.SUBMIT_EXPENSE,
     WorkspacePermission.REVIEW_EXPENSE,
     WorkspacePermission.MANAGE_BUDGET,
+    WorkspacePermission.MANAGE_SPEND_LIMIT,
+    WorkspacePermission.MANAGE_ORGANIZATION,
     WorkspacePermission.MANAGE_AGENT_SKILL,
     WorkspacePermission.VIEW_AGENT_AUDIT,
     WorkspacePermission.APPROVE_FINANCE_ACTION,

@@ -1,5 +1,6 @@
 @import '../../../packages/ui/src/tokens/finora.css';
 @import '@fontsource-variable/manrope';
+@import '@xyflow/react/dist/style.css';
 
 * {
   box-sizing: border-box;

@@ -1,0 +1,4 @@
+externalId,employeeEmail,merchant,amount,currency,incurredAt,nodeCode,category,description
+EXP_IMPORT_001,priya@finora.local,IndiGo,1500.00,INR,2026-08-25,EMP-PRIYA,TRAVEL,Flight change fee
+EXP_IMPORT_002,rohan@finora.local,Office Hub,3200.00,INR,2026-08-25,EMP-ROHAN,OFFICE_SUPPLIES,Operations stationery
+EXP_IMPORT_BLOCKED,priya@finora.local,Premium Travel,50000.00,INR,2026-08-26,EMP-PRIYA,TRAVEL,Deliberate hard-limit test case

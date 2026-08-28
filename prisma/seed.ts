@@ -76,7 +76,10 @@ async function main() {
   await prisma.receiptRequest.deleteMany();
   await prisma.financialDocument.deleteMany();
   await prisma.expenseClaim.deleteMany();
+  await prisma.invoice.deleteMany();
+  await prisma.importBatch.deleteMany();
   await prisma.budget.deleteMany();
+  await prisma.spendLimit.deleteMany();
   await prisma.approvalPolicy.deleteMany();
   await prisma.agentStep.deleteMany();
   await prisma.agentRun.deleteMany();
@@ -90,7 +93,6 @@ async function main() {
   await prisma.reconciliationRun.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.taxLine.deleteMany();
-  await prisma.invoice.deleteMany();
   await prisma.transaction.deleteMany();
   await prisma.settlement.deleteMany();
   await prisma.cashMovement.deleteMany();
@@ -153,6 +155,7 @@ async function main() {
         type: 'COMPANY',
         name: 'Acme Commerce India',
         code: 'ACME-IN',
+        ownerUserId: 'demo-admin',
       },
       {
         id: 'node-mumbai',
@@ -161,6 +164,7 @@ async function main() {
         type: 'OFFICE',
         name: 'Mumbai Office',
         code: 'OFF-MUM',
+        ownerUserId: 'demo-admin',
       },
       {
         id: 'node-finance',
@@ -169,6 +173,7 @@ async function main() {
         type: 'DEPARTMENT',
         name: 'Finance',
         code: 'DEPT-FIN',
+        ownerUserId: 'demo-user',
       },
       {
         id: 'node-operations',
@@ -177,6 +182,7 @@ async function main() {
         type: 'DEPARTMENT',
         name: 'Operations',
         code: 'DEPT-OPS',
+        ownerUserId: 'demo-user',
       },
       {
         id: 'node-priya',
@@ -186,6 +192,7 @@ async function main() {
         type: 'EMPLOYEE',
         name: 'Priya Sharma',
         code: 'EMP-PRIYA',
+        ownerUserId: 'demo-employee-priya',
       },
       {
         id: 'node-rohan',
@@ -195,9 +202,84 @@ async function main() {
         type: 'EMPLOYEE',
         name: 'Rohan Desai',
         code: 'EMP-ROHAN',
+        ownerUserId: 'demo-employee-rohan',
       },
     ],
   });
+
+  const limitStart = new Date(Date.UTC(2026, 7, 1));
+  const limitEnd = new Date(Date.UTC(2026, 8, 1));
+  const spendLimits = [
+    [
+      'limit-company-aug',
+      'node-company',
+      '3000000.00',
+      [
+        ['PAYROLL', '600000.00'],
+        ['TRAVEL', '120000.00'],
+      ],
+    ],
+    [
+      'limit-mumbai-aug',
+      'node-mumbai',
+      '2500000.00',
+      [
+        ['TRAVEL', '100000.00'],
+        ['SOFTWARE', '300000.00'],
+      ],
+    ],
+    ['limit-finance-aug', 'node-finance', '800000.00', [['PROFESSIONAL_SERVICES', '150000.00']]],
+    [
+      'limit-operations-aug',
+      'node-operations',
+      '1500000.00',
+      [
+        ['TRAVEL', '80000.00'],
+        ['MEALS', '30000.00'],
+        ['SOFTWARE', '150000.00'],
+      ],
+    ],
+    [
+      'limit-priya-aug',
+      'node-priya',
+      '40000.00',
+      [
+        ['TRAVEL', '9000.00'],
+        ['LOCAL_TRANSPORT', '5000.00'],
+      ],
+    ],
+    [
+      'limit-rohan-aug',
+      'node-rohan',
+      '60000.00',
+      [
+        ['MEALS', '5000.00'],
+        ['SOFTWARE', '20000.00'],
+      ],
+    ],
+  ] as const;
+  for (const [id, nodeId, amount, categories] of spendLimits) {
+    await prisma.spendLimit.create({
+      data: {
+        id,
+        organizationId: orgId,
+        nodeId,
+        createdById: 'demo-admin',
+        updatedById: 'demo-admin',
+        amount,
+        currency: 'INR',
+        periodStart: limitStart,
+        periodEnd: limitEnd,
+        status: 'ACTIVE',
+        categoryLimits: {
+          create: categories.map(([category, categoryAmount]) => ({
+            category,
+            amount: categoryAmount,
+          })),
+        },
+      },
+    });
+  }
 
   await prisma.budget.createMany({
     data: [
@@ -231,7 +313,7 @@ async function main() {
         nodeId: 'node-priya',
         createdById: 'demo-user',
         name: 'Priya travel · August 2026',
-        category: 'OTHER',
+        category: 'TRAVEL',
         amount: '45000.00',
         currency: 'INR',
         periodStart: new Date(Date.UTC(2026, 7, 1)),
@@ -392,7 +474,11 @@ async function main() {
         amount: '8500.00',
         currency: 'INR',
         merchant: 'IndiGo',
-        category: 'OTHER',
+        category: 'TRAVEL',
+        categorySource: 'RULE',
+        categoryStatus: 'CONFIRMED',
+        categoryConfidence: '0.990',
+        categoryReason: 'Airline merchant matched the travel rule.',
         incurredAt: iso(5),
         description: 'Customer visit flight to Bengaluru',
         sourceType: 'WEB',
@@ -410,7 +496,11 @@ async function main() {
         amount: '2400.00',
         currency: 'INR',
         merchant: 'City Cabs',
-        category: 'OTHER',
+        category: 'LOCAL_TRANSPORT',
+        categorySource: 'RULE',
+        categoryStatus: 'CONFIRMED',
+        categoryConfidence: '0.990',
+        categoryReason: 'Cab merchant matched the local transport rule.',
         incurredAt: iso(8),
         description: 'Airport transfer',
         sourceType: 'BANK_IMPORT',
@@ -426,7 +516,11 @@ async function main() {
         amount: '6800.00',
         currency: 'INR',
         merchant: 'Copper Chimney',
-        category: 'OTHER',
+        category: 'MEALS',
+        categorySource: 'RULE',
+        categoryStatus: 'CONFIRMED',
+        categoryConfidence: '0.990',
+        categoryReason: 'Restaurant merchant matched the meals rule.',
         incurredAt: iso(10),
         description: 'Client operations review dinner',
         sourceType: 'SLACK',
@@ -443,7 +537,11 @@ async function main() {
         amount: '14999.00',
         currency: 'INR',
         merchant: 'FieldOps Software',
-        category: 'VENDOR_PAYMENT',
+        category: 'SOFTWARE',
+        categorySource: 'RULE',
+        categoryStatus: 'CONFIRMED',
+        categoryConfidence: '0.990',
+        categoryReason: 'Software subscription matched the software rule.',
         incurredAt: iso(13),
         description: 'Monthly field operations subscription',
         sourceType: 'BANK_IMPORT',
@@ -549,6 +647,19 @@ async function main() {
         actionUrl: '/exceptions',
         entityType: 'ReconciliationRun',
       },
+      ...['demo-user', 'demo-admin', 'demo-employee-rohan'].map((userId) => ({
+        organizationId: orgId,
+        userId,
+        type: 'CATEGORY_LIMIT_EXCEEDED',
+        channel: 'IN_APP' as const,
+        status: 'PENDING' as const,
+        title: 'MEALS limit exceeded',
+        body: 'Rohan Desai is ₹1,800.00 above the ₹5,000.00 soft meals limit. The expense remains recorded because the ₹60,000.00 hard limit is intact.',
+        actionUrl: '/organization?node=node-rohan',
+        entityType: 'SpendLimit',
+        entityId: 'limit-rohan-aug',
+        dedupeKey: 'category-limit:limit-rohan-aug:MEALS',
+      })),
     ],
   });
   await prisma.agentSkill.createMany({

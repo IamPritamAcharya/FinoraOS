@@ -431,6 +431,51 @@
   color: var(--finora-text);
   padding: 0 12px;
 }
+.importPanel {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 220px minmax(260px, 0.8fr) auto;
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 16px;
+  border: 1px solid #bed5f2;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8fbff, #fff);
+  padding: 18px;
+}
+.importPanel h2,
+.importPanel p {
+  margin: 0;
+}
+.importPanel > div:first-child span,
+.importHelp {
+  color: var(--finora-text-muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.importHelp {
+  grid-column: 1 / -1;
+}
+.importError {
+  grid-column: 1 / -1;
+  color: var(--finora-danger);
+  font-size: 11px;
+}
+.importResult {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  border: 1px solid #b9dfd1;
+  border-radius: 9px;
+  background: #edf9f4;
+  color: var(--finora-success);
+  padding: 10px 12px;
+  font-size: 11px;
+}
+.importResult small {
+  margin-left: auto;
+  color: var(--finora-text-muted);
+}
 
 @media (max-width: 900px) {
   .shell {
@@ -459,5 +504,15 @@
   }
   .exceptionSummary {
     grid-template-columns: 1fr auto;
+  }
+  .importPanel {
+    grid-template-columns: 1fr;
+  }
+  .importResult {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .importResult small {
+    margin-left: 0;
   }
 }

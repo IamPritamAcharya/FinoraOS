@@ -96,6 +96,44 @@
   width: 38px;
   padding: 0;
 }
+.finora-ui-field {
+  display: grid;
+  gap: 6px;
+  color: var(--finora-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.finora-ui-field > small {
+  font-size: 10px;
+  font-weight: 500;
+}
+.finora-ui-field__error {
+  color: var(--finora-danger);
+}
+.finora-ui-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--finora-border);
+  border-radius: 8px;
+  background: var(--finora-surface);
+  color: var(--finora-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 9px 10px;
+  outline: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.finora-ui-input:focus {
+  border-color: var(--finora-brand);
+  box-shadow: 0 0 0 3px var(--finora-brand-subtle);
+}
+.finora-ui-textarea {
+  min-height: 90px;
+  resize: vertical;
+}
 .finora-ui-surface {
   background: var(--finora-surface);
   border: 1px solid var(--finora-border);

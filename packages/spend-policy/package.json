@@ -1,0 +1,21 @@
+{
+  "name": "@finora/spend-policy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint src tests",
+    "lint:fix": "eslint src tests --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --maxWorkers=2"
+  },
+  "dependencies": {
+    "decimal.js": "10.6.0"
+  },
+  "devDependencies": {
+    "vitest": "3.2.4"
+  }
+}

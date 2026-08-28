@@ -7,7 +7,7 @@
 - [x] Controlled AI chat, settlement Q&A, exception investigation, typed proposals, approval/audit/rerun.
 - [x] Overview, records, reconciliation, exceptions, baseline cash forecast, and tax lines.
 - [x] Keycloak login, workspace roles/permissions, and tenant-safe agent reads.
-- [x] Organization hierarchy, node budgets, employee expenses, receipt upload, notifications, custom skills, agent audit, and policy/integration/job control surfaces.
+- [x] Editable organization tree/canvas, node budgets, deterministic spend/category limits, audited invoice/expense imports, categorized receipt upload, limit notifications, custom skills, agent audit, and policy/integration/job control surfaces.
 - [x] Razorpay test-mode read adapter and Slack outbound reminder adapter.
 
 ## V1.x — Close the new operational loops

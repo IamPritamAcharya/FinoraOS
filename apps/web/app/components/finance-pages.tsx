@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { money } from '@finora/platform';
-import { Amount, FinoraButton, StatusBadge } from '@finora/ui';
+import {
+  Amount,
+  FinoraButton,
+  FinoraField,
+  FinoraInput,
+  FinoraSelect,
+  StatusBadge,
+} from '@finora/ui';
 import styles from '../workspace.module.css';
 import { finoraRequest as request } from '../lib/api';
 
@@ -425,18 +432,23 @@ function RecordsPage() {
   });
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
-  useEffect(() => {
-    void Promise.all(tabLabels.map((item) => request(`/finance/${item.id}`)))
-      .then((values) =>
+  const [showImport, setShowImport] = useState(false);
+  const [importResult, setImportResult] = useState<Data | null>(null);
+  const loadRecords = useCallback(
+    () =>
+      Promise.all(tabLabels.map((item) => request(`/finance/${item.id}`))).then((values) =>
         setRecords(
           Object.fromEntries(tabLabels.map((item, index) => [item.id, values[index]])) as Record<
             RecordTab,
             Data[]
           >,
         ),
-      )
-      .catch((reason: Error) => setError(reason.message));
-  }, []);
+      ),
+    [],
+  );
+  useEffect(() => {
+    void loadRecords().catch((reason: Error) => setError(reason.message));
+  }, [loadRecords]);
   const visible = useMemo(
     () =>
       records[tab].filter(
@@ -446,7 +458,38 @@ function RecordsPage() {
   );
   return (
     <>
-      <PageHeader title="Records" />
+      <PageHeader
+        title="Records"
+        action={
+          <FinoraButton onClick={() => setShowImport((value) => !value)}>
+            {showImport ? 'Close import' : 'Import records'}
+          </FinoraButton>
+        }
+      />
+      {showImport && (
+        <RecordImport
+          onImported={async (result) => {
+            setImportResult(result);
+            await loadRecords();
+          }}
+        />
+      )}
+      {importResult && (
+        <div className={styles.importResult}>
+          <strong>{String(importResult.succeededCount)} records imported</strong>
+          <span>
+            {String(importResult.failedCount)} rejected ·{' '}
+            {String((importResult.warnings as unknown[] | undefined)?.length ?? 0)} category
+            warnings
+          </span>
+          {Number(importResult.failedCount) > 0 ? (
+            <small>
+              Open the import result below to correct rejected rows; accepted rows are already
+              audited.
+            </small>
+          ) : null}
+        </div>
+      )}
       <div className={styles.recordToolbar}>
         <div className={styles.tabs}>
           {tabLabels.map((item) => (
@@ -482,6 +525,70 @@ function RecordsPage() {
         </section>
       )}
     </>
+  );
+}
+
+function RecordImport({ onImported }: { onImported: (result: Data) => Promise<void> }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  return (
+    <form
+      className={styles.importPanel}
+      onSubmit={async (event) => {
+        event.preventDefault();
+        setSaving(true);
+        setError('');
+        const values = new FormData(event.currentTarget);
+        const file = values.get('file');
+        if (!(file instanceof File) || !file.size) {
+          setError('Choose an invoice or expense CSV file.');
+          setSaving(false);
+          return;
+        }
+        const body = new FormData();
+        body.append('file', file);
+        try {
+          const result = (await request(`/workspace/imports?type=${values.get('type')}`, {
+            method: 'POST',
+            body,
+          })) as Data;
+          await onImported(result);
+        } catch (reason) {
+          setError((reason as Error).message);
+        } finally {
+          setSaving(false);
+        }
+      }}
+    >
+      <div>
+        <p className={styles.eyebrow}>AUDITED CSV IMPORT</p>
+        <h2>Add invoices or reimbursements</h2>
+        <span>
+          Hard-limit breaches are rejected. Category overages are recorded and notify Finance and
+          the node owner.
+        </span>
+      </div>
+      <FinoraField label="Record type">
+        <FinoraSelect name="type" defaultValue="EXPENSE">
+          <option value="EXPENSE">Expenses / reimbursements</option>
+          <option value="INVOICE">Vendor invoices</option>
+        </FinoraSelect>
+      </FinoraField>
+      <FinoraField label="CSV file" hint="Up to 500 rows and 2 MB">
+        <FinoraInput name="file" type="file" accept="text/csv,.csv" required />
+      </FinoraField>
+      <FinoraButton type="submit" disabled={saving}>
+        {saving ? 'Validating rows…' : 'Validate & import'}
+      </FinoraButton>
+      <p className={styles.importHelp}>
+        <strong>Expense columns:</strong> externalId, employeeEmail, merchant, amount, currency,
+        incurredAt, nodeCode, category, description
+        <br />
+        <strong>Invoice columns:</strong> externalId, vendor, amount, currency, issuedAt, dueAt,
+        nodeCode, category, direction
+      </p>
+      {error ? <span className={styles.importError}>{error}</span> : null}
+    </form>
   );
 }
 

@@ -35,6 +35,7 @@ enum AgentType {
   SETTLEMENT
   TAX
   FORECAST
+  EXPENSE_CATEGORIZER
 }
 
 enum TransactionStatus {
@@ -63,7 +64,51 @@ enum CashMovementCategory {
   PAYROLL
   RENT
   TAX_PAYMENT
+  TRAVEL
+  MEALS
+  LODGING
+  LOCAL_TRANSPORT
+  SOFTWARE
+  OFFICE_SUPPLIES
+  MARKETING
+  PROFESSIONAL_SERVICES
+  UTILITIES
   OTHER
+}
+
+enum SpendLimitStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum ExpenseCategorySource {
+  USER
+  AI
+  RULE
+  IMPORT
+}
+
+enum ExpenseCategoryStatus {
+  SUGGESTED
+  CONFIRMED
+  NEEDS_REVIEW
+}
+
+enum InvoiceDirection {
+  RECEIVABLE
+  PAYABLE
+}
+
+enum ImportRecordType {
+  INVOICE
+  EXPENSE
+}
+
+enum ImportBatchStatus {
+  PROCESSING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
 }
 
 enum WorkspaceRole {
@@ -207,26 +252,32 @@ model Organization {
   integrations       IntegrationConnection[]
   automationJobs     AutomationJob[]
   approvalPolicies   ApprovalPolicy[]
+  spendLimits        SpendLimit[]
+  importBatches      ImportBatch[]
 }
 
 model User {
-  id                    String              @id
-  organizationId        String
-  name                  String
-  email                 String              @unique
-  identityProviderId    String?             @unique
-  role                  WorkspaceRole       @default(EMPLOYEE)
-  slackUserId           String?
-  organization          Organization        @relation(fields: [organizationId], references: [id])
-  chatThreads           ChatThread[]
-  organizationNode      OrganizationNode?   @relation("OrganizationNodeMember")
-  createdBudgets        Budget[]            @relation("BudgetCreator")
-  expenseClaims         ExpenseClaim[]      @relation("ExpenseClaimant")
-  approvedExpenseClaims ExpenseClaim[]      @relation("ExpenseApprover")
-  uploadedDocuments     FinancialDocument[] @relation("DocumentUploader")
-  receiptRequests       ReceiptRequest[]
-  createdSkills         AgentSkill[]        @relation("AgentSkillCreator")
-  notifications         Notification[]
+  id                     String              @id
+  organizationId         String
+  name                   String
+  email                  String              @unique
+  identityProviderId     String?             @unique
+  role                   WorkspaceRole       @default(EMPLOYEE)
+  slackUserId            String?
+  organization           Organization        @relation(fields: [organizationId], references: [id])
+  chatThreads            ChatThread[]
+  organizationNode       OrganizationNode?   @relation("OrganizationNodeMember")
+  createdBudgets         Budget[]            @relation("BudgetCreator")
+  expenseClaims          ExpenseClaim[]      @relation("ExpenseClaimant")
+  approvedExpenseClaims  ExpenseClaim[]      @relation("ExpenseApprover")
+  uploadedDocuments      FinancialDocument[] @relation("DocumentUploader")
+  receiptRequests        ReceiptRequest[]
+  createdSkills          AgentSkill[]        @relation("AgentSkillCreator")
+  notifications          Notification[]
+  ownedOrganizationNodes OrganizationNode[]  @relation("OrganizationNodeOwner")
+  createdSpendLimits     SpendLimit[]        @relation("SpendLimitCreator")
+  updatedSpendLimits     SpendLimit[]        @relation("SpendLimitUpdater")
+  importBatches          ImportBatch[]
 }
 
 model Settlement {
@@ -262,15 +313,26 @@ model Transaction {
 }
 
 model Invoice {
-  id             String       @id @default(cuid())
+  id             String                @id @default(cuid())
   organizationId String
   externalId     String
-  amount         Decimal      @db.Decimal(18, 2)
-  currency       String       @default("INR")
+  amount         Decimal               @db.Decimal(18, 2)
+  currency       String                @default("INR")
   issuedAt       DateTime
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  dueAt          DateTime?
+  direction      InvoiceDirection      @default(RECEIVABLE)
+  nodeId         String?
+  vendor         String?
+  category       CashMovementCategory?
+  status         String                @default("OPEN")
+  sourceMetadata Json?
+  importBatchId  String?
+  organization   Organization          @relation(fields: [organizationId], references: [id])
+  node           OrganizationNode?     @relation(fields: [nodeId], references: [id])
+  importBatch    ImportBatch?          @relation(fields: [importBatchId], references: [id])
 
   @@unique([organizationId, externalId])
+  @@index([organizationId, direction, issuedAt])
 }
 
 model TaxLine {
@@ -474,10 +536,12 @@ model OrganizationNode {
   organizationId   String
   parentId         String?
   memberUserId     String?              @unique
+  ownerUserId      String?
   type             OrganizationNodeType
   name             String
   code             String
   active           Boolean              @default(true)
+  version          Int                  @default(1)
   metadata         Json?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
@@ -485,12 +549,52 @@ model OrganizationNode {
   parent           OrganizationNode?    @relation("OrganizationNodeTree", fields: [parentId], references: [id])
   children         OrganizationNode[]   @relation("OrganizationNodeTree")
   memberUser       User?                @relation("OrganizationNodeMember", fields: [memberUserId], references: [id])
+  ownerUser        User?                @relation("OrganizationNodeOwner", fields: [ownerUserId], references: [id])
   budgets          Budget[]
   expenseClaims    ExpenseClaim[]
   approvalPolicies ApprovalPolicy[]
+  spendLimits      SpendLimit[]
+  invoices         Invoice[]
 
   @@unique([organizationId, code])
   @@index([organizationId, parentId])
+  @@index([organizationId, ownerUserId])
+}
+
+model SpendLimit {
+  id             String               @id @default(cuid())
+  organizationId String
+  nodeId         String
+  createdById    String
+  updatedById    String
+  amount         Decimal              @db.Decimal(18, 2)
+  currency       String               @default("INR")
+  periodStart    DateTime
+  periodEnd      DateTime
+  status         SpendLimitStatus     @default(ACTIVE)
+  version        Int                  @default(1)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  organization   Organization         @relation(fields: [organizationId], references: [id])
+  node           OrganizationNode     @relation(fields: [nodeId], references: [id])
+  createdBy      User                 @relation("SpendLimitCreator", fields: [createdById], references: [id])
+  updatedBy      User                 @relation("SpendLimitUpdater", fields: [updatedById], references: [id])
+  categoryLimits CategorySpendLimit[]
+
+  @@unique([nodeId, periodStart, periodEnd, currency])
+  @@index([organizationId, status, periodStart, periodEnd])
+}
+
+model CategorySpendLimit {
+  id           String               @id @default(cuid())
+  spendLimitId String
+  category     CashMovementCategory
+  amount       Decimal              @db.Decimal(18, 2)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  spendLimit   SpendLimit           @relation(fields: [spendLimitId], references: [id], onDelete: Cascade)
+
+  @@unique([spendLimitId, category])
 }
 
 model Budget {
@@ -517,36 +621,65 @@ model Budget {
 }
 
 model ExpenseClaim {
-  id              String               @id @default(cuid())
-  organizationId  String
-  externalId      String
-  claimantUserId  String
-  nodeId          String
-  budgetId        String?
-  approvedById    String?
-  status          ExpenseClaimStatus   @default(DRAFT)
-  amount          Decimal              @db.Decimal(18, 2)
-  currency        String               @default("INR")
-  merchant        String
-  category        CashMovementCategory @default(OTHER)
-  incurredAt      DateTime
-  description     String
-  sourceType      String               @default("WEB")
-  submittedAt     DateTime?
-  approvedAt      DateTime?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  organization    Organization         @relation(fields: [organizationId], references: [id])
-  claimant        User                 @relation("ExpenseClaimant", fields: [claimantUserId], references: [id])
-  approvedBy      User?                @relation("ExpenseApprover", fields: [approvedById], references: [id])
-  node            OrganizationNode     @relation(fields: [nodeId], references: [id])
-  budget          Budget?              @relation(fields: [budgetId], references: [id])
-  documents       FinancialDocument[]
-  receiptRequests ReceiptRequest[]
+  id                 String                @id @default(cuid())
+  organizationId     String
+  externalId         String
+  claimantUserId     String
+  nodeId             String
+  budgetId           String?
+  approvedById       String?
+  status             ExpenseClaimStatus    @default(DRAFT)
+  amount             Decimal               @db.Decimal(18, 2)
+  currency           String                @default("INR")
+  merchant           String
+  category           CashMovementCategory  @default(OTHER)
+  categorySource     ExpenseCategorySource @default(USER)
+  categoryStatus     ExpenseCategoryStatus @default(CONFIRMED)
+  categoryConfidence Decimal?              @db.Decimal(4, 3)
+  categoryReason     String?
+  importBatchId      String?
+  incurredAt         DateTime
+  description        String
+  sourceType         String                @default("WEB")
+  submittedAt        DateTime?
+  approvedAt         DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  organization       Organization          @relation(fields: [organizationId], references: [id])
+  claimant           User                  @relation("ExpenseClaimant", fields: [claimantUserId], references: [id])
+  approvedBy         User?                 @relation("ExpenseApprover", fields: [approvedById], references: [id])
+  node               OrganizationNode      @relation(fields: [nodeId], references: [id])
+  budget             Budget?               @relation(fields: [budgetId], references: [id])
+  documents          FinancialDocument[]
+  receiptRequests    ReceiptRequest[]
+  importBatch        ImportBatch?          @relation(fields: [importBatchId], references: [id])
 
   @@unique([organizationId, externalId])
   @@index([organizationId, claimantUserId, status])
   @@index([nodeId, incurredAt])
+}
+
+model ImportBatch {
+  id             String            @id @default(cuid())
+  organizationId String
+  uploadedById   String
+  type           ImportRecordType
+  status         ImportBatchStatus @default(PROCESSING)
+  fileName       String
+  sha256         String
+  rowCount       Int               @default(0)
+  succeededCount Int               @default(0)
+  failedCount    Int               @default(0)
+  errorReport    Json?
+  createdAt      DateTime          @default(now())
+  completedAt    DateTime?
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  uploadedBy     User              @relation(fields: [uploadedById], references: [id])
+  invoices       Invoice[]
+  expenseClaims  ExpenseClaim[]
+
+  @@unique([organizationId, sha256, type])
+  @@index([organizationId, createdAt])
 }
 
 model FinancialDocument {
@@ -628,12 +761,14 @@ model Notification {
   actionUrl      String?
   entityType     String?
   entityId       String?
+  dedupeKey      String?
   sentAt         DateTime?
   readAt         DateTime?
   createdAt      DateTime            @default(now())
   organization   Organization        @relation(fields: [organizationId], references: [id])
   user           User                @relation(fields: [userId], references: [id])
 
+  @@unique([organizationId, userId, dedupeKey])
   @@index([organizationId, userId, status, createdAt])
 }
 

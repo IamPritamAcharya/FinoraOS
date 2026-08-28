@@ -1,9 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Amount, FinoraButton, FinoraIcon, StatusBadge } from '@finora/ui';
+import {
+  Amount,
+  FinoraButton,
+  FinoraField,
+  FinoraIcon,
+  FinoraInput,
+  FinoraSelect,
+  StatusBadge,
+} from '@finora/ui';
 import { finoraRequest } from '../lib/api';
 import styles from './workspace-pages.module.css';
+import { OrganizationCanvas } from './organization-canvas';
 
 type Json = Record<string, any>;
 const availableSkillTools = [
@@ -97,7 +106,10 @@ export function WorkspacePage({ view }: { view: string }) {
 
 function OrganizationPage() {
   const { data: nodes, loading, error, load } = useWorkspaceData<Json[]>('/workspace/organization');
-  const [showBudget, setShowBudget] = useState(false);
+  const [view, setView] = useState<'tree' | 'canvas'>('tree');
+  const [selectedId, setSelectedId] = useState<string>();
+  const [editor, setEditor] = useState<'edit' | 'add' | 'limit' | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const roots = useMemo(() => {
     if (!nodes) return [];
     const byParent = new Map<string | null, Json[]>();
@@ -111,31 +123,38 @@ function OrganizationPage() {
     });
     return (byParent.get(null) ?? []).map(attach);
   }, [nodes]);
-  const activeBudgets =
-    nodes?.flatMap((node) => node.budgets ?? []).filter((budget) => budget.status === 'ACTIVE') ??
+  const selected = nodes?.find((node) => node.id === selectedId) ?? nodes?.[0];
+  useEffect(() => {
+    if (!selectedId && nodes?.length) setSelectedId(nodes[0].id);
+  }, [nodes, selectedId]);
+  const limits =
+    nodes?.flatMap((node) => node.spendLimits ?? []).filter((limit) => limit.status === 'ACTIVE') ??
     [];
+  const toggleCollapse = (id: string) =>
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   return (
     <>
       <Header
         eyebrow="ORGANIZATION CONTROL"
-        title="Nodes & budgets"
-        copy="Model how money ownership flows across entities, offices, departments, teams and people."
+        title="Organization & spend control"
+        copy="Edit ownership, explore the hierarchy, and govern hard and category spend limits from one place."
         action={
-          <FinoraButton onClick={() => setShowBudget((value) => !value)}>
-            <FinoraIcon name="add" /> Set budget
-          </FinoraButton>
+          <div className={styles.headerActions}>
+            <FinoraButton variant="secondary" onClick={() => setEditor('add')}>
+              <FinoraIcon name="add" /> Add node
+            </FinoraButton>
+            <FinoraButton onClick={() => setEditor('limit')} disabled={!selected}>
+              <FinoraIcon name="add" /> Set spend limit
+            </FinoraButton>
+          </div>
         }
       />
       <AsyncState loading={loading} error={error} />
-      {showBudget && (
-        <BudgetForm
-          nodes={nodes ?? []}
-          onSaved={async () => {
-            setShowBudget(false);
-            await load();
-          }}
-        />
-      )}
       {nodes && (
         <div className={styles.metricStrip}>
           <div>
@@ -143,46 +162,223 @@ function OrganizationPage() {
             <span>Organization nodes</span>
           </div>
           <div>
-            <strong>{activeBudgets.length}</strong>
-            <span>Active budgets</span>
+            <strong>{limits.length}</strong>
+            <span>Active hard limits</span>
           </div>
           <div>
             <strong>
               <Amount
-                value={activeBudgets
-                  .reduce((sum, budget) => sum + Number(budget.amount), 0)
+                value={limits
+                  .filter((limit) => !nodes.find((node) => node.id === limit.nodeId)?.parentId)
+                  .reduce((sum, limit) => sum + Number(limit.amount), 0)
                   .toFixed(2)}
               />
             </strong>
-            <span>Allocated this period</span>
+            <span>Top-level controlled spend</span>
           </div>
         </div>
       )}
-      <section className={styles.panel}>
-        <div className={styles.panelHead}>
-          <div>
-            <h2>Organization hierarchy</h2>
-            <p>Budgets roll up through the node tree without changing raw finance records.</p>
+      <div className={styles.organizationLayout}>
+        <section className={`${styles.panel} ${styles.hierarchyPanel}`}>
+          <div className={styles.panelHead}>
+            <div>
+              <h2>Organization hierarchy</h2>
+              <p>Select any node to edit it or manage its spend envelope.</p>
+            </div>
+            <div className={styles.hierarchyActions}>
+              <FinoraButton
+                size="small"
+                variant="ghost"
+                onClick={() => setCollapsed(new Set(nodes?.map((node) => node.id) ?? []))}
+              >
+                Collapse all
+              </FinoraButton>
+              <FinoraButton size="small" variant="ghost" onClick={() => setCollapsed(new Set())}>
+                Expand all
+              </FinoraButton>
+              <div className={styles.viewSwitch}>
+                <FinoraButton
+                  size="small"
+                  variant={view === 'tree' ? 'primary' : 'ghost'}
+                  onClick={() => setView('tree')}
+                >
+                  Tree
+                </FinoraButton>
+                <FinoraButton
+                  size="small"
+                  variant={view === 'canvas' ? 'primary' : 'ghost'}
+                  onClick={() => setView('canvas')}
+                >
+                  Canvas
+                </FinoraButton>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className={styles.tree}>
-          {roots.map((node) => (
-            <NodeBranch key={node.id} node={node} depth={0} />
-          ))}
-        </div>
-      </section>
+          {view === 'tree' ? (
+            <div className={styles.tree}>
+              {roots.map((node) => (
+                <NodeBranch
+                  key={node.id}
+                  node={node}
+                  depth={0}
+                  selectedId={selected?.id}
+                  collapsed={collapsed}
+                  onSelect={(id) => {
+                    setSelectedId(id);
+                    setEditor(null);
+                  }}
+                  onToggle={toggleCollapse}
+                />
+              ))}
+            </div>
+          ) : (
+            <OrganizationCanvas
+              nodes={nodes ?? []}
+              selectedId={selected?.id}
+              collapsed={collapsed}
+              onSelect={(id) => {
+                setSelectedId(id);
+                setEditor(null);
+              }}
+            />
+          )}
+        </section>
+        <aside className={styles.nodeInspector}>
+          {selected ? (
+            <>
+              <div className={styles.inspectorHead}>
+                <span className={styles.nodeGlyph}>
+                  <FinoraIcon name={selected.type === 'EMPLOYEE' ? 'account' : 'organization'} />
+                </span>
+                <div>
+                  <p>{String(selected.type).replaceAll('_', ' ')}</p>
+                  <h2>{selected.name}</h2>
+                  <small>{selected.code}</small>
+                </div>
+              </div>
+              <dl className={styles.nodeFacts}>
+                <div>
+                  <dt>Owner</dt>
+                  <dd>{selected.ownerUser?.name ?? 'Not assigned'}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>{selected.active ? 'Active' : 'Inactive'}</dd>
+                </div>
+                <div>
+                  <dt>Children</dt>
+                  <dd>{nodes?.filter((node) => node.parentId === selected.id).length ?? 0}</dd>
+                </div>
+              </dl>
+              <div className={styles.limitSummary}>
+                <p>Active spend limit</p>
+                {selected.spendLimits?.find((limit: Json) => limit.status === 'ACTIVE') ? (
+                  <>
+                    <strong>
+                      <Amount
+                        value={
+                          selected.spendLimits.find((limit: Json) => limit.status === 'ACTIVE')
+                            .amount
+                        }
+                      />
+                    </strong>
+                    <div>
+                      {selected.spendLimits
+                        .find((limit: Json) => limit.status === 'ACTIVE')
+                        .categoryLimits.map((item: Json) => (
+                          <span key={item.id}>
+                            {String(item.category).replaceAll('_', ' ')}{' '}
+                            <Amount value={item.amount} />
+                          </span>
+                        ))}
+                    </div>
+                  </>
+                ) : (
+                  <small>No limit configured</small>
+                )}
+              </div>
+              <div className={styles.inspectorActions}>
+                <FinoraButton variant="secondary" onClick={() => setEditor('edit')}>
+                  Edit node
+                </FinoraButton>
+                <FinoraButton onClick={() => setEditor('limit')}>Manage limit</FinoraButton>
+              </div>
+            </>
+          ) : (
+            <p>Select a node.</p>
+          )}
+        </aside>
+      </div>
+      {editor === 'edit' && selected && (
+        <NodeForm
+          node={selected}
+          nodes={nodes ?? []}
+          onSaved={async () => {
+            setEditor(null);
+            await load();
+          }}
+        />
+      )}
+      {editor === 'add' && (
+        <NodeForm
+          parent={selected}
+          nodes={nodes ?? []}
+          onSaved={async (node) => {
+            setEditor(null);
+            setSelectedId(node.id);
+            await load();
+          }}
+        />
+      )}
+      {editor === 'limit' && selected && (
+        <SpendLimitForm
+          node={selected}
+          onSaved={async () => {
+            setEditor(null);
+            await load();
+          }}
+        />
+      )}
     </>
   );
 }
 
-function NodeBranch({ node, depth }: { node: Json; depth: number }) {
-  const budget = (node.budgets ?? []).find((item: Json) => item.status === 'ACTIVE');
-  const utilization = budget
-    ? Math.min(100, (Number(budget.committedAmount) / Number(budget.amount)) * 100)
-    : 0;
+function NodeBranch({
+  node,
+  depth,
+  selectedId,
+  collapsed,
+  onSelect,
+  onToggle,
+}: {
+  node: Json;
+  depth: number;
+  selectedId?: string;
+  collapsed: Set<string>;
+  onSelect: (id: string) => void;
+  onToggle: (id: string) => void;
+}) {
+  const limit = (node.spendLimits ?? []).find((item: Json) => item.status === 'ACTIVE');
+  const hasChildren = Boolean(node.children?.length);
   return (
     <div className={styles.branch}>
-      <article className={styles.node} style={{ marginLeft: `${depth * 26}px` }}>
+      <article
+        className={`${styles.node}${selectedId === node.id ? ` ${styles.nodeSelected}` : ''}`}
+        style={{ marginLeft: `${depth * 26}px` }}
+        onClick={() => onSelect(node.id)}
+      >
+        <FinoraButton
+          className={styles.collapseButton}
+          size="small"
+          variant="ghost"
+          disabled={!hasChildren}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggle(node.id);
+          }}
+        >
+          {hasChildren ? (collapsed.has(node.id) ? '+' : '−') : '·'}
+        </FinoraButton>
         <span className={styles.nodeGlyph}>
           <FinoraIcon name={node.type === 'EMPLOYEE' ? 'account' : 'organization'} />
         </span>
@@ -192,60 +388,190 @@ function NodeBranch({ node, depth }: { node: Json; depth: number }) {
             {String(node.type).replaceAll('_', ' ')} · {node.code}
           </span>
         </div>
-        {node.memberUser && (
+        {(node.ownerUser || node.memberUser) && (
           <div className={styles.nodeMember}>
-            <span>{node.memberUser.email}</span>
-            <small>{String(node.memberUser.role).replaceAll('_', ' ')}</small>
+            <span>{node.ownerUser?.name ?? node.memberUser?.name}</span>
+            <small>Owner · {node.ownerUser?.email ?? node.memberUser?.email}</small>
           </div>
         )}
-        {budget ? (
+        {limit ? (
           <div className={styles.budget}>
             <div>
-              <span>{budget.name}</span>
+              <span>Hard spend limit</span>
               <strong>
-                <Amount value={budget.amount} />
+                <Amount value={limit.amount} />
               </strong>
             </div>
-            <div className={styles.progress}>
-              <i style={{ width: `${utilization}%` }} />
-            </div>
-            <small>
-              <Amount value={budget.committedAmount} /> committed · {utilization.toFixed(0)}%
-            </small>
+            <small>{limit.categoryLimits.length} soft category limits</small>
           </div>
         ) : (
-          <span className={styles.emptyBudget}>No active budget</span>
+          <span className={styles.emptyBudget}>No hard limit</span>
         )}
       </article>
-      {(node.children ?? []).map((child: Json) => (
-        <NodeBranch key={child.id} node={child} depth={depth + 1} />
-      ))}
+      {!collapsed.has(node.id) &&
+        (node.children ?? []).map((child: Json) => (
+          <NodeBranch
+            key={child.id}
+            node={child}
+            depth={depth + 1}
+            selectedId={selectedId}
+            collapsed={collapsed}
+            onSelect={onSelect}
+            onToggle={onToggle}
+          />
+        ))}
     </div>
   );
 }
 
-function BudgetForm({ nodes, onSaved }: { nodes: Json[]; onSaved: () => Promise<void> }) {
+function NodeForm({
+  node,
+  parent,
+  nodes,
+  onSaved,
+}: {
+  node?: Json;
+  parent?: Json;
+  nodes: Json[];
+  onSaved: (node: Json) => Promise<void>;
+}) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   return (
     <form
-      className={styles.formPanel}
+      className={styles.editorPanel}
       onSubmit={async (event) => {
         event.preventDefault();
         setSaving(true);
         setError('');
         const values = new FormData(event.currentTarget);
         try {
-          await finoraRequest('/workspace/budgets', {
+          const result = await finoraRequest(
+            node ? `/workspace/organization/nodes/${node.id}` : '/workspace/organization/nodes',
+            {
+              method: node ? 'PATCH' : 'POST',
+              body: JSON.stringify({
+                parentId: values.get('parentId') || (node ? null : undefined),
+                name: values.get('name'),
+                code: values.get('code'),
+                type: values.get('type'),
+                ownerUserId: values.get('ownerUserId') || (node ? null : undefined),
+                ...(node ? { version: node.version, active: true } : {}),
+              }),
+            },
+          );
+          await onSaved(result as Json);
+        } catch (reason) {
+          setError((reason as Error).message);
+        } finally {
+          setSaving(false);
+        }
+      }}
+    >
+      <div className={styles.editorTitle}>
+        <p className={styles.eyebrow}>{node ? 'EDIT NODE' : 'NEW NODE'}</p>
+        <h2>{node ? node.name : `Add under ${parent?.name ?? 'organization'}`}</h2>
+      </div>
+      <FinoraField label="Name">
+        <FinoraInput name="name" required defaultValue={node?.name} />
+      </FinoraField>
+      <FinoraField label="Code">
+        <FinoraInput name="code" required defaultValue={node?.code} placeholder="DEPT-SALES" />
+      </FinoraField>
+      <FinoraField label="Type">
+        <FinoraSelect name="type" defaultValue={node?.type ?? 'TEAM'}>
+          {[
+            'COMPANY',
+            'LEGAL_ENTITY',
+            'OFFICE',
+            'DEPARTMENT',
+            'TEAM',
+            'COST_CENTER',
+            'EMPLOYEE',
+          ].map((type) => (
+            <option key={type}>{type}</option>
+          ))}
+        </FinoraSelect>
+      </FinoraField>
+      <FinoraField label="Parent">
+        <FinoraSelect name="parentId" defaultValue={node?.parentId ?? parent?.id ?? ''}>
+          <option value="">Top level</option>
+          {nodes
+            .filter((item) => item.id !== node?.id)
+            .map((item) => (
+              <option value={item.id} key={item.id}>
+                {item.name}
+              </option>
+            ))}
+        </FinoraSelect>
+      </FinoraField>
+      <FinoraField label="Owner">
+        <FinoraSelect name="ownerUserId" defaultValue={node?.ownerUserId ?? ''}>
+          <option value="">Unassigned</option>
+          {Array.from(
+            new Map(
+              nodes
+                .flatMap((item) => [item.memberUser, item.ownerUser])
+                .filter(Boolean)
+                .map((user) => [user.id, user]),
+            ).values(),
+          ).map((user: Json) => (
+            <option value={user.id} key={user.id}>
+              {user.name}
+            </option>
+          ))}
+        </FinoraSelect>
+      </FinoraField>
+      <FinoraButton type="submit" disabled={saving}>
+        {saving ? 'Saving…' : node ? 'Save changes' : 'Create node'}
+      </FinoraButton>
+      {error && <span className={styles.inlineError}>{error}</span>}
+    </form>
+  );
+}
+
+const spendCategories = [
+  'TRAVEL',
+  'MEALS',
+  'LODGING',
+  'LOCAL_TRANSPORT',
+  'SOFTWARE',
+  'OFFICE_SUPPLIES',
+  'MARKETING',
+  'PROFESSIONAL_SERVICES',
+  'UTILITIES',
+  'VENDOR_PAYMENT',
+  'OTHER',
+];
+function SpendLimitForm({ node, onSaved }: { node: Json; onSaved: () => Promise<void> }) {
+  const current = node.spendLimits?.find((limit: Json) => limit.status === 'ACTIVE');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  return (
+    <form
+      className={styles.editorPanel}
+      onSubmit={async (event) => {
+        event.preventDefault();
+        setSaving(true);
+        setError('');
+        const values = new FormData(event.currentTarget);
+        try {
+          const categoryLimits = spendCategories
+            .map((category) => ({
+              category,
+              amount: String(values.get(`category:${category}`) ?? ''),
+            }))
+            .filter((item) => item.amount);
+          await finoraRequest(`/workspace/organization/nodes/${node.id}/spend-limit`, {
             method: 'POST',
             body: JSON.stringify({
-              nodeId: values.get('nodeId'),
-              name: values.get('name'),
               amount: values.get('amount'),
               currency: 'INR',
               periodStart: values.get('periodStart'),
               periodEnd: values.get('periodEnd'),
               status: 'ACTIVE',
+              version: current?.version,
+              categoryLimits,
             }),
           });
           await onSaved();
@@ -256,49 +582,57 @@ function BudgetForm({ nodes, onSaved }: { nodes: Json[]; onSaved: () => Promise<
         }
       }}
     >
-      <div>
-        <p className={styles.eyebrow}>NEW ALLOCATION</p>
-        <h2>Set a node budget</h2>
+      <div className={styles.editorTitle}>
+        <p className={styles.eyebrow}>SPEND CONTROL</p>
+        <h2>{node.name}</h2>
+        <span>
+          Hard limits block spend. Category limits warn the owner and finance team without hiding
+          the record.
+        </span>
       </div>
-      <label>
-        Node
-        <select name="nodeId" required defaultValue="">
-          <option value="" disabled>
-            Select a node
-          </option>
-          {nodes.map((node) => (
-            <option key={node.id} value={node.id}>
-              {node.name} · {node.code}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Budget name
-        <input name="name" required minLength={3} placeholder="August operating budget" />
-      </label>
-      <label>
-        Amount (INR)
-        <input
+      <FinoraField label="Hard limit (INR)">
+        <FinoraInput
           name="amount"
           required
           inputMode="decimal"
-          pattern="\d+(\.\d{1,2})?"
-          placeholder="1200000.00"
+          defaultValue={current?.amount}
+          placeholder="100000.00"
         />
-      </label>
-      <label>
-        Starts
-        <input name="periodStart" required type="date" />
-      </label>
-      <label>
-        Ends
-        <input name="periodEnd" required type="date" />
-      </label>
+      </FinoraField>
+      <FinoraField label="Starts">
+        <FinoraInput
+          name="periodStart"
+          required
+          type="date"
+          defaultValue={current?.periodStart?.slice(0, 10) ?? '2026-08-01'}
+        />
+      </FinoraField>
+      <FinoraField label="Ends">
+        <FinoraInput
+          name="periodEnd"
+          required
+          type="date"
+          defaultValue={current?.periodEnd?.slice(0, 10) ?? '2026-09-01'}
+        />
+      </FinoraField>
+      <div className={styles.categoryLimits}>
+        {spendCategories.map((category) => (
+          <FinoraField key={category} label={category.replaceAll('_', ' ')}>
+            <FinoraInput
+              name={`category:${category}`}
+              inputMode="decimal"
+              defaultValue={
+                current?.categoryLimits?.find((item: Json) => item.category === category)?.amount
+              }
+              placeholder="Optional soft limit"
+            />
+          </FinoraField>
+        ))}
+      </div>
       <FinoraButton type="submit" disabled={saving}>
-        {saving ? 'Saving…' : 'Create budget'}
+        {saving ? 'Validating…' : 'Save spend controls'}
       </FinoraButton>
-      {error && <span className={styles.inlineError}>{error}</span>}
+      {error && <span className={styles.friendlyError}>{error}</span>}
     </form>
   );
 }
@@ -410,36 +744,52 @@ function ReceiptUpload({
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [category, setCategory] = useState('AUTO');
   return (
-    <label className={styles.uploadButton}>
-      <input
-        type="file"
-        accept="application/pdf,image/jpeg,image/png,image/webp"
-        disabled={uploading}
-        onChange={async (event) => {
-          const file = event.target.files?.[0];
-          if (!file) return;
-          setUploading(true);
-          setError('');
-          const body = new FormData();
-          body.append('file', file);
-          try {
-            await finoraRequest(`/workspace/expenses/${expenseId}/receipt`, {
-              method: 'POST',
-              body,
-            });
-            await onUploaded();
-          } catch (reason) {
-            setError((reason as Error).message);
-          } finally {
-            setUploading(false);
-            event.target.value = '';
-          }
-        }}
-      />
-      <span>{uploading ? 'Uploading…' : 'Upload receipt'}</span>
-      {error && <small title={error}>Failed</small>}
-    </label>
+    <div className={styles.receiptAction}>
+      <FinoraSelect
+        aria-label="Receipt expense category"
+        value={category}
+        onChange={(event) => setCategory(event.target.value)}
+      >
+        <option value="AUTO">Auto-detect category</option>
+        {spendCategories.map((item) => (
+          <option key={item} value={item}>
+            {item.replaceAll('_', ' ')}
+          </option>
+        ))}
+      </FinoraSelect>
+      <label className={styles.uploadButton}>
+        <input
+          type="file"
+          accept="application/pdf,image/jpeg,image/png,image/webp"
+          disabled={uploading}
+          onChange={async (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            setUploading(true);
+            setError('');
+            const body = new FormData();
+            body.append('file', file);
+            if (category !== 'AUTO') body.append('category', category);
+            try {
+              await finoraRequest(`/workspace/expenses/${expenseId}/receipt`, {
+                method: 'POST',
+                body,
+              });
+              await onUploaded();
+            } catch (reason) {
+              setError((reason as Error).message);
+            } finally {
+              setUploading(false);
+              event.target.value = '';
+            }
+          }}
+        />
+        <span>{uploading ? 'Uploading…' : 'Upload receipt'}</span>
+        {error && <small title={error}>Failed</small>}
+      </label>
+    </div>
   );
 }
 

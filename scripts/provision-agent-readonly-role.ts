@@ -75,6 +75,8 @@ async function main() {
       ['IntegrationConnection', `"organizationId" = ${orgId}`],
       ['AutomationJob', `"organizationId" = ${orgId}`],
       ['ApprovalPolicy', `"organizationId" = ${orgId}`],
+      ['SpendLimit', `"organizationId" = ${orgId}`],
+      ['ImportBatch', `"organizationId" = ${orgId}`],
     ] as const;
     for (const [table, predicate] of directTenantTables) {
       await client.query(`ALTER TABLE public."${table}" ENABLE ROW LEVEL SECURITY;`);
@@ -89,6 +91,7 @@ async function main() {
       ['AgentStep', 'AgentRun', 'agentRunId', 'id'],
       ['ChatMessage', 'ChatThread', 'threadId', 'id'],
       ['AutomationJobRun', 'AutomationJob', 'jobId', 'id'],
+      ['CategorySpendLimit', 'SpendLimit', 'spendLimitId', 'id'],
     ] as const;
     for (const [table, parentTable, foreignKey, parentKey] of relatedTenantTables) {
       await client.query(`ALTER TABLE public."${table}" ENABLE ROW LEVEL SECURITY;`);

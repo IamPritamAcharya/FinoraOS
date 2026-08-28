@@ -15,6 +15,7 @@
     "@finora/platform": "workspace:*",
     "@finora/ui": "workspace:*",
     "@fontsource-variable/manrope": "5.2.8",
+    "@xyflow/react": "12.11.5",
     "ai": "7.0.77",
     "next": "16.3.2",
     "next-auth": "4.24.15",

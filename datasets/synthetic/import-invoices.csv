@@ -1,0 +1,3 @@
+externalId,vendor,amount,currency,issuedAt,dueAt,nodeCode,category,direction
+INV_PAYABLE_001,FieldOps Software,6000.00,INR,2026-08-25,2026-09-05,EMP-ROHAN,SOFTWARE,PAYABLE
+INV_PAYABLE_002,Legal Partners,12000.00,INR,2026-08-25,2026-09-10,DEPT-FIN,PROFESSIONAL_SERVICES,PAYABLE

@@ -27,6 +27,7 @@ export enum AgentType {
   SETTLEMENT = 'SETTLEMENT',
   TAX = 'TAX',
   FORECAST = 'FORECAST',
+  EXPENSE_CATEGORIZER = 'EXPENSE_CATEGORIZER',
 }
 
 export enum RecordSource {
@@ -56,6 +57,15 @@ export enum CashMovementCategory {
   PAYROLL = 'PAYROLL',
   RENT = 'RENT',
   TAX_PAYMENT = 'TAX_PAYMENT',
+  TRAVEL = 'TRAVEL',
+  MEALS = 'MEALS',
+  LODGING = 'LODGING',
+  LOCAL_TRANSPORT = 'LOCAL_TRANSPORT',
+  SOFTWARE = 'SOFTWARE',
+  OFFICE_SUPPLIES = 'OFFICE_SUPPLIES',
+  MARKETING = 'MARKETING',
+  PROFESSIONAL_SERVICES = 'PROFESSIONAL_SERVICES',
+  UTILITIES = 'UTILITIES',
   OTHER = 'OTHER',
 }
 
@@ -73,6 +83,7 @@ export enum WorkspacePermission {
   SUBMIT_EXPENSE = 'SUBMIT_EXPENSE',
   REVIEW_EXPENSE = 'REVIEW_EXPENSE',
   MANAGE_BUDGET = 'MANAGE_BUDGET',
+  MANAGE_SPEND_LIMIT = 'MANAGE_SPEND_LIMIT',
   MANAGE_ORGANIZATION = 'MANAGE_ORGANIZATION',
   MANAGE_AGENT_SKILL = 'MANAGE_AGENT_SKILL',
   VIEW_AGENT_AUDIT = 'VIEW_AGENT_AUDIT',
@@ -94,6 +105,41 @@ export enum BudgetStatus {
   DRAFT = 'DRAFT',
   ACTIVE = 'ACTIVE',
   CLOSED = 'CLOSED',
+}
+
+export enum SpendLimitStatus {
+  ACTIVE = 'ACTIVE',
+  CLOSED = 'CLOSED',
+}
+
+export enum ExpenseCategorySource {
+  USER = 'USER',
+  AI = 'AI',
+  RULE = 'RULE',
+  IMPORT = 'IMPORT',
+}
+
+export enum ExpenseCategoryStatus {
+  SUGGESTED = 'SUGGESTED',
+  CONFIRMED = 'CONFIRMED',
+  NEEDS_REVIEW = 'NEEDS_REVIEW',
+}
+
+export enum InvoiceDirection {
+  RECEIVABLE = 'RECEIVABLE',
+  PAYABLE = 'PAYABLE',
+}
+
+export enum ImportRecordType {
+  INVOICE = 'INVOICE',
+  EXPENSE = 'EXPENSE',
+}
+
+export enum ImportBatchStatus {
+  PROCESSING = 'PROCESSING',
+  COMPLETED = 'COMPLETED',
+  COMPLETED_WITH_ERRORS = 'COMPLETED_WITH_ERRORS',
+  FAILED = 'FAILED',
 }
 
 export enum ExpenseClaimStatus {

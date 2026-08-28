@@ -37,8 +37,9 @@ const serviceWith = (overrides: Record<string, unknown> = {}) => {
   };
   const messaging = { sendDirectMessage: vi.fn() };
   const documents = { store: vi.fn() };
+  const ai = { complete: vi.fn() };
   return {
-    service: new WorkspaceService(prisma as never, messaging, documents),
+    service: new WorkspaceService(prisma as never, messaging, documents, ai),
     prisma,
     tx,
   };

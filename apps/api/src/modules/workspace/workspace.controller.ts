@@ -8,6 +8,7 @@ import {
   Post,
   UploadedFile,
   UseInterceptors,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthService } from '../auth/auth.service.js';
@@ -15,6 +16,10 @@ import {
   CreateAgentSkillSchema,
   CreateBudgetSchema,
   CreateOrganizationNodeSchema,
+  FinanceImportSchema,
+  ReceiptCategorySchema,
+  UpdateOrganizationNodeSchema,
+  UpsertSpendLimitSchema,
   UpdateAgentSkillSchema,
 } from './workspace.schemas.js';
 import { WorkspaceService } from './workspace.service.js';
@@ -35,6 +40,26 @@ export class WorkspaceController {
       CreateOrganizationNodeSchema.parse(body),
     );
   }
+  @Patch('organization/nodes/:id') updateOrganizationNode(
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.workspace.updateOrganizationNode(
+      this.auth.currentPrincipal(),
+      id,
+      UpdateOrganizationNodeSchema.parse(body),
+    );
+  }
+  @Post('organization/nodes/:id/spend-limit') upsertSpendLimit(
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.workspace.upsertSpendLimit(
+      this.auth.currentPrincipal(),
+      id,
+      UpsertSpendLimitSchema.parse(body),
+    );
+  }
   @Post('budgets') createBudget(@Body() body: unknown) {
     return this.workspace.createBudget(
       this.auth.currentPrincipal(),
@@ -50,9 +75,32 @@ export class WorkspaceController {
     @Param('id') id: string,
     @UploadedFile()
     file: { originalname: string; mimetype: string; size: number; buffer: Buffer } | undefined,
+    @Body() body: unknown,
   ) {
     if (!file) throw new BadRequestException('A receipt file is required.');
-    return this.workspace.uploadReceipt(this.auth.currentPrincipal(), id, file);
+    return this.workspace.uploadReceipt(
+      this.auth.currentPrincipal(),
+      id,
+      file,
+      ReceiptCategorySchema.parse(body).category,
+    );
+  }
+  @Post('imports')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 2 * 1024 * 1024, files: 1 } }))
+  importRecords(
+    @Query() query: unknown,
+    @UploadedFile()
+    file: { originalname: string; mimetype: string; size: number; buffer: Buffer } | undefined,
+  ) {
+    if (!file) throw new BadRequestException('A CSV file is required.');
+    return this.workspace.importRecords(
+      this.auth.currentPrincipal(),
+      FinanceImportSchema.parse(query).type,
+      file,
+    );
+  }
+  @Get('imports') imports() {
+    return this.workspace.imports(this.auth.currentPrincipal());
   }
   @Get('skills') skills() {
     return this.workspace.skills(this.auth.currentPrincipal());
