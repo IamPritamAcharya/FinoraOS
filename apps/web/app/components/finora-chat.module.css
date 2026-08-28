@@ -335,21 +335,17 @@
 }
 
 .evidenceCard {
-  max-width: 420px;
+  max-width: 560px;
   margin-top: 14px;
-  border: 1px solid var(--finora-border);
-  border-radius: 12px;
-  background: var(--finora-surface);
-  padding: 18px 18px 14px;
+  border-left: 2px solid #c8daf0;
+  padding: 4px 0 4px 14px;
 }
 
 .exceptionCard {
-  max-width: 460px;
+  max-width: 560px;
   margin-top: 14px;
-  border: 1px solid #c8daf0;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #fbfdff, #f4f8fe);
-  padding: 18px 18px 14px;
+  border-left: 2px solid #c8daf0;
+  padding: 4px 0 4px 14px;
 }
 
 .exceptionCard > p {
@@ -472,10 +468,8 @@
   max-width: 620px;
   margin-top: 14px;
   overflow: hidden;
-  border: 1px solid var(--finora-border);
-  border-radius: 12px;
-  background: var(--finora-surface);
-  padding: 18px;
+  border-left: 2px solid #c8daf0;
+  padding: 4px 0 4px 14px;
 }
 
 .artifactTableWrap {
@@ -527,9 +521,8 @@
   min-width: 0;
   flex-direction: column;
   gap: 2px;
-  border-radius: 9px;
-  background: var(--finora-muted);
-  padding: 10px 12px;
+  border-bottom: 1px solid var(--finora-border);
+  padding: 8px 0;
 }
 
 .metricRows span,
@@ -550,7 +543,7 @@
 }
 
 .forecastRows .forecastRisk {
-  background: #fff7e9;
+  border-bottom-color: #e8c98f;
 }
 
 .forecastRisk strong,
@@ -562,9 +555,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-radius: 8px;
-  background: var(--finora-muted);
-  padding: 9px 11px;
+  border-top: 1px solid var(--finora-border);
+  border-bottom: 1px solid var(--finora-border);
+  padding: 9px 0;
 }
 
 .activity {
