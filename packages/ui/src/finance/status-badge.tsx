@@ -8,6 +8,7 @@ const labels: Record<string, string> = {
   OPEN: 'Open',
   PROPOSED: 'Approval pending',
   UNRESOLVED: 'Unresolved',
+  SUPERSEDED: 'Superseded by rerun',
 };
 export function StatusBadge({
   status,

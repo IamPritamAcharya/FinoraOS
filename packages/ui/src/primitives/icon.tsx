@@ -4,8 +4,11 @@ export type FinoraIconName =
   | 'account'
   | 'add'
   | 'audit'
+  | 'cash'
+  | 'chart'
   | 'chevronRight'
   | 'check'
+  | 'arrowUpRight'
   | 'close'
   | 'exceptions'
   | 'finora'
@@ -36,6 +39,20 @@ export function FinoraIcon({ name, ...props }: SVGProps<SVGSVGElement> & { name:
         <path d="M6 3.5h12v17H6z" strokeLinejoin="round" />
         <path d="M9 8h6M9 12h6M9 16h3" strokeLinecap="round" />
         <path d="m14.5 16 1.5 1.5 3-3" strokeLinecap="round" strokeLinejoin="round" />
+      </>
+    ),
+    arrowUpRight: <path d="M7 17 17 7M9 7h8v8" strokeLinecap="round" strokeLinejoin="round" />,
+    cash: (
+      <>
+        <rect x="3.5" y="6.5" width="17" height="11" rx="2" />
+        <circle cx="12" cy="12" r="2.2" />
+        <path d="M6.5 10h.01M17.5 14h.01" strokeLinecap="round" />
+      </>
+    ),
+    chart: (
+      <>
+        <path d="M4.5 19.5V4.5M4.5 19.5h15" strokeLinecap="round" />
+        <path d="m7.5 15 3.2-3.2 2.5 1.8 4.3-5" strokeLinecap="round" strokeLinejoin="round" />
       </>
     ),
     chevronRight: <path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />,

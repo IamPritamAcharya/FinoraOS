@@ -11,6 +11,7 @@ export enum ExceptionStatus {
   RESOLVED = 'RESOLVED',
   NEEDS_REVIEW = 'NEEDS_REVIEW',
   UNRESOLVED = 'UNRESOLVED',
+  SUPERSEDED = 'SUPERSEDED',
 }
 
 export enum ExceptionType {

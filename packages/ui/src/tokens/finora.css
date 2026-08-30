@@ -139,6 +139,29 @@
   border: 1px solid var(--finora-border);
   border-radius: var(--finora-radius);
 }
+.finora-ui-surface--glass {
+  position: relative;
+  overflow: hidden;
+  border-color: #c8dcf6;
+  background: linear-gradient(120deg, rgb(255 255 255 / 96%), rgb(239 247 255 / 94%));
+  box-shadow: 0 18px 36px -30px rgb(20 80 153 / 48%);
+}
+.finora-ui-surface--glass::before {
+  position: absolute;
+  top: -95px;
+  right: 15%;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: rgb(87 151 231 / 20%);
+  content: '';
+  filter: blur(36px);
+  pointer-events: none;
+}
+.finora-ui-surface--glass > * {
+  position: relative;
+  z-index: 1;
+}
 
 .finora-status {
   display: inline-flex;
@@ -170,4 +193,9 @@
   border-color: #f0c7c3;
   background: #fff3f2;
   color: var(--finora-danger);
+}
+.finora-status--superseded {
+  border-color: var(--finora-border);
+  background: var(--finora-muted);
+  color: var(--finora-text-muted);
 }

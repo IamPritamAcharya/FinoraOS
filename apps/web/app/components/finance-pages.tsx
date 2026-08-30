@@ -7,15 +7,17 @@ import {
   Amount,
   FinoraButton,
   FinoraField,
+  FinoraIcon,
   FinoraInput,
   FinoraSelect,
+  FinoraSurface,
   StatusBadge,
 } from '@finora/ui';
 import styles from '../workspace.module.css';
 import { finoraRequest as request } from '../lib/api';
 
 type Data = Record<string, unknown>;
-type FinanceView = 'overview' | 'records' | 'reconciliation' | 'exceptions';
+type FinanceView = 'overview' | 'records' | 'exceptions';
 type RecordTab =
   | 'transactions'
   | 'settlements'
@@ -26,10 +28,12 @@ type RecordTab =
 function PageHeader({
   title,
   eyebrow = 'FINANCE OPERATIONS',
+  description,
   action,
 }: {
   title: string;
   eyebrow?: string;
+  description?: string;
   action?: React.ReactNode;
 }) {
   return (
@@ -37,8 +41,9 @@ function PageHeader({
       <div>
         <p className={styles.eyebrow}>{eyebrow}</p>
         <h1>{title}</h1>
+        {description ? <p className={styles.pageDescription}>{description}</p> : null}
       </div>
-      {action ?? <div className={styles.profile}>AM</div>}
+      {action ? <div className={styles.pageActions}>{action}</div> : null}
     </header>
   );
 }
@@ -66,11 +71,11 @@ function LoadingState() {
 export function FinancePage({ view }: { view: FinanceView }) {
   if (view === 'overview') return <OverviewPage />;
   if (view === 'records') return <RecordsPage />;
-  if (view === 'reconciliation') return <ReconciliationPage />;
   return <ExceptionsPage />;
 }
 
 function OverviewPage() {
+  const router = useRouter();
   const [state, setState] = useState<{
     overview: Data;
     run: Data | null;
@@ -78,8 +83,10 @@ function OverviewPage() {
     forecast: Data[];
   } | null>(null);
   const [error, setError] = useState('');
-  useEffect(() => {
-    void Promise.all([
+  const [running, setRunning] = useState(false);
+  const load = useCallback(() => {
+    setError('');
+    return Promise.all([
       request('/finance/overview'),
       request('/reconciliation/runs/latest'),
       request('/reconciliation/exceptions'),
@@ -95,140 +102,10 @@ function OverviewPage() {
       )
       .catch((reason: Error) => setError(reason.message));
   }, []);
-  if (error)
-    return (
-      <>
-        <PageHeader title="Overview" />
-        <ErrorState message={error} />
-      </>
-    );
-  if (!state)
-    return (
-      <>
-        <PageHeader title="Overview" />
-        <LoadingState />
-      </>
-    );
-  const open = state.exceptions.filter((item) => item.status !== 'RESOLVED');
-  const cards = [
-    { label: 'Current cash position', value: state.overview.cashPosition, amount: true },
-    { label: 'Records processed', value: state.overview.recordsProcessed },
-    { label: 'Open exceptions', value: state.overview.openExceptions },
-    { label: 'Resolved safely', value: state.overview.agentResolved },
-  ];
-  return (
-    <>
-      <PageHeader title="Overview" />
-      <div className={styles.metrics}>
-        {cards.map((card) => (
-          <article className={styles.metric} key={card.label}>
-            <p>{card.label}</p>
-            <strong>
-              {card.amount ? <Amount value={String(card.value)} /> : String(card.value)}
-            </strong>
-            <span>
-              {card.label === 'Open exceptions'
-                ? 'Requires finance attention'
-                : 'Live workspace data'}
-            </span>
-          </article>
-        ))}
-      </div>
-      <div className={styles.twoCol}>
-        <section className={styles.panel}>
-          <div className={styles.panelHead}>
-            <div>
-              <h2>Reconciliation health</h2>
-              <p>Latest deterministic run</p>
-            </div>
-            <StatusBadge status={String(state.run?.status ?? 'PENDING')} />
-          </div>
-          {state.run ? (
-            <div className={styles.health}>
-              <Metric label="Records" value={state.run.recordsProcessed} />
-              <Metric label="Matched" value={state.run.deterministicMatches} />
-              <Metric label="Needs review" value={state.run.needsReview} />
-              <Metric label="Unresolved" value={state.run.unresolved} />
-            </div>
-          ) : (
-            <p className={styles.muted}>No reconciliation run yet.</p>
-          )}
-          <a className={styles.pageLink} href="/reconciliation">
-            Open reconciliation →
-          </a>
-        </section>
-        <section className={styles.panel}>
-          <div className={styles.panelHead}>
-            <div>
-              <h2>Forward cash position</h2>
-              <p>Known scheduled movements only</p>
-            </div>
-          </div>
-          <div className={styles.forecastList}>
-            {state.forecast.slice(0, 5).map((row) => (
-              <div key={String(row.date)} className={row.risk ? styles.riskRow : ''}>
-                <span>{String(row.day)}</span>
-                <strong>
-                  <Amount value={String(row.amount)} />
-                </strong>
-                {row.risk ? <small>Shortfall risk</small> : null}
-              </div>
-            ))}
-          </div>
-        </section>
-        <section className={`${styles.panel} ${styles.fullSpan}`}>
-          <div className={styles.panelHead}>
-            <div>
-              <h2>Priority exceptions</h2>
-              <p>{open.length} items remain open</p>
-            </div>
-            <a className={styles.pageLink} href="/exceptions">
-              View queue →
-            </a>
-          </div>
-          <div className={styles.priorityGrid}>
-            {open.slice(0, 4).map((item) => (
-              <div className={styles.miniRow} key={String(item.id)}>
-                <div>
-                  <strong>{String(item.externalId)}</strong>
-                  <span>{String(item.type).replaceAll('_', ' ')}</span>
-                </div>
-                <StatusBadge status={String(item.status)} />
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
-    </>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: unknown }) {
-  return (
-    <div className={styles.runMetric}>
-      <strong>{String(value ?? 0)}</strong>
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function ReconciliationPage() {
-  const [run, setRun] = useState<Data | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
-  const [error, setError] = useState('');
-  const load = useCallback(
-    () =>
-      request('/reconciliation/runs/latest')
-        .then((value) => setRun(value as Data | null))
-        .catch((reason: Error) => setError(reason.message))
-        .finally(() => setLoading(false)),
-    [],
-  );
   useEffect(() => {
     void load();
   }, [load]);
-  const start = async () => {
+  const runReconciliation = async () => {
     setRunning(true);
     setError('');
     try {
@@ -240,56 +117,247 @@ function ReconciliationPage() {
       setRunning(false);
     }
   };
-  const processed = Number(run?.recordsProcessed ?? 0);
-  const closed = Number(run?.deterministicMatches ?? 0) + Number(run?.agentResolved ?? 0);
+  if (!state)
+    return (
+      <>
+        <PageHeader title="Overview" />
+        {error ? <ErrorState message={error} /> : <LoadingState />}
+      </>
+    );
+  const open = state.exceptions.filter((item) => item.status !== 'RESOLVED');
+  const processed = Number(state.run?.recordsProcessed ?? state.overview.recordsProcessed ?? 0);
+  const deterministicMatches = Number(state.run?.deterministicMatches ?? 0);
+  const agentResolved = Number(state.run?.agentResolved ?? state.overview.agentResolved ?? 0);
+  const closed = deterministicMatches + agentResolved;
+  const coverage = processed ? Math.round((closed / processed) * 100) : 0;
+  const maxForecast = Math.max(
+    ...state.forecast.map((item) => Math.abs(Number(item.amount ?? 0))),
+    1,
+  );
   return (
     <>
       <PageHeader
-        title="Reconciliation"
-        eyebrow="DETERMINISTIC CONTROL"
+        title="Overview"
+        description="Current financial position, reconciliation results, and items that need attention."
         action={
-          <FinoraButton onClick={() => void start()} disabled={running}>
-            {running ? 'Running…' : 'Run reconciliation'}
-          </FinoraButton>
+          <>
+            <FinoraButton variant="secondary" onClick={() => router.push('/')}>
+              Ask Finora
+            </FinoraButton>
+            <FinoraButton onClick={() => void runReconciliation()} disabled={running}>
+              {running ? 'Running reconciliation…' : 'Run reconciliation'}
+            </FinoraButton>
+          </>
         }
       />
-      {error && <ErrorState message={error} />}
-      {loading ? (
-        <LoadingState />
-      ) : (
-        <section className={styles.panel}>
+      {error ? <ErrorState message={error} /> : null}
+      <FinoraSurface className={styles.cashOverview} variant="glass">
+        <div className={styles.cashOverviewBalance}>
+          <span>Current cash position</span>
+          <strong>
+            <Amount value={String(state.overview.cashPosition)} />
+          </strong>
+          <p>Posted movements across connected cash accounts.</p>
+        </div>
+        <div className={styles.cashOverviewForecast}>
+          <div className={styles.cashOverviewHeading}>
+            <span>Forward cash position</span>
+            <small>Known scheduled movements</small>
+          </div>
+          <div className={styles.cashOverviewChart}>
+            {state.forecast.slice(0, 5).map((row) => {
+              const ratio = Math.max(
+                9,
+                Math.round((Math.abs(Number(row.amount ?? 0)) / maxForecast) * 100),
+              );
+              return (
+                <div key={String(row.date)} className={row.risk ? styles.cashChartRisk : ''}>
+                  <span className={styles.cashChartBar} style={{ height: `${ratio}%` }} />
+                  <strong>{String(row.day)}</strong>
+                  <small>
+                    <Amount value={String(row.amount)} compact />
+                  </small>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </FinoraSurface>
+      <div className={styles.overviewGrid}>
+        <FinoraSurface className={`${styles.panel} ${styles.coveragePanel}`}>
           <div className={styles.panelHead}>
             <div>
-              <h2>Latest matching run</h2>
-              <p>Exact reference → settlement relation → date window → composite score</p>
-            </div>
-            <StatusBadge status={String(run?.status ?? 'PENDING')} />
-          </div>
-          {run ? (
-            <>
-              <div className={styles.runGrid}>
-                <Metric label="Records processed" value={run.recordsProcessed} />
-                <Metric label="Deterministic matches" value={run.deterministicMatches} />
-                <Metric label="Exceptions" value={run.exceptionsGenerated} />
-                <Metric
-                  label="Auto-close rate"
-                  value={processed ? `${((closed / processed) * 100).toFixed(1)}%` : '0.0%'}
-                />
-              </div>
-              <p className={styles.muted}>
-                Started{' '}
-                {new Intl.DateTimeFormat('en-IN', {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                }).format(new Date(String(run.startedAt)))}
-                . Ambiguous records are never forced into matches.
+              <h2>Reconciliation coverage</h2>
+              <p>
+                {state.run
+                  ? 'Latest deterministic matching result'
+                  : 'Run reconciliation to establish match coverage'}
               </p>
-            </>
+            </div>
+            <FinoraButton
+              size="small"
+              variant="ghost"
+              onClick={() => void runReconciliation()}
+              disabled={running}
+            >
+              {running ? 'Running…' : 'Run again'} <FinoraIcon name="arrowUpRight" />
+            </FinoraButton>
+          </div>
+          <div className={styles.coverageLayout}>
+            <div className={styles.coverageScore}>
+              <strong>{coverage}%</strong>
+              <span>of records matched or approved</span>
+              <small>
+                {processed
+                  ? `${closed} of ${processed} records processed`
+                  : 'No records processed yet'}
+              </small>
+            </div>
+            <div className={styles.coverageDetails}>
+              <div
+                className={styles.coverageProgress}
+                aria-label={`${coverage}% reconciliation coverage`}
+              >
+                <span style={{ width: `${coverage}%` }} />
+              </div>
+              <p>Ambiguous records remain visible for finance review.</p>
+            </div>
+          </div>
+          <div className={styles.coverageFootnotes}>
+            <span>
+              <strong>{deterministicMatches}</strong>
+              Deterministic matches
+            </span>
+            <span>
+              <strong>{open.length}</strong>
+              Exceptions needing review
+            </span>
+            <span>
+              <strong>{agentResolved}</strong>
+              Resolved by agent
+            </span>
+            <span>
+              <strong>{Number(state.run?.unresolved ?? 0)}</strong>
+              Unresolved
+            </span>
+          </div>
+          <div className={styles.coverageRunMeta}>
+            <span>Latest run</span>
+            <StatusBadge status={String(state.run?.status ?? 'PENDING')} />
+            <span>
+              {state.run?.startedAt
+                ? new Intl.DateTimeFormat('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  }).format(new Date(String(state.run.startedAt)))
+                : 'Awaiting first run'}
+            </span>
+          </div>
+        </FinoraSurface>
+        <FinoraSurface className={`${styles.panel} ${styles.queuePanel}`}>
+          <div className={styles.panelHead}>
+            <div>
+              <h2>Priority queue</h2>
+              <p>
+                {open.length
+                  ? `${open.length} exceptions require a decision`
+                  : 'No active exceptions'}
+              </p>
+            </div>
+            <FinoraButton size="small" variant="ghost" onClick={() => router.push('/exceptions')}>
+              View queue <FinoraIcon name="arrowUpRight" />
+            </FinoraButton>
+          </div>
+          {open.length ? (
+            <div className={styles.queueList}>
+              {open.slice(0, 4).map((item) => {
+                const variance = money(String(item.expectedAmount ?? 0))
+                  .minus(String(item.receivedAmount ?? 0))
+                  .abs()
+                  .toFixed(2);
+                return (
+                  <button
+                    type="button"
+                    className={styles.queueRow}
+                    key={String(item.id)}
+                    onClick={() => router.push('/exceptions')}
+                  >
+                    <span className={styles.queueReference}>
+                      <strong>{String(item.externalId)}</strong>
+                      <small>{String(item.type).replaceAll('_', ' ')}</small>
+                    </span>
+                    <span className={styles.queueVariance}>
+                      <Amount value={variance} />
+                      <StatusBadge status={String(item.status)} />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           ) : (
-            <p className={styles.muted}>Run reconciliation to create the first measured result.</p>
+            <div className={styles.queueEmpty}>
+              <FinoraIcon name="check" />
+              <strong>The exception queue is clear.</strong>
+              <span>New exceptions will appear here after a reconciliation run.</span>
+            </div>
           )}
-        </section>
-      )}
+        </FinoraSurface>
+        <FinoraSurface className={`${styles.panel} ${styles.settlementPanel}`}>
+          <div className={styles.panelHead}>
+            <div>
+              <h2>Recent settlements</h2>
+              <p>Latest source records received in this workspace</p>
+            </div>
+            <FinoraButton
+              size="small"
+              variant="ghost"
+              onClick={() => router.push('/records?tab=settlements')}
+            >
+              All settlements <FinoraIcon name="arrowUpRight" />
+            </FinoraButton>
+          </div>
+          <div className={styles.settlementList}>
+            {(state.overview.recentSettlements as Data[]).slice(0, 4).map((settlement) => {
+              const expected = money(String(settlement.expectedAmount ?? 0));
+              const received = money(String(settlement.receivedAmount ?? 0));
+              const variance = expected.minus(received).abs().toFixed(2);
+              return (
+                <button
+                  type="button"
+                  className={styles.settlementRow}
+                  key={String(settlement.id)}
+                  onClick={() => router.push('/records?tab=settlements')}
+                >
+                  <span>
+                    <strong>{String(settlement.externalId)}</strong>
+                    <small>
+                      {new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' }).format(
+                        new Date(String(settlement.settledAt)),
+                      )}
+                    </small>
+                  </span>
+                  <span className={styles.settlementAmounts}>
+                    <strong>
+                      <Amount value={String(settlement.receivedAmount)} />
+                    </strong>
+                    <small>
+                      {Number(variance) ? (
+                        <>
+                          Variance <Amount value={variance} />
+                        </>
+                      ) : (
+                        'Fully settled'
+                      )}
+                    </small>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </FinoraSurface>
+      </div>
     </>
   );
 }

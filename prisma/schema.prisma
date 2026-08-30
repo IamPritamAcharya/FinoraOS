@@ -19,6 +19,7 @@ enum ExceptionStatus {
   RESOLVED
   NEEDS_REVIEW
   UNRESOLVED
+  SUPERSEDED
 }
 
 enum ExceptionType {

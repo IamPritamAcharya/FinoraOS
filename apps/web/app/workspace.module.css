@@ -45,7 +45,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 30px;
+  gap: 24px;
+  margin-bottom: 28px;
 }
 
 .eyebrow {
@@ -59,20 +60,25 @@
 .pageHeader h1 {
   margin: 0;
   color: var(--finora-text);
-  font-size: 28px;
-  letter-spacing: -0.6px;
+  font-size: 34px;
+  font-weight: 780;
+  letter-spacing: -1.1px;
+  line-height: 1.18;
 }
 
-.profile {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--finora-text);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 800;
+.pageDescription {
+  max-width: 660px;
+  margin: 8px 0 0;
+  color: var(--finora-text-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.pageActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
 }
 
 .error {
@@ -93,8 +99,740 @@
 .metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.cashOverview {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(420px, 1.15fr);
+  gap: 36px;
+  min-height: 260px;
+  margin-bottom: 14px;
+  border-radius: 14px;
+  padding: 28px 30px;
+}
+
+.cashOverviewBalance {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.cashOverviewBalance > span,
+.cashOverviewHeading > span,
+.metricRail > div > span {
+  color: var(--finora-text-muted);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+}
+
+.cashOverviewBalance > strong {
+  margin-top: 10px;
+  color: var(--finora-text);
+  font-size: clamp(34px, 3.3vw, 48px);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  line-height: 1.05;
+}
+
+.cashOverviewBalance > p {
+  max-width: 290px;
+  margin: 12px 0 0;
+  color: var(--finora-text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.cashOverviewForecast {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  padding-left: 30px;
+  border-left: 1px solid rgb(160 193 230 / 58%);
+}
+
+.cashOverviewHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cashOverviewHeading > span {
+  color: var(--finora-text);
+  font-size: 15px;
+}
+.cashOverviewHeading > small {
+  color: var(--finora-text-muted);
+  font-size: 11px;
+}
+
+.cashOverviewChart {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: end;
+  gap: 14px;
+  min-height: 165px;
+  margin-top: 18px;
+}
+
+.cashOverviewChart > div {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(92px, 1fr) auto auto;
+  align-items: end;
+  gap: 6px;
+  height: 100%;
+  min-width: 0;
+}
+
+.cashOverviewChart > div::before {
+  position: absolute;
+  right: 0;
+  bottom: 42px;
+  left: 0;
+  height: 1px;
+  background: rgb(113 156 207 / 18%);
+  content: '';
+}
+
+.cashChartBar {
+  z-index: 1;
+  width: 100%;
+  min-height: 8px;
+  align-self: end;
+  border-radius: 7px 7px 2px 2px;
+  background: linear-gradient(180deg, #6a9fe7, var(--finora-brand));
+  box-shadow: 0 7px 16px -10px rgb(36 117 215 / 70%);
+  transition: height 320ms ease;
+}
+
+.cashOverviewChart strong {
+  overflow: hidden;
+  color: var(--finora-text);
+  font-size: 11px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cashOverviewChart small {
+  overflow: hidden;
+  color: var(--finora-text-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cashOverviewChart .cashChartRisk .cashChartBar {
+  background: linear-gradient(180deg, #e9bb65, #c98718);
+  box-shadow: 0 7px 16px -10px rgb(185 117 10 / 62%);
+}
+
+.cashOverviewChart .cashChartRisk strong,
+.cashOverviewChart .cashChartRisk small {
+  color: var(--finora-warning);
+}
+
+.metricRail {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 14px;
+  border: 1px solid var(--finora-border);
+  border-radius: 14px;
+  background: var(--finora-surface);
+  box-shadow: 0 13px 30px -29px rgb(26 61 107 / 36%);
+}
+
+.metricRail > div {
+  min-width: 0;
+  padding: 18px 22px;
+}
+
+.metricRail > div + div {
+  border-left: 1px solid var(--finora-border);
+}
+
+.metricRail strong,
+.metricRail small {
+  display: block;
+}
+.metricRail strong {
+  margin-top: 7px;
+  color: var(--finora-text);
+  font-size: 25px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.8px;
+}
+.metricRail small {
+  overflow: hidden;
+  margin-top: 5px;
+  color: var(--finora-text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.controlBrief {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 28px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  border: 1px solid var(--finora-border);
+  border-radius: 14px;
+  background: var(--finora-surface);
+  box-shadow: 0 13px 30px -29px rgb(26 61 107 / 36%);
+  padding: 23px 24px;
+}
+
+.controlBriefCopy,
+.controlBriefStats {
+  position: relative;
+  z-index: 1;
+}
+
+.controlBriefTitle {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.controlBriefTitle h2 {
+  max-width: 600px;
+  margin: 0;
+  color: var(--finora-text);
+  font-size: 21px;
+  font-weight: 760;
+  letter-spacing: -0.5px;
+  line-height: 1.35;
+}
+
+.controlBriefTitle p {
+  max-width: 620px;
+  margin: 7px 0 0;
+  color: var(--finora-text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.controlProgress {
+  margin-top: 21px;
+}
+
+.controlProgressTrack {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(36 117 215 / 11%);
+}
+
+.controlProgressTrack span {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--finora-brand), #5e9bea);
+  box-shadow: 0 0 16px rgb(36 117 215 / 46%);
+  transition: width 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.controlProgressMeta {
+  display: flex;
+  justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-top: 8px;
+  color: var(--finora-text-muted);
+  font-size: 12px;
+}
+
+.controlProgressMeta strong {
+  color: var(--finora-text);
+  font-weight: 750;
+}
+
+.controlBriefStats {
+  display: grid;
+  align-content: center;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.controlBriefStats > div {
+  min-width: 0;
+  border: 1px solid var(--finora-border);
+  border-radius: 10px;
+  background: var(--finora-muted);
+  padding: 13px 11px;
+}
+
+.controlBriefStats span,
+.controlBriefStats strong {
+  display: block;
+}
+
+.controlBriefStats span {
+  min-height: 29px;
+  color: var(--finora-text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.controlBriefStats strong {
+  margin-top: 7px;
+  color: var(--finora-text);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.6px;
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.7fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.panel {
+  box-shadow: 0 13px 30px -29px rgb(26 61 107 / 36%);
+}
+
+.queuePanel,
+.settlementPanel {
+  padding: 20px;
+}
+
+.coveragePanel,
+.queuePanel {
+  display: flex;
+  flex-direction: column;
+}
+
+.settlementPanel {
+  grid-column: 1 / -1;
+}
+
+.panelHead {
+  align-items: center;
+  margin-bottom: 19px;
+}
+
+.panelHead h2 {
+  font-size: 18px;
+  font-weight: 760;
+  letter-spacing: -0.35px;
+}
+
+.panelHead > .finora-ui-button {
+  gap: 5px;
+  padding-right: 4px;
+}
+
+.panelHead > .finora-ui-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.coverageLayout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 28px;
+  flex: 1;
+  padding: 6px 0 21px;
+}
+
+.coverageScore {
+  display: grid;
+  align-content: center;
+  min-width: 165px;
+  color: var(--finora-text);
+}
+
+.coverageScore strong {
+  font-size: 42px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1.8px;
+  line-height: 1;
+}
+.coverageScore span {
+  margin-top: 7px;
+  color: var(--finora-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.coverageScore small {
+  margin-top: 5px;
+  color: var(--finora-text-muted);
+  font-size: 11px;
+}
+
+.coverageDetails {
+  min-width: 0;
+}
+
+.coverageDetails p {
+  margin: 13px 0 0;
+  color: var(--finora-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.coverageProgress {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(36 117 215 / 12%);
+}
+.coverageProgress span {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--finora-brand), #78a7e9);
+  box-shadow: 0 0 16px rgb(36 117 215 / 46%);
+}
+
+.coverageBreakdown {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 17px;
+}
+
+.coverageBreakdown span {
+  display: grid;
+  gap: 4px;
+  color: var(--finora-text-muted);
+  font-size: 12px;
+}
+.coverageBreakdown strong {
+  color: var(--finora-text);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.coverageFootnotes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--finora-border);
+  padding: 21px 0 17px;
+}
+.coverageFootnotes span {
+  display: grid;
+  gap: 5px;
+  color: var(--finora-text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.coverageFootnotes strong {
+  color: var(--finora-text);
+  font-size: 25px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.8px;
+}
+
+.coverageRunMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 0;
+  border-top: 1px solid var(--finora-border);
+  color: var(--finora-text-muted);
+  font-size: 11px;
+  padding-top: 15px;
+}
+
+.coverageRunMeta > span:last-child {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.cashTimeline {
+  display: grid;
+  gap: 11px;
+}
+
+.cashRow,
+.cashRiskRow {
+  display: grid;
+  grid-template-columns: 104px minmax(70px, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  min-height: 42px;
+}
+
+.cashDay strong,
+.cashDay span {
+  display: block;
+}
+
+.cashDay strong {
+  color: var(--finora-text);
+  font-size: 13px;
+  font-weight: 740;
+}
+
+.cashDay span {
+  margin-top: 2px;
+  color: var(--finora-text-muted);
+  font-size: 11px;
+}
+
+.cashBar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--finora-muted);
+}
+
+.cashBar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #77a5e5;
+  transition: width 320ms ease;
+}
+
+.cashRow > .finora-amount,
+.cashRiskRow > .finora-amount {
+  min-width: 105px;
+  color: var(--finora-text);
+  font-size: 13px;
+  font-weight: 740;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.cashRiskRow .cashDay strong,
+.cashRiskRow .cashDay span,
+.cashRiskRow > .finora-amount {
+  color: var(--finora-warning);
+}
+.cashRiskRow .cashBar {
+  background: #fff3da;
+}
+.cashRiskRow .cashBar span {
+  background: #e7ad44;
+}
+
+.priorityLead {
+  position: relative;
+  display: grid;
+  width: 100%;
+  grid-template-columns: 1fr auto;
+  gap: 5px 12px;
+  overflow: hidden;
+  border: 1px solid #d4e4fa;
+  border-radius: 11px;
+  background: rgb(255 255 255 / 52%);
+  color: var(--finora-text);
+  cursor: pointer;
+  padding: 15px;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.priorityLead:hover {
+  border-color: #aac9ef;
+  box-shadow: 0 13px 28px -22px rgb(36 117 215 / 48%);
+  transform: translateY(-1px);
+}
+
+.priorityLeadLabel {
+  grid-column: 1 / -1;
+  color: var(--finora-text-muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+}
+
+.priorityLead > strong {
+  font-size: 18px;
+  letter-spacing: -0.25px;
+}
+.priorityLead > span:not(.priorityLeadLabel) {
+  color: var(--finora-text-muted);
+  font-size: 12px;
+}
+.priorityLead .finora-status {
+  align-self: center;
+  grid-column: 1;
+  justify-self: start;
+  margin-top: 5px;
+}
+.priorityLead > svg {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 16px;
+  height: 16px;
+  color: var(--finora-brand);
+}
+
+.queueList {
+  display: grid;
+  margin-top: 2px;
+}
+
+.queueRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--finora-border);
+  background: transparent;
+  color: var(--finora-text);
+  cursor: pointer;
+  padding: 13px 2px;
+  text-align: left;
+}
+
+.queueRow:hover strong {
+  color: var(--finora-brand);
+}
+.queueReference strong,
+.queueReference small,
+.queueVariance {
+  display: block;
+}
+.queueReference strong {
+  font-size: 13px;
+  font-weight: 750;
+}
+.queueReference small {
+  margin-top: 2px;
+  color: var(--finora-text-muted);
+  font-size: 11px;
+}
+.queueVariance {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+}
+.queueVariance > .finora-amount {
+  color: var(--finora-text);
+  font-size: 12px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.queueEmpty {
+  display: grid;
+  place-items: center;
+  min-height: 160px;
+  padding: 20px;
+  color: var(--finora-text-muted);
+  text-align: center;
+}
+.queueEmpty svg {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 8px;
+  color: var(--finora-success);
+}
+.queueEmpty strong {
+  color: var(--finora-text);
+  font-size: 12px;
+}
+.queueEmpty span {
+  margin-top: 4px;
+  font-size: 10px;
+}
+
+.settlementList {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.settlementRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-right: 1px solid var(--finora-border);
+  background: transparent;
+  color: var(--finora-text);
+  cursor: pointer;
+  padding: 10px 18px;
+  text-align: left;
+}
+.settlementRow:first-child {
+  padding-left: 0;
+}
+.settlementRow:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+.settlementRow:hover strong {
+  color: var(--finora-brand);
+}
+.settlementRow > span,
+.settlementRow strong,
+.settlementRow small {
+  display: block;
+  min-width: 0;
+}
+.settlementRow > span:first-child strong {
+  font-size: 14px;
+  font-weight: 750;
+}
+.settlementRow small {
+  margin-top: 3px;
+  color: var(--finora-text-muted);
+  font-size: 11px;
+}
+.settlementAmounts {
+  text-align: right;
+}
+.settlementAmounts strong {
+  color: var(--finora-text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.settlementAmounts .finora-amount {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1180px) {
+  .cashOverview {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .cashOverviewForecast {
+    padding: 20px 0 0;
+    border-top: 1px solid rgb(160 193 230 / 58%);
+    border-left: 0;
+  }
+  .overviewGrid {
+    grid-template-columns: 1fr;
+  }
+  .coveragePanel {
+    grid-row: auto;
+  }
+  .settlementList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 14px;
+  }
+  .settlementRow:nth-child(2n) {
+    border-right: 0;
+    padding-right: 0;
+  }
+  .settlementRow:nth-child(2n + 1) {
+    padding-left: 0;
+  }
 }
 
 .metric,
@@ -507,11 +1245,73 @@
     padding: 0;
   }
 
+  .pageHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .pageHeader h1 {
+    font-size: 26px;
+  }
+
+  .pageActions {
+    width: 100%;
+  }
+
+  .pageActions .finora-ui-button {
+    flex: 1;
+  }
+
   .metrics,
   .twoCol,
   .loadingGrid,
   .priorityGrid {
     grid-template-columns: 1fr;
+  }
+
+  .controlBrief {
+    padding: 19px;
+  }
+  .controlBriefTitle {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .cashOverview {
+    padding: 22px 20px;
+  }
+  .cashOverviewBalance > strong {
+    font-size: 36px;
+  }
+  .cashOverviewChart {
+    gap: 8px;
+  }
+  .coverageLayout {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .coverageScore {
+    min-width: 0;
+  }
+  .coverageScore strong {
+    font-size: 36px;
+  }
+  .coverageFootnotes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .settlementList {
+    grid-template-columns: 1fr;
+  }
+  .settlementRow,
+  .settlementRow:nth-child(2n),
+  .settlementRow:nth-child(2n + 1) {
+    border-right: 0;
+    border-bottom: 1px solid var(--finora-border);
+    padding: 10px 0;
+  }
+  .settlementRow:last-child {
+    border-bottom: 0;
   }
 
   .recordToolbar {

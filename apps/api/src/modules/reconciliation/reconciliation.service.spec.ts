@@ -22,7 +22,10 @@ const prismaMock = (items = [transaction('1'), transaction('2', 'MISSING')]) => 
   const tx = {
     reconciliationRun: { create: vi.fn().mockResolvedValue({ id: 'run-1' }) },
     reconciliationMatch: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
-    exception: { create: vi.fn().mockResolvedValue({ id: 'exception-1' }) },
+    exception: {
+      create: vi.fn().mockResolvedValue({ id: 'exception-1' }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit-1' }) },
   };
   return {
@@ -45,6 +48,14 @@ describe('ReconciliationService.run', () => {
     expect(prisma.$transaction).toHaveBeenCalledOnce();
     expect(prisma.tx.reconciliationRun.create).toHaveBeenCalledOnce();
     expect(prisma.tx.reconciliationMatch.createMany).toHaveBeenCalledOnce();
+    expect(prisma.tx.exception.updateMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: 'demo-org',
+        reconciliationRunId: { not: null },
+        status: { in: ['OPEN', 'NEEDS_REVIEW', 'UNRESOLVED', 'PROPOSED'] },
+      },
+      data: { status: 'SUPERSEDED' },
+    });
     expect(prisma.tx.exception.create).toHaveBeenCalledOnce();
     expect(prisma.tx.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({

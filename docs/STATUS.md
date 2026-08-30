@@ -15,6 +15,7 @@ The application now has Keycloak login/RBAC, an editable organization tree/canva
 - pnpm/Turbo workspace with graceful `pnpm dev` Docker lifecycle and preflight port checks.
 - PostgreSQL/Redis/Keycloak Compose stack; Prisma 7 config, migrations, reproducible seed, shared enums, Decimal money rules, and enum synchronization.
 - Pure deterministic reconciliation package and transactional run/match/exception/evidence/audit persistence.
+- Reconciliation reruns supersede the prior active reconciliation exception snapshot atomically before persisting the new one. Historical evidence remains auditable, while Overview and Exceptions show only the current active queue.
 - Ollama/Qwen plus hosted provider abstraction, controlled multi-tool planning, grounded answers, persisted chat, typed proposals, approval/rejection, adjustment records, and reruns.
 - `finora_agent_ro` with SELECT-only grants, read-only transactions, `NOBYPASSRLS`, and organization RLS. Provisioning proves no rows are visible without a valid tenant.
 - `finora_agent_rw` with organization RLS, column-limited UPDATE rights, optimistic version checks, no identifier/tenant changes, and no DELETE/TRUNCATE. Rollback-only smoke testing proves correct-tenant writes and zero cross-tenant visibility.
@@ -33,7 +34,7 @@ The application now has Keycloak login/RBAC, an editable organization tree/canva
 - User-scoped notifications inbox and operations UI for connectors, jobs, job outcomes, and approval policies.
 - Scheduled/manual receipt reminders. Mock delivery works locally; the Slack adapter uses `chat.postMessage` when configured.
 - Razorpay sandbox-only adapter for payments, settlements, refunds, fees, tax, and UTR. Live-mode keys are rejected.
-- Responsive routes for Finora, Overview, Records, Reconciliation, Exceptions, Organization, Expenses, Agent control, Notifications, Operations, and Audit.
+- Responsive routes for Finora, Overview, Records, Exceptions, Organization, Expenses, Agent control, Notifications, Operations, and Audit. Overview is the reconciliation command center; the legacy `/reconciliation` route redirects to Overview.
 - Local Keycloak realm import/health, NextAuth provider discovery and PKCE redirect, branded login, unauthenticated API 401, migration/seed, RLS verification, graceful shutdown, and production web build smoke-tested.
 
 ## In progress

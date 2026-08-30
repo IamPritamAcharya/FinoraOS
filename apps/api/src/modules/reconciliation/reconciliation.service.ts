@@ -48,7 +48,10 @@ export class ReconciliationService {
   }
   exceptions(principal: RequestPrincipal) {
     return this.prisma.exception.findMany({
-      where: { organizationId: principal.organizationId },
+      where: {
+        organizationId: principal.organizationId,
+        status: { in: ['OPEN', 'NEEDS_REVIEW', 'UNRESOLVED', 'PROPOSED'] },
+      },
       include: { evidence: true, agentRuns: { include: { steps: true } } },
       orderBy: { createdAt: 'desc' },
     });
@@ -293,6 +296,14 @@ export class ReconciliationService {
           reason: item.reason,
         })),
       });
+      const superseded = await tx.exception.updateMany({
+        where: {
+          organizationId,
+          reconciliationRunId: { not: null },
+          status: { in: ['OPEN', 'NEEDS_REVIEW', 'UNRESOLVED', 'PROPOSED'] },
+        },
+        data: { status: ExceptionStatus.SUPERSEDED },
+      });
       for (const [index, item] of result.exceptions.entries()) {
         const externalId = `EXC_${run.id.slice(-6).toUpperCase()}_${String(index + 1).padStart(3, '0')}`;
         await tx.exception.create({
@@ -332,6 +343,20 @@ export class ReconciliationService {
           details: result.metrics,
         },
       });
+      if (superseded.count) {
+        await tx.auditLog.create({
+          data: {
+            organizationId,
+            actor: 'Reconciliation Engine',
+            actorType: 'SYSTEM',
+            source: 'RECONCILIATION_ENGINE',
+            action: 'RECONCILIATION_EXCEPTIONS_SUPERSEDED',
+            entityType: 'ReconciliationRun',
+            entityId: run.id,
+            details: { supersededCount: superseded.count },
+          },
+        });
+      }
       return {
         run,
         metrics: result.metrics,
