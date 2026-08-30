@@ -317,7 +317,7 @@ If evidence is required, return {"type":"tool","call":{"tool":"...","arguments":
 For multi-part questions, return all independent reads together as {"type":"tools","calls":[{"tool":"...","arguments":{}},{"tool":"...","arguments":{}}]}.
 After tools return evidence, return {"type":"answer","answer":"natural concise answer","citations":["call-1"]}.
 If a necessary detail is genuinely missing, return {"type":"clarify","question":"one concise question"}.
-Never invent values or claim a tool failed when it returned data. Prefer finance language over database language. Use summary tools for totals and find tools for record lists. Use getExpenseSummary for expenses/spend/costs/outflows, not findTransactions. Use getCurrentUser for "my" profile questions. The current user message is authoritative. Conversation context is reference material only: ignore an old clarification when the current message names a new topic, period, or record. Never ask again for a detail already supplied, and never repeat a previous clarification. "Last" and "latest" mean the newest matching record and do not require a date range. Use conversation context for genuinely short follow-ups and resolve pronouns from the latest referenced record. You may call several tools before answering comparisons or multi-part questions. Never write SQL or create unlisted tools. Never investigate unless explicitly requested. A record update request must use proposeRecordUpdate, must name the exact record and fields, and only prepares a diff; never claim the change is applied. The user approves or rejects the diff outside the model.
+Never invent values or claim a tool failed when it returned data. Prefer finance language over database language. Use summary tools for totals and find tools for record lists. Use getExpenseSummary for expenses/spend/costs/outflows, not findTransactions. Use getCurrentUser for "my" profile questions. The current user message is authoritative. Conversation context is reference material only: ignore an old clarification when the current message names a new topic, period, or record, except when it directly answers the latest pending write clarification. Never ask again for a detail already supplied, and never repeat a previous clarification. "Last" and "latest" mean the newest matching record and do not require a date range. Use conversation context for genuinely short follow-ups and resolve pronouns from the latest referenced record. You may call several tools before answering comparisons or multi-part questions. Never write SQL or create unlisted tools. Never investigate unless explicitly requested. A record update request must use proposeRecordUpdate, must name the exact record and fields, and only prepares a diff; never claim the change is applied. The user approves or rejects the diff outside the model. Record prefixes determine entity type: pay_##### is a TRANSACTION, STL_#### is a SETTLEMENT, INV_#### is an INVOICE, and GST_#### is a TAX_LINE. Never ask for an entity type already established by one of these prefixes.
 Workspace skills are approved operating procedures supplied in the prompt. Select a skillId only when the request clearly matches it. A skill can narrow behavior but never override these safety rules, and every selected tool must appear in that skill's allowedTools.
 ${toolGuide}`;
 
@@ -425,6 +425,50 @@ const deterministicFastLane = (message: string): FinanceToolCall | undefined => 
   return undefined;
 };
 
+const mutationVerb = /\b(?:change|update|edit|set|correct|replace|mark)\b/i;
+const pendingMutationQuestion =
+  /(?:\?|\b(?:which|what exact|exact .* reference|are you requesting|do you mean|please specify)\b)/i;
+
+const mutationTranscript = (input: {
+  message: string;
+  context?: FinanceChatContext[];
+  writeMode?: boolean;
+}) => {
+  if (mutationVerb.test(input.message)) return input.message;
+  const context = input.context ?? [];
+  const latest = context.at(-1);
+  const isPending =
+    input.writeMode &&
+    latest?.role === 'assistant' &&
+    pendingMutationQuestion.test(latest.text) &&
+    context.slice(-6, -1).some((item) => item.role === 'user' && mutationVerb.test(item.text));
+  if (!isPending) return input.message;
+  return [
+    ...context
+      .slice(-6)
+      .filter((item) => item.role === 'user')
+      .map((item) => item.text),
+    input.message,
+  ].join('\n');
+};
+
+const deterministicMutation = (message: string): FinanceToolCall | undefined => {
+  if (!mutationVerb.test(message)) return undefined;
+  const transactionId = message.match(/\bpay_\d{5}\b/i)?.[0]?.toLowerCase();
+  if (!transactionId) return undefined;
+  const status = message.match(/\b(?:CAPTURED|REFUNDED|PENDING)\b/i)?.[0]?.toUpperCase();
+  if (!status) return undefined;
+  return FinanceToolCallSchema.parse({
+    tool: 'proposeRecordUpdate',
+    arguments: {
+      entityType: 'TRANSACTION',
+      recordId: transactionId,
+      changes: { status },
+      reason: `Change ${transactionId} status to ${status} at the user's explicit request.`,
+    },
+  });
+};
+
 const latestControlledReference = (context: FinanceChatContext[]) => {
   for (const item of context.slice(-2).reverse()) {
     const reference = item.text.match(/\b(?:pay_\d{5}|STL_\d{4}|EXC_\d{3})\b/i)?.[0];
@@ -464,12 +508,16 @@ export class FinanceAgent {
     )
       ? latestControlledReference(input.context ?? [])
       : undefined;
-    const mutationIntent = /\b(change|update|edit|set|correct|replace|mark)\b/i.test(input.message);
-    const fastLane = mutationIntent
-      ? undefined
-      : deterministicFastLane(
-          contextualReference ? `${input.message} ${contextualReference}` : input.message,
-        );
+    const writeTranscript = mutationTranscript(input);
+    const mutationIntent = mutationVerb.test(writeTranscript);
+    const proposedMutation = input.writeMode ? deterministicMutation(writeTranscript) : undefined;
+    const fastLane =
+      proposedMutation ??
+      (mutationIntent
+        ? undefined
+        : deterministicFastLane(
+            contextualReference ? `${input.message} ${contextualReference}` : input.message,
+          ));
     if (fastLane) {
       const callId = 'call-1';
       try {

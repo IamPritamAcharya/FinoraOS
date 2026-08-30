@@ -70,6 +70,65 @@ describe('FinanceAgent', () => {
     expect(result.text).toContain('nothing has been written');
   });
 
+  it('prepares an explicit payment status diff without asking the model to route it', async () => {
+    const execute = vi.fn().mockResolvedValue({
+      callId: 'call-1',
+      tool: 'proposeRecordUpdate',
+      summary: 'Prepared a one-field diff; nothing has been written yet.',
+      data: { id: 'proposal-1', status: 'PENDING_APPROVAL' },
+    });
+    const model = { complete: vi.fn() };
+    await new FinanceAgent(model, { execute }).run({
+      message: 'Change pay_00008 status to refunded.',
+      currentDate: '2026-08-28T00:00:00.000Z',
+      writeMode: true,
+    });
+    expect(execute).toHaveBeenCalledWith(
+      {
+        tool: 'proposeRecordUpdate',
+        arguments: {
+          entityType: 'TRANSACTION',
+          recordId: 'pay_00008',
+          changes: { status: 'REFUNDED' },
+          reason: "Change pay_00008 status to REFUNDED at the user's explicit request.",
+        },
+      },
+      'call-1',
+    );
+    expect(model.complete).not.toHaveBeenCalled();
+  });
+
+  it('keeps a pending payment mutation when the final turn only supplies its reference', async () => {
+    const execute = vi.fn().mockResolvedValue({
+      callId: 'call-1',
+      tool: 'proposeRecordUpdate',
+      summary: 'Prepared a one-field diff; nothing has been written yet.',
+      data: { id: 'proposal-1', status: 'PENDING_APPROVAL' },
+    });
+    const model = { complete: vi.fn() };
+    await new FinanceAgent(model, { execute }).run({
+      message: 'pay_00008',
+      context: [
+        { role: 'user', text: 'Change the payment status to refunded.' },
+        { role: 'assistant', text: 'What is the exact pay_##### reference?' },
+      ],
+      currentDate: '2026-08-28T00:00:00.000Z',
+      writeMode: true,
+    });
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tool: 'proposeRecordUpdate',
+        arguments: expect.objectContaining({
+          entityType: 'TRANSACTION',
+          recordId: 'pay_00008',
+          changes: { status: 'REFUNDED' },
+        }),
+      }),
+      'call-1',
+    );
+    expect(model.complete).not.toHaveBeenCalled();
+  });
+
   it('answers budget questions from deterministic budget evidence without looping', async () => {
     const model = { complete: vi.fn() };
     const execute = vi.fn().mockResolvedValue({

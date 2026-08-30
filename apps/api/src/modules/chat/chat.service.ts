@@ -18,6 +18,19 @@ export const shouldUseConversationContext = (message: string) => {
   return message.trim().split(/\s+/).length <= 8;
 };
 
+const mutationIntent = /\b(?:change|update|edit|set|correct|replace|mark)\b/i;
+const clarificationPrompt =
+  /(?:\?|\b(?:which|what exact|exact .* reference|are you requesting|do you mean|please specify)\b)/i;
+
+export const shouldResumePendingWrite = (context: FinanceChatContext[], writeMode: boolean) => {
+  if (!writeMode || context.length < 2) return false;
+  const latest = context.at(-1);
+  if (latest?.role !== 'assistant' || !clarificationPrompt.test(latest.text)) return false;
+  return context
+    .slice(-6, -1)
+    .some((item) => item.role === 'user' && mutationIntent.test(item.text));
+};
+
 @Injectable()
 export class ChatService {
   constructor(
@@ -39,13 +52,14 @@ export class ChatService {
     });
     const persistedContext = await this.chats.context(principal, thread.id);
     const availableContext = persistedContext.length ? persistedContext : clientContext;
-    const useContext = shouldUseConversationContext(message);
+    const resumingWrite = shouldResumePendingWrite(availableContext, writeMode);
+    const useContext = resumingWrite || shouldUseConversationContext(message);
     const context = useContext ? availableContext.slice(-8) : [];
     apiLogger.info('Finora agent run started', {
       threadId: thread.id,
       organizationId: principal.organizationId,
       contextMessages: context.length,
-      contextMode: useContext ? 'follow-up' : 'standalone',
+      contextMode: resumingWrite ? 'pending-write' : useContext ? 'follow-up' : 'standalone',
       writeMode,
     });
     const currentDate = new Date().toISOString();

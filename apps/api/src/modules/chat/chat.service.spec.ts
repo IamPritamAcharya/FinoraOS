@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ChatService, shouldUseConversationContext } from './chat.service.js';
+import {
+  ChatService,
+  shouldResumePendingWrite,
+  shouldUseConversationContext,
+} from './chat.service.js';
 
 const principal = { organizationId: 'demo-org', userId: 'demo-user' };
 
@@ -10,6 +14,25 @@ describe('ChatService', () => {
     expect(shouldUseConversationContext('whats pay_00008')).toBe(false);
     expect(shouldUseConversationContext('Summarise our expenses this month')).toBe(false);
     expect(shouldUseConversationContext('what is our monthly operating budget')).toBe(false);
+  });
+
+  it('retains an active write clarification when the user supplies the missing reference', () => {
+    const context = [
+      { role: 'user' as const, text: 'Change the payment status to refunded.' },
+      { role: 'assistant' as const, text: 'What is the exact pay_##### reference?' },
+    ];
+    expect(shouldUseConversationContext('pay_00008')).toBe(false);
+    expect(shouldResumePendingWrite(context, true)).toBe(true);
+    expect(shouldResumePendingWrite(context, false)).toBe(false);
+    expect(
+      shouldResumePendingWrite(
+        [
+          { role: 'user', text: 'Tell me about payments.' },
+          { role: 'assistant', text: 'Which period?' },
+        ],
+        true,
+      ),
+    ).toBe(false);
   });
 
   it('runs a multi-step tool conversation and persists the structured result', async () => {
