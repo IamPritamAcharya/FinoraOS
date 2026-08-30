@@ -1,0 +1,94 @@
+.page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 18%, rgb(36 117 215 / 13%), transparent 32%), var(--finora-bg);
+  padding: 24px;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  width: min(440px, 100%);
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #c8dcf6;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgb(255 255 255 / 98%), rgb(241 247 255 / 95%));
+  box-shadow: 0 24px 56px -34px rgb(23 72 132 / 34%);
+  padding: 42px;
+  text-align: center;
+}
+
+.card::before {
+  position: absolute;
+  top: -75px;
+  right: 35%;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: rgb(93 151 231 / 22%);
+  content: '';
+  filter: blur(30px);
+}
+
+.card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 30px;
+  color: var(--finora-text);
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+}
+
+.brand svg {
+  width: 27px;
+  color: var(--finora-brand);
+}
+
+.status {
+  border: 1px solid #f0d49b;
+  border-radius: 999px;
+  background: #fff8e9;
+  color: var(--finora-warning);
+  font-size: 11px;
+  font-weight: 750;
+  padding: 5px 9px;
+}
+
+.card h1 {
+  margin: 16px 0 0;
+  color: var(--finora-text);
+  font-size: 29px;
+  letter-spacing: -1px;
+}
+
+.card p {
+  max-width: 320px;
+  margin: 12px 0 26px;
+  color: var(--finora-text-muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.action {
+  width: 100%;
+  justify-content: center;
+}
+
+.card small {
+  margin-top: 18px;
+  color: var(--finora-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}

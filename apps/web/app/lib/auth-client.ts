@@ -2,6 +2,11 @@
 
 import { signOut } from 'next-auth/react';
 
+/** Clears a stale local session without ending the provider session. */
+export async function clearExpiredFinoraSession() {
+  await signOut({ redirect: false });
+}
+
 export async function logoutFromFinora() {
   let providerLogoutUrl = '/login';
   try {

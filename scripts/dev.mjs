@@ -25,6 +25,27 @@ const runWorkspaceProcess = (workingDirectory, args) =>
     detached: true,
   });
 
+const waitForApi = async ({ attempts = 30, delayMs = 500 } = {}) => {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      // All API routes require a principal. A 401 therefore proves that the
+      // listener, router and authentication boundary are ready without
+      // introducing an unauthenticated health endpoint.
+      const response = await fetch(`${apiUrl}/finance/overview`, {
+        signal: AbortSignal.timeout(1_500),
+      });
+      if (response.status === 401 || response.ok) return;
+    } catch {
+      // The server is still booting; retry below.
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  throw new Error(
+    `API did not become reachable at ${apiUrl}. Check the API startup output before opening FinoraOS.`,
+  );
+};
+
 const wait = (child) =>
   new Promise((resolve) => {
     // A Ctrl+C reaches child processes and this parent at nearly the same time.
@@ -102,14 +123,7 @@ async function main() {
     return shutdown(1);
   }
   children = [
-    runWorkspaceProcess('apps/api', [
-      '--watch',
-      '--watch-preserve-output',
-      '--loader',
-      'ts-node/esm',
-      '--no-warnings',
-      'src/main.ts',
-    ]),
+    runWorkspaceProcess('apps/api', ['--loader', 'ts-node/esm', '--no-warnings', 'src/main.ts']),
     runWorkspaceProcess('apps/web', [
       resolve(rootDirectory, 'apps/web/node_modules/next/dist/bin/next'),
       'dev',
@@ -117,6 +131,12 @@ async function main() {
       '3000',
     ]),
   ];
+  try {
+    await waitForApi();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    return shutdown(1);
+  }
   await shutdown(await Promise.race(children.map(wait)));
 }
 

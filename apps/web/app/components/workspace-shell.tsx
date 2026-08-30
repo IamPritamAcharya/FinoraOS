@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { usePathname, useRouter } from 'next/navigation';
 import { AppSidebar, type WorkspaceView } from './app-sidebar';
 import styles from '../workspace.module.css';
-import { logoutFromFinora } from '../lib/auth-client';
+import { clearExpiredFinoraSession, logoutFromFinora } from '../lib/auth-client';
+import { SessionExpired } from './session-expired';
 
 const viewForPath = (pathname: string): WorkspaceView => {
   if (pathname === '/') return 'Chat';
@@ -21,17 +22,25 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const keycloakEnabled = process.env.NEXT_PUBLIC_AUTH_MODE === 'keycloak';
   const activeView = viewForPath(pathname);
+  const [sessionExpired, setSessionExpired] = useState(false);
   useEffect(() => {
-    if (keycloakEnabled && status === 'unauthenticated' && pathname !== '/login') {
+    if (
+      keycloakEnabled &&
+      !sessionExpired &&
+      status === 'unauthenticated' &&
+      pathname !== '/login'
+    ) {
       router.replace('/login');
     }
-  }, [keycloakEnabled, pathname, router, status]);
+  }, [keycloakEnabled, pathname, router, sessionExpired, status]);
   useEffect(() => {
     if (keycloakEnabled && session?.error === 'RefreshAccessTokenError') {
-      void logoutFromFinora();
+      setSessionExpired(true);
+      void clearExpiredFinoraSession();
     }
   }, [keycloakEnabled, session?.error]);
   if (pathname === '/login') return children;
+  if (keycloakEnabled && sessionExpired) return <SessionExpired callbackUrl={pathname} />;
   if (keycloakEnabled && status !== 'authenticated') {
     return <main className={styles.authLoading}>Securing your FinoraOS workspace…</main>;
   }
