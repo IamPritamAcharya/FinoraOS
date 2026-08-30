@@ -33,6 +33,16 @@ export class FinanceController {
   @Get('tax-lines') taxLines() {
     return this.finance.taxLines(this.auth.require(WorkspacePermission.VIEW_ORGANIZATION_FINANCE));
   }
+  @Get('expense-claims') expenseClaims() {
+    return this.finance.expenseClaims(
+      this.auth.require(WorkspacePermission.VIEW_ORGANIZATION_FINANCE),
+    );
+  }
+  @Get('record-options') recordOptions() {
+    return this.finance.recordOptions(
+      this.auth.require(WorkspacePermission.VIEW_ORGANIZATION_FINANCE),
+    );
+  }
   @Get('forecast') forecast() {
     return this.finance.forecast(this.auth.require(WorkspacePermission.VIEW_ORGANIZATION_FINANCE));
   }

@@ -158,6 +158,8 @@ export class ReconciliationService {
         data: {
           organizationId: principal.organizationId,
           actor: 'Reconciliation Engine',
+          actorType: 'SYSTEM',
+          source: 'RECONCILIATION_ENGINE',
           action: 'POST_APPROVAL_RECONCILIATION_RERUN',
           entityType: 'Exception',
           entityId: exception.id,
@@ -322,6 +324,8 @@ export class ReconciliationService {
         data: {
           organizationId,
           actor: 'Reconciliation Engine',
+          actorType: 'SYSTEM',
+          source: 'RECONCILIATION_ENGINE',
           action: 'RECONCILIATION_COMPLETED',
           entityType: 'ReconciliationRun',
           entityId: run.id,

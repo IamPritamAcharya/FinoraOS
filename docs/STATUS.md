@@ -1,14 +1,14 @@
 # FinoraOS Status
 
-Last updated: 2026-08-28
-Current phase: Finance-hub V1 with organization spend governance and audited imports
+Last updated: 2026-08-30
+Current phase: Finance-hub V1 with governed record mutations and unified audit
 Last verified commit: see `git log -1`
 
 ## Current state
 
 FinoraOS has a working Track 04 flagship loop and a broader finance-hub foundation. The deterministic engine processes a 240-record evaluation fixture with 108 correct matches, 12 honest exceptions, and zero false auto-matches. Ambiguous exceptions can be investigated through the configured AI gateway, persisted as typed proposals, reviewed by a human, audited, and rerun without modifying raw imported data.
 
-The application now has Keycloak login/RBAC, an editable organization tree/canvas, budgets plus deterministic hard and soft-category spend controls, audited invoice/expense CSV imports in Records, categorized receipt workflows, custom bounded agent skills, agent/audit visibility, notifications, scheduled receipt reminders, integration/policy control surfaces, and a Razorpay test-mode adapter. PostgreSQL row-level security remains the tenant boundary for agent reads.
+The application now has Keycloak login/RBAC, an editable organization tree/canvas, budgets plus deterministic hard and soft-category spend controls, audited bulk and single-record entry/editing, categorized receipt workflows, custom bounded agent skills, unified site/agent audit, notifications, scheduled receipt reminders, integration/policy control surfaces, and a Razorpay test-mode adapter. PostgreSQL row-level security remains the tenant boundary for both controlled agent reads and approval-gated writes.
 
 ## Completed
 
@@ -17,19 +17,23 @@ The application now has Keycloak login/RBAC, an editable organization tree/canva
 - Pure deterministic reconciliation package and transactional run/match/exception/evidence/audit persistence.
 - Ollama/Qwen plus hosted provider abstraction, controlled multi-tool planning, grounded answers, persisted chat, typed proposals, approval/rejection, adjustment records, and reruns.
 - `finora_agent_ro` with SELECT-only grants, read-only transactions, `NOBYPASSRLS`, and organization RLS. Provisioning proves no rows are visible without a valid tenant.
+- `finora_agent_rw` with organization RLS, column-limited UPDATE rights, optimistic version checks, no identifier/tenant changes, and no DELETE/TRUNCATE. Rollback-only smoke testing proves correct-tenant writes and zero cross-tenant visibility.
 - Keycloak/NextAuth login with Employee, Finance Controller, and Enterprise Admin identities. Nest verifies JWT issuer/audience and maps `sub + organization_id` to a database membership and database-owned role. The Finora-themed OIDC screen, coordinated provider logout, forced account re-authentication, and explicit 5-minute/30-minute/8-hour token/session limits are configured idempotently on development startup.
 - Role/permission contracts for finance, expenses, budgets, organization management, skills, audit, approvals, and integrations. Existing finance/reconciliation operations enforce them.
 - Finance-hub models: organization nodes, budgets, expense claims, financial documents, receipt requests, agent skills, notifications, integration connections, automation jobs/runs, approval policies, and richer tax metadata.
 - Organization hierarchy UI with node selection/editing, ownership, create/reparent validation, collapse/expand, and an interactive pan/zoom canvas.
 - Pure `@finora/spend-policy` engine with parent/child allocation checks, subtree/ancestor hard enforcement, soft category warnings, and deterministic tests.
 - Audited Records CSV imports for payable invoices and employee reimbursements, with partial-result error reports, category provenance, and hard-limit rejection.
+- Records can create one transaction, settlement, invoice, tax line, cash movement, or expense claim and edit existing records with full before/after audit evidence.
+- Finora chat has an explicit, non-persistent write-mode switch. The model can prepare only an expiring typed diff; an authorized user must approve it before the restricted writer applies it atomically. Rejection, expiry, stale records, and failures leave finance data unchanged.
+- Dedicated Audit route combines site-wide events (nodes, limits, budgets, imports, records, approvals) and agent runs under organization scoping.
 - Category overages notify finance controllers/admins and the relevant node owner without dropping the underlying financial record.
 - Employee/finance expense queue with real bounded PDF/image receipt upload through a document-storage gateway. Local files are ignored under `.data/documents`.
 - Agent control UI with skill creation/activation, strict tool allowlists, active-skill controller context, skill-linked runs, model/tool history, and financial audit events.
 - User-scoped notifications inbox and operations UI for connectors, jobs, job outcomes, and approval policies.
 - Scheduled/manual receipt reminders. Mock delivery works locally; the Slack adapter uses `chat.postMessage` when configured.
 - Razorpay sandbox-only adapter for payments, settlements, refunds, fees, tax, and UTR. Live-mode keys are rejected.
-- Responsive routes for Finora, Overview, Records, Reconciliation, Exceptions, Organization, Expenses, Agent control, Notifications, and Operations.
+- Responsive routes for Finora, Overview, Records, Reconciliation, Exceptions, Organization, Expenses, Agent control, Notifications, Operations, and Audit.
 - Local Keycloak realm import/health, NextAuth provider discovery and PKCE redirect, branded login, unauthenticated API 401, migration/seed, RLS verification, graceful shutdown, and production web build smoke-tested.
 
 ## In progress
@@ -60,13 +64,14 @@ No partial code task is intentionally left in progress at this checkpoint.
 - `pnpm check:enums`
 - `pnpm lint`
 - `pnpm typecheck`
-- `pnpm test` (58 tests)
+- `pnpm test` (65 tests)
 - `pnpm eval:reconciliation`
 - `pnpm build`
 - `pnpm format:check`
 - `pnpm db:deploy`
 - `pnpm seed`
-- `pnpm db:agent-role`
+- `pnpm db:agent-roles`
+- Governed writer rollback smoke: in-tenant allowlisted UPDATE succeeded, cross-tenant rows remained invisible, transaction rolled back with no data change
 - Live API smoke: 6 nodes/6 limits loaded; sample expense import accepted 2, rejected the deliberate hard breach, emitted 1 soft warning and targeted 3 recipients
 - `pnpm auth:configure`
 - PostgreSQL/Redis/Keycloak healthy Compose startup and graceful shutdown

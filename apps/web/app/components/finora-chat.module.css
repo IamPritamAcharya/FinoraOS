@@ -560,6 +560,74 @@
   padding: 9px 0;
 }
 
+.mutationArtifact {
+  max-width: 620px;
+  margin-top: 14px;
+  border-left: 2px solid var(--finora-warning);
+  padding: 4px 0 4px 14px;
+}
+
+.mutationArtifact > p {
+  margin: 0 0 12px;
+  color: var(--finora-text-muted);
+  font-size: 12px;
+}
+
+.diffTable {
+  border-top: 1px solid var(--finora-border);
+  border-bottom: 1px solid var(--finora-border);
+}
+
+.diffHead,
+.diffRow {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.8fr) repeat(2, minmax(120px, 1fr));
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.diffHead {
+  color: var(--finora-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.diffRow {
+  border-top: 1px solid var(--finora-border);
+  color: var(--finora-text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.diffRow span:last-child {
+  color: var(--finora-brand-strong);
+  font-weight: 750;
+}
+
+.mutationActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.mutationActions small {
+  margin-left: auto;
+  color: var(--finora-text-muted);
+}
+
+.mutationOutcome,
+.mutationError {
+  margin-top: 10px !important;
+}
+
+.mutationError {
+  color: var(--finora-danger) !important;
+}
+
 .activity {
   width: fit-content;
   max-width: 620px;
@@ -701,6 +769,17 @@
   flex: 0 0 auto;
   color: var(--finora-text-muted);
   font-size: 11px;
+}
+
+.composerMode {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.composerMode > span {
+  color: var(--finora-text-muted);
+  font-size: 10px;
 }
 
 .composerFooter > div {

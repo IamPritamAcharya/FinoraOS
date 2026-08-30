@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { ExceptionStatus, ExceptionType, WorkspacePermission, WorkspaceRole } from './enums.js';
+import {
+  ExceptionStatus,
+  ExceptionType,
+  FinancialRecordType,
+  MutationOperation,
+  MutationStatus,
+  WorkspacePermission,
+  WorkspaceRole,
+} from './enums.js';
 
 export const MoneySchema = z.object({
   amount: z.string().regex(/^-?\d+(\.\d{1,2})?$/, 'Use a decimal string'),
@@ -31,6 +39,46 @@ export const RequestPrincipalSchema = z.object({
 
 export type RequestPrincipal = z.infer<typeof RequestPrincipalSchema>;
 
+export const FinancialRecordChangeValueSchema = z.union([
+  z.string().max(500),
+  z.number().finite(),
+  z.boolean(),
+  z.null(),
+]);
+
+export const RecordMutationRequestSchema = z.object({
+  entityType: z.nativeEnum(FinancialRecordType),
+  recordId: z.string().trim().min(1).max(128),
+  operation: z.nativeEnum(MutationOperation).default(MutationOperation.UPDATE),
+  changes: z
+    .record(z.string(), FinancialRecordChangeValueSchema)
+    .refine((changes) => Object.keys(changes).length > 0, 'At least one change is required.'),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export const MutationDiffEntrySchema = z.object({
+  field: z.string(),
+  before: FinancialRecordChangeValueSchema,
+  after: FinancialRecordChangeValueSchema,
+});
+
+export const MutationProposalSchema = z.object({
+  id: z.string(),
+  entityType: z.nativeEnum(FinancialRecordType),
+  entityId: z.string(),
+  recordExternalId: z.string(),
+  operation: z.nativeEnum(MutationOperation),
+  status: z.nativeEnum(MutationStatus),
+  reason: z.string(),
+  before: z.record(z.string(), z.unknown()),
+  after: z.record(z.string(), z.unknown()),
+  diff: z.array(MutationDiffEntrySchema),
+  expiresAt: z.string(),
+});
+
+export type RecordMutationRequest = z.infer<typeof RecordMutationRequestSchema>;
+export type MutationProposal = z.infer<typeof MutationProposalSchema>;
+
 const rolePermissions: Record<WorkspaceRole, readonly WorkspacePermission[]> = {
   [WorkspaceRole.EMPLOYEE]: [
     WorkspacePermission.VIEW_OWN_FINANCE,
@@ -54,12 +102,15 @@ const rolePermissions: Record<WorkspaceRole, readonly WorkspacePermission[]> = {
     WorkspacePermission.MANAGE_AGENT_SKILL,
     WorkspacePermission.VIEW_AGENT_AUDIT,
     WorkspacePermission.APPROVE_FINANCE_ACTION,
+    WorkspacePermission.MANAGE_FINANCE_RECORDS,
+    WorkspacePermission.VIEW_AUDIT,
   ],
   [WorkspaceRole.ENTERPRISE_ADMIN]: Object.values(WorkspacePermission),
   [WorkspaceRole.AUDITOR]: [
     WorkspacePermission.VIEW_OWN_FINANCE,
     WorkspacePermission.VIEW_ORGANIZATION_FINANCE,
     WorkspacePermission.VIEW_AGENT_AUDIT,
+    WorkspacePermission.VIEW_AUDIT,
   ],
 };
 
@@ -69,7 +120,7 @@ export const hasWorkspacePermission = (
 ) => rolePermissions[principal.role ?? WorkspaceRole.EMPLOYEE].includes(permission);
 
 export const FinoraArtifactSchema = z.object({
-  type: z.enum(['metrics', 'table', 'settlement', 'exception', 'forecast', 'profile']),
+  type: z.enum(['metrics', 'table', 'settlement', 'exception', 'forecast', 'profile', 'mutation']),
   title: z.string(),
   data: z.record(z.string(), z.unknown()),
   href: z.string().optional(),

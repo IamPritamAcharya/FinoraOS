@@ -6,7 +6,9 @@ async function main() {
   if (!databaseUrl) throw new Error('DATABASE_URL is required to provision finora_agent_ro.');
 
   const role = 'finora_agent_ro';
+  const writeRole = 'finora_agent_rw';
   const password = process.env.AGENT_READ_DATABASE_PASSWORD ?? 'finora_agent_readonly_dev';
+  const writePassword = process.env.AGENT_WRITE_DATABASE_PASSWORD ?? 'finora_agent_writer_dev';
   const databaseName = new URL(databaseUrl).pathname.slice(1);
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(databaseName)) {
     throw new Error(
@@ -21,6 +23,14 @@ async function main() {
       url.password = password;
       return url.toString();
     })();
+  const agentWriteUrl =
+    process.env.AGENT_WRITE_DATABASE_URL ??
+    (() => {
+      const url = new URL(databaseUrl);
+      url.username = writeRole;
+      url.password = writePassword;
+      return url.toString();
+    })();
 
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
@@ -31,6 +41,15 @@ async function main() {
       CREATE ROLE ${role} LOGIN PASSWORD '${password.replaceAll("'", "''")}';
     ELSE
       ALTER ROLE ${role} LOGIN PASSWORD '${password.replaceAll("'", "''")}';
+    END IF;
+  END
+  $$;`);
+    await client.query(`DO $$
+  BEGIN
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${writeRole}') THEN
+      CREATE ROLE ${writeRole} LOGIN PASSWORD '${writePassword.replaceAll("'", "''")}';
+    ELSE
+      ALTER ROLE ${writeRole} LOGIN PASSWORD '${writePassword.replaceAll("'", "''")}';
     END IF;
   END
   $$;`);
@@ -77,6 +96,7 @@ async function main() {
       ['ApprovalPolicy', `"organizationId" = ${orgId}`],
       ['SpendLimit', `"organizationId" = ${orgId}`],
       ['ImportBatch', `"organizationId" = ${orgId}`],
+      ['MutationProposal', `"organizationId" = ${orgId}`],
     ] as const;
     for (const [table, predicate] of directTenantTables) {
       await client.query(`ALTER TABLE public."${table}" ENABLE ROW LEVEL SECURITY;`);
@@ -106,7 +126,85 @@ async function main() {
       );
     }
     await client.query(`ALTER ROLE ${role} SET default_transaction_read_only = on;`);
+    await client.query(
+      `ALTER ROLE ${writeRole} NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;`,
+    );
+    await client.query(`GRANT CONNECT ON DATABASE "${databaseName}" TO ${writeRole};`);
+    await client.query(`GRANT USAGE ON SCHEMA public TO ${writeRole};`);
+    await client.query(`GRANT SELECT ON ALL TABLES IN SCHEMA public TO ${writeRole};`);
+    await client.query(
+      `REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public FROM ${writeRole};`,
+    );
+    await client.query(
+      `GRANT UPDATE ("amount", "currency", "status", "occurredAt", "settlementId", "version", "updatedAt") ON public."Transaction" TO ${writeRole};`,
+    );
+    await client.query(
+      `GRANT UPDATE ("expectedAmount", "receivedAmount", "feeAmount", "gstAmount", "refundAmount", "settledAt", "version", "updatedAt") ON public."Settlement" TO ${writeRole};`,
+    );
+    await client.query(
+      `GRANT UPDATE ("amount", "currency", "issuedAt", "dueAt", "direction", "nodeId", "vendor", "category", "status", "version", "updatedAt") ON public."Invoice" TO ${writeRole};`,
+    );
+    await client.query(
+      `GRANT UPDATE ("invoiceId", "amount", "taxRate", "matched", "matchStatus", "taxType", "taxPeriod", "counterpartyTaxId", "version", "updatedAt") ON public."TaxLine" TO ${writeRole};`,
+    );
+    await client.query(
+      `GRANT UPDATE ("direction", "category", "status", "amount", "currency", "description", "counterparty", "occurredAt", "version", "updatedAt") ON public."CashMovement" TO ${writeRole};`,
+    );
+    await client.query(
+      `GRANT UPDATE ("amount", "currency", "merchant", "category", "status", "incurredAt", "description", "nodeId", "version", "updatedAt") ON public."ExpenseClaim" TO ${writeRole};`,
+    );
+    await client.query(
+      `GRANT UPDATE ("status", "approvedById", "decidedAt", "executedAt", "failureReason", "updatedAt") ON public."MutationProposal" TO ${writeRole};`,
+    );
+    await client.query(
+      `GRANT INSERT ("id", "organizationId", "actor", "actorType", "source", "action", "entityType", "entityId", "details", "createdAt") ON public."AuditLog" TO ${writeRole};`,
+    );
+    await client.query(
+      `REVOKE USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public FROM ${writeRole};`,
+    );
+    const writerTables = [
+      'Transaction',
+      'Settlement',
+      'Invoice',
+      'TaxLine',
+      'CashMovement',
+      'ExpenseClaim',
+      'MutationProposal',
+    ];
+    for (const table of writerTables) {
+      await client.query(`ALTER TABLE public."${table}" ENABLE ROW LEVEL SECURITY;`);
+      await client.query(`DROP POLICY IF EXISTS finora_agent_rw_update ON public."${table}";`);
+      await client.query(
+        `CREATE POLICY finora_agent_rw_update ON public."${table}" FOR UPDATE TO ${writeRole}
+         USING ("organizationId" = ${orgId}) WITH CHECK ("organizationId" = ${orgId});`,
+      );
+    }
+    await client.query(`DROP POLICY IF EXISTS finora_agent_rw_insert ON public."AuditLog";`);
+    await client.query(
+      `CREATE POLICY finora_agent_rw_insert ON public."AuditLog" FOR INSERT TO ${writeRole}
+       WITH CHECK ("organizationId" = ${orgId});`,
+    );
+    for (const [table, predicate] of directTenantTables) {
+      await client.query(`DROP POLICY IF EXISTS finora_agent_rw_select ON public."${table}";`);
+      await client.query(
+        `CREATE POLICY finora_agent_rw_select ON public."${table}" FOR SELECT TO ${writeRole} USING (${predicate});`,
+      );
+    }
+    for (const [table, parentTable, foreignKey, parentKey] of relatedTenantTables) {
+      await client.query(`DROP POLICY IF EXISTS finora_agent_rw_select ON public."${table}";`);
+      await client.query(
+        `CREATE POLICY finora_agent_rw_select ON public."${table}" FOR SELECT TO ${writeRole}
+         USING (EXISTS (
+           SELECT 1 FROM public."${parentTable}" parent
+           WHERE parent."${parentKey}" = public."${table}"."${foreignKey}"
+             AND parent."organizationId" = ${orgId}
+         ));`,
+      );
+    }
     console.log(`Provisioned ${role} with read-only access to the Finora finance schema.`);
+    console.log(
+      `Provisioned ${writeRole} with tenant-scoped, column-limited finance UPDATE access.`,
+    );
   } finally {
     await client.end();
   }
@@ -154,6 +252,40 @@ async function main() {
     );
   } finally {
     await readClient.end();
+  }
+
+  const writeClient = new Client({ connectionString: agentWriteUrl });
+  await writeClient.connect();
+  try {
+    const verification = await writeClient.query<{
+      current_user: string;
+      can_update_amount: boolean;
+      can_update_external_id: boolean;
+      can_delete: boolean;
+      rows_without_tenant: number;
+    }>(`
+      SELECT current_user,
+        has_column_privilege(current_user, 'public."Transaction"', 'amount', 'UPDATE') AS can_update_amount,
+        has_column_privilege(current_user, 'public."Transaction"', 'externalId', 'UPDATE') AS can_update_external_id,
+        has_table_privilege(current_user, 'public."Transaction"', 'DELETE') AS can_delete,
+        (SELECT count(*) FROM public."Transaction")::int AS rows_without_tenant
+    `);
+    const result = verification.rows[0];
+    if (
+      !result ||
+      result.current_user !== writeRole ||
+      !result.can_update_amount ||
+      result.can_update_external_id ||
+      result.can_delete ||
+      result.rows_without_tenant !== 0
+    ) {
+      throw new Error('Governed write-role verification failed.');
+    }
+    console.log(
+      `Verified ${writeRole}: allowed columns are writable; identifiers and DELETE remain blocked.`,
+    );
+  } finally {
+    await writeClient.end();
   }
 }
 

@@ -15,6 +15,7 @@ const ChatRequestSchema = z.object({
     .max(12)
     .default([]),
   threadId: z.string().min(1).max(128).optional(),
+  writeMode: z.boolean().default(false),
 });
 
 @Controller('chat')
@@ -24,8 +25,8 @@ export class ChatController {
     private readonly auth: AuthService,
   ) {}
   @Post() async send(@Body() body: unknown) {
-    const { message, context, threadId } = ChatRequestSchema.parse(body);
-    return this.chat.respond(this.auth.currentPrincipal(), message, context, threadId);
+    const { message, context, threadId, writeMode } = ChatRequestSchema.parse(body);
+    return this.chat.respond(this.auth.currentPrincipal(), message, context, threadId, writeMode);
   }
 
   @Get('threads') threads() {

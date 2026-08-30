@@ -84,6 +84,43 @@ export class FinanceService {
       orderBy: { externalId: 'asc' },
     });
   }
+  expenseClaims(principal: RequestPrincipal) {
+    return this.prisma.expenseClaim.findMany({
+      where: { organizationId: principal.organizationId },
+      include: {
+        claimant: { select: { id: true, name: true, email: true } },
+        node: { select: { id: true, name: true, code: true } },
+      },
+      orderBy: { incurredAt: 'desc' },
+      take: 200,
+    });
+  }
+  async recordOptions(principal: RequestPrincipal) {
+    const [users, nodes, accounts, settlements] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { organizationId: principal.organizationId },
+        select: { id: true, name: true, email: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.organizationNode.findMany({
+        where: { organizationId: principal.organizationId, active: true },
+        select: { id: true, name: true, code: true, type: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.cashAccount.findMany({
+        where: { organizationId: principal.organizationId },
+        select: { id: true, name: true, currency: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.settlement.findMany({
+        where: { organizationId: principal.organizationId },
+        select: { id: true, externalId: true },
+        orderBy: { settledAt: 'desc' },
+        take: 100,
+      }),
+    ]);
+    return { users, nodes, accounts, settlements };
+  }
   async forecast(principal: RequestPrincipal) {
     const [accounts, posted, scheduled] = await Promise.all([
       this.prisma.cashAccount.findMany({ where: { organizationId: principal.organizationId } }),

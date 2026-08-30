@@ -60,7 +60,7 @@ The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, cl
 
 | Capability                   | What it does now                                                                                                                                                                                                                               |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Finance workspace            | Role-aware Finora, overview, records, reconciliation, exceptions, organization, expenses, agent control, notifications, and operations routes over seeded backend data.                                                                        |
+| Finance workspace            | Role-aware Finora, overview, records, reconciliation, exceptions, organization, expenses, agent control, notifications, operations, and unified audit routes over seeded backend data.                                                         |
 | Deterministic reconciliation | Exact-reference, settlement-relationship, date-window, and explicit composite-score matching. Ambiguous cases are never forced into a match.                                                                                                   |
 | Exception persistence        | Reconciliation runs persist matches, exceptions, exception evidence, metrics, and audit events transactionally.                                                                                                                                |
 | Settlement Q&A               | Ask Finora about `STL_0001`; amounts and variance are calculated deterministically, then a configured AI gateway may provide a constrained qualitative explanation.                                                                            |
@@ -70,6 +70,7 @@ The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, cl
 | AI providers                 | API-key-first gateway selection for Gemini, Groq, and OpenRouter; local Ollama fallback; explicit mock only for tests.                                                                                                                         |
 | Identity and tenancy         | Keycloak OIDC, NextAuth sessions, database-backed workspace roles, API permission checks, and PostgreSQL RLS for the agent's read-only identity.                                                                                               |
 | Finance-hub workflows        | Editable organization tree/canvas, budgets, deterministic hard/category spend controls, audited invoice/expense CSV imports, categorized receipts, targeted limit notifications, approval policies, reminders, and agent/audit inspection.     |
+| Governed record operations   | Create one record or import a batch, edit with optimistic concurrency, and use explicit chat write mode to prepare an expiring before/after diff that cannot execute until an authorized user approves it.                                     |
 | Custom agent skills          | Admin-created guidance can select only an explicit allowlist of existing organization-scoped read tools; it cannot add SQL, credentials, permissions, or write access.                                                                         |
 | Provider gateways            | Mock-first banking/payment/messaging boundaries, Slack outbound reminders, and a Razorpay sandbox-only read adapter.                                                                                                                           |
 | Synthetic demo               | Reproducible Acme Commerce India data: 4 users, node hierarchy, 3 budgets, 4 expenses, 120 transactions, 12 settlements, 49 cash movements, invoices/tax lines, and 14 exceptions.                                                             |
@@ -95,8 +96,10 @@ The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, cl
 6. Ask: `Show unresolved exceptions above ₹25,000.`, `What is our expected cash position this week?`, or `Which GST lines failed to match?`
 7. Open **Reconciliation** to inspect the latest measured run.
 8. Open **Exceptions** to inspect the queue and its supporting reasons.
-9. Open **Organization** to edit nodes or use the canvas, set a hard/category limit, then use **Records → Import records** with `datasets/synthetic/import-expenses.csv` or `import-invoices.csv`. Hard breaches are rejected; category overages notify Finance and the node owner.
-10. Run the evaluation harness to demonstrate batch-level accuracy—not a cherry-picked result.
+9. Open **Records** to create one record, edit an existing record, or import a CSV batch. Every mutation appears in **Audit** with its actor and before/after evidence.
+10. In **Finora**, enable **Write mode**, ask `Change pay_00008 status to REFUNDED`, inspect the proposed diff, then approve or reject it. No record changes before approval.
+11. Open **Organization** to edit nodes or use the canvas and set a hard/category limit. Hard breaches are rejected; category overages notify Finance and the node owner.
+12. Run the evaluation harness to demonstrate batch-level accuracy—not a cherry-picked result.
 
 The app supports normal route navigation. Server-persisted chat threads remain available when a finance user checks another workspace view and returns.
 
@@ -127,7 +130,7 @@ pnpm db:generate
 pnpm dev
 ```
 
-`pnpm dev` checks ports, starts PostgreSQL, Redis, and Keycloak, waits for health, applies committed migrations, provisions the agent read-only role and RLS policies, refreshes the reproducible demo seed, then launches:
+`pnpm dev` checks ports, starts PostgreSQL, Redis, and Keycloak, waits for health, applies committed migrations, provisions and verifies the read-only and governed-writer roles with RLS policies, refreshes the reproducible demo seed, then launches:
 
 - Web: `http://localhost:3000`
 - API: `http://localhost:3001/api`
@@ -224,15 +227,15 @@ Investigate EXC_005.
 
 Finora invokes the existing Exception Investigator with controlled evidence. It persists only an agent run, a typed **proposal**, and an audit event; raw imported records are not changed, and no proposal is approved or closed from chat.
 
-### Tenant-safe agent reads
+### Tenant-safe agent reads and governed writes
 
-`pnpm dev` provisions `finora_agent_ro` before seeding. This separate PostgreSQL identity has `SELECT` only, no sequence or inherited privileges, `NOBYPASSRLS`, and read-only transactions. Every controlled read sets a transaction-local organization context; PostgreSQL row-level security returns no rows when the context is absent or belongs to another tenant. You can re-run and verify the setup directly:
+`pnpm dev` provisions `finora_agent_ro` and `finora_agent_rw` before seeding. The reader has `SELECT` only, no sequence or inherited privileges, `NOBYPASSRLS`, and read-only transactions. The writer is also `NOBYPASSRLS`; it can update only explicit business columns after approval and cannot change identifiers/tenant ownership or delete/truncate records. Every operation sets a transaction-local organization context, and PostgreSQL returns no rows when it is absent or belongs to another tenant. Re-run both role checks directly:
 
 ```bash
-pnpm db:agent-role
+pnpm db:agent-roles
 ```
 
-The model never receives this connection URL or SQL access. It chooses only from the typed tool catalogue. The API verifies the Keycloak token, resolves `sub + organization_id` to an active database membership, applies database-owned permissions, and supplies that trusted organization context to every tool.
+The model never receives either connection URL or SQL access. It chooses only from the typed tool catalogue. Write mode creates a pending diff, not a write; approval is performed by an authenticated controller/admin and the restricted executor applies the exact validated proposal atomically with its audit event.
 
 The API emits compact human-readable logs in development and structured JSON logs in production for gateway selection, completions, hosted-to-local fallback, request completion, reconciliation runs, and exception investigations. Prompts, API keys, authorization headers, and credentials are never logged.
 
@@ -299,7 +302,7 @@ Business modules do not import vendor SDKs directly. Agents do not import Prisma
 | `pnpm db:generate`                  | Generate the Prisma client after a fresh install or schema change.                |
 | `pnpm db:migrate`                   | Create and apply a development migration.                                         |
 | `pnpm db:deploy`                    | Apply committed migrations.                                                       |
-| `pnpm db:agent-role`                | Provision and verify the SELECT-only, RLS-protected agent database role.          |
+| `pnpm db:agent-roles`               | Provision and verify the RLS-protected reader and governed writer database roles. |
 | `pnpm seed`                         | Refresh the deterministic Acme Commerce India demo data.                          |
 | `pnpm check`                        | Format check, lint, typecheck, and tests.                                         |
 | `pnpm check:enums`                  | Verify Prisma and shared platform enum values do not drift.                       |

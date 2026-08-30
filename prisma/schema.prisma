@@ -226,6 +226,27 @@ enum TaxMatchStatus {
   NEEDS_REVIEW
 }
 
+enum FinancialRecordType {
+  TRANSACTION
+  SETTLEMENT
+  INVOICE
+  TAX_LINE
+  CASH_MOVEMENT
+  EXPENSE_CLAIM
+}
+
+enum MutationOperation {
+  UPDATE
+}
+
+enum MutationStatus {
+  PENDING_APPROVAL
+  EXECUTED
+  REJECTED
+  FAILED
+  EXPIRED
+}
+
 model Organization {
   id                 String                  @id
   name               String
@@ -254,6 +275,7 @@ model Organization {
   approvalPolicies   ApprovalPolicy[]
   spendLimits        SpendLimit[]
   importBatches      ImportBatch[]
+  mutationProposals  MutationProposal[]
 }
 
 model User {
@@ -278,6 +300,8 @@ model User {
   createdSpendLimits     SpendLimit[]        @relation("SpendLimitCreator")
   updatedSpendLimits     SpendLimit[]        @relation("SpendLimitUpdater")
   importBatches          ImportBatch[]
+  requestedMutations     MutationProposal[] @relation("MutationRequester")
+  approvedMutations      MutationProposal[] @relation("MutationApprover")
 }
 
 model Settlement {
@@ -290,6 +314,8 @@ model Settlement {
   gstAmount      Decimal       @db.Decimal(18, 2)
   refundAmount   Decimal       @db.Decimal(18, 2)
   settledAt      DateTime
+  version        Int           @default(1)
+  updatedAt      DateTime      @updatedAt
   organization   Organization  @relation(fields: [organizationId], references: [id])
   transactions   Transaction[]
 
@@ -306,6 +332,8 @@ model Transaction {
   occurredAt     DateTime
   settlementId   String?
   sourceMetadata Json?
+  version        Int               @default(1)
+  updatedAt      DateTime          @updatedAt
   organization   Organization      @relation(fields: [organizationId], references: [id])
   settlement     Settlement?       @relation(fields: [settlementId], references: [id])
 
@@ -327,6 +355,8 @@ model Invoice {
   status         String                @default("OPEN")
   sourceMetadata Json?
   importBatchId  String?
+  version        Int                   @default(1)
+  updatedAt      DateTime              @updatedAt
   organization   Organization          @relation(fields: [organizationId], references: [id])
   node           OrganizationNode?     @relation(fields: [nodeId], references: [id])
   importBatch    ImportBatch?          @relation(fields: [importBatchId], references: [id])
@@ -348,6 +378,8 @@ model TaxLine {
   taxPeriod         String?
   counterpartyTaxId String?
   sourceMetadata    Json?
+  version           Int            @default(1)
+  updatedAt         DateTime       @updatedAt
   organization      Organization   @relation(fields: [organizationId], references: [id])
 
   @@unique([organizationId, externalId])
@@ -447,6 +479,8 @@ model AuditLog {
   entityType     String
   entityId       String?
   details        Json?
+  actorType      String       @default("USER")
+  source         String       @default("APPLICATION")
   createdAt      DateTime     @default(now())
   organization   Organization @relation(fields: [organizationId], references: [id])
 }
@@ -506,12 +540,44 @@ model CashMovement {
   sourceType     String
   sourceId       String?
   sourceMetadata Json?
+  version        Int                  @default(1)
+  updatedAt      DateTime             @updatedAt
   organization   Organization         @relation(fields: [organizationId], references: [id])
   account        CashAccount          @relation(fields: [accountId], references: [id])
 
   @@unique([organizationId, externalId])
   @@index([organizationId, direction, status, occurredAt])
   @@index([organizationId, category, occurredAt])
+}
+
+model MutationProposal {
+  id               String              @id @default(cuid())
+  organizationId   String
+  requestedById    String
+  approvedById     String?
+  threadId         String?
+  operation        MutationOperation   @default(UPDATE)
+  entityType       FinancialRecordType
+  entityId         String
+  recordExternalId String
+  status           MutationStatus      @default(PENDING_APPROVAL)
+  reason           String
+  before           Json
+  after            Json
+  diff             Json
+  expectedVersion  Int
+  expiresAt        DateTime
+  decidedAt        DateTime?
+  executedAt       DateTime?
+  failureReason    String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  organization     Organization        @relation(fields: [organizationId], references: [id])
+  requestedBy      User                @relation("MutationRequester", fields: [requestedById], references: [id])
+  approvedBy       User?               @relation("MutationApprover", fields: [approvedById], references: [id])
+
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, entityType, entityId])
 }
 
 model Adjustment {
@@ -645,6 +711,7 @@ model ExpenseClaim {
   approvedAt         DateTime?
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
+  version            Int                   @default(1)
   organization       Organization          @relation(fields: [organizationId], references: [id])
   claimant           User                  @relation("ExpenseClaimant", fields: [claimantUserId], references: [id])
   approvedBy         User?                 @relation("ExpenseApprover", fields: [approvedById], references: [id])

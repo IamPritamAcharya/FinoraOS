@@ -442,6 +442,22 @@
   background: linear-gradient(135deg, #f8fbff, #fff);
   padding: 18px;
 }
+
+.recordEditor {
+  margin-bottom: 18px;
+  border: 1px solid var(--finora-border);
+  border-radius: 14px;
+  background: var(--finora-surface);
+  box-shadow: 0 16px 36px -30px rgb(18 23 43 / 28%);
+  padding: 18px;
+}
+
+.recordEditorGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 16px 0;
+}
 .importPanel h2,
 .importPanel p {
   margin: 0;
@@ -514,5 +530,11 @@
   }
   .importResult small {
     margin-left: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .recordEditorGrid {
+    grid-template-columns: 1fr;
   }
 }

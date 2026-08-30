@@ -80,6 +80,8 @@ export class AgentsService {
         data: {
           organizationId: exception.organizationId,
           actor: 'Exception Investigator',
+          actorType: 'AGENT',
+          source: 'EXCEPTION_INVESTIGATOR',
           action: 'PROPOSED_RESOLUTION',
           entityType: 'Exception',
           entityId: exceptionId,

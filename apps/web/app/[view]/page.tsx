@@ -9,6 +9,7 @@ const workspaceViews = new Set([
   'intelligence',
   'notifications',
   'operations',
+  'audit',
 ]);
 
 export default async function ViewPage({ params }: { params: Promise<{ view: string }> }) {

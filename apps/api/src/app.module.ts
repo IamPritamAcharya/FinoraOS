@@ -7,6 +7,8 @@ import { ReconciliationModule } from './modules/reconciliation/reconciliation.mo
 import { AgentsModule } from './modules/agents/agents.module.js';
 import { ChatModule } from './modules/chat/chat.module.js';
 import { WorkspaceModule } from './modules/workspace/workspace.module.js';
+import { AuditModule } from './modules/audit/audit.module.js';
+import { RecordMutationModule } from './modules/mutations/record-mutation.module.js';
 @Module({
   imports: [
     PrismaModule,
@@ -17,6 +19,8 @@ import { WorkspaceModule } from './modules/workspace/workspace.module.js';
     AgentsModule,
     ChatModule,
     WorkspaceModule,
+    AuditModule,
+    RecordMutationModule,
   ],
 })
 export class AppModule {}

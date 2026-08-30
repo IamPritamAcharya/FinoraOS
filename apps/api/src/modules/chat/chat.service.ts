@@ -31,6 +31,7 @@ export class ChatService {
     message: string,
     clientContext: FinanceChatContext[] = [],
     threadId?: string,
+    writeMode = false,
   ) {
     const thread = await this.chats.getOrCreateThread(principal, {
       threadId,
@@ -45,6 +46,7 @@ export class ChatService {
       organizationId: principal.organizationId,
       contextMessages: context.length,
       contextMode: useContext ? 'follow-up' : 'standalone',
+      writeMode,
     });
     const currentDate = new Date().toISOString();
     const skills = await this.tools.activeSkills(principal);
@@ -57,9 +59,9 @@ export class ChatService {
           return completion.text;
         },
       },
-      this.tools.forPrincipal(principal, currentDate),
+      this.tools.forPrincipal(principal, currentDate, { writeMode, threadId: thread.id }),
       5,
-    ).run({ message, context, currentDate, skills });
+    ).run({ message, context, currentDate, skills, writeMode });
     const artifacts = result.observations.flatMap((item) => (item.artifact ? [item.artifact] : []));
     const references = [...new Set(result.observations.flatMap((item) => item.references ?? []))];
     const payload = {

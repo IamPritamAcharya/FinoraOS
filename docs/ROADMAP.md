@@ -9,6 +9,7 @@
 - [x] Keycloak login, workspace roles/permissions, and tenant-safe agent reads.
 - [x] Editable organization tree/canvas, node budgets, deterministic spend/category limits, audited invoice/expense imports, categorized receipt upload, limit notifications, custom skills, agent audit, and policy/integration/job control surfaces.
 - [x] Razorpay test-mode read adapter and Slack outbound reminder adapter.
+- [x] Single-record creation/editing, tenant-scoped unified audit, and approval-gated chat write mode with a restricted database executor.
 
 ## V1.x — Close the new operational loops
 

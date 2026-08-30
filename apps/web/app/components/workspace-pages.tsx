@@ -101,7 +101,133 @@ export function WorkspacePage({ view }: { view: string }) {
   if (view === 'expenses') return <ExpensesPage />;
   if (view === 'intelligence') return <IntelligencePage />;
   if (view === 'notifications') return <NotificationsPage />;
+  if (view === 'audit') return <AuditPage />;
   return <OperationsPage />;
+}
+
+function AuditPage() {
+  const { data, loading, error, load } = useWorkspaceData<Json>('/audit?limit=150');
+  const [tab, setTab] = useState<'events' | 'agents'>('events');
+  const [query, setQuery] = useState('');
+  const events = Array.isArray(data?.events) ? (data.events as Json[]) : [];
+  const runs = Array.isArray(data?.agentRuns) ? (data.agentRuns as Json[]) : [];
+  const visibleEvents = events.filter((event) =>
+    JSON.stringify(event).toLowerCase().includes(query.toLowerCase()),
+  );
+  const visibleRuns = runs.filter((run) =>
+    JSON.stringify(run).toLowerCase().includes(query.toLowerCase()),
+  );
+  return (
+    <>
+      <Header
+        eyebrow="TENANT-SCOPED CONTROL LOG"
+        title="Audit"
+        copy="One immutable view of record edits, approvals, organization changes, budgets, agents, imports, and system actions."
+        action={
+          <FinoraButton variant="secondary" onClick={() => void load()}>
+            Refresh
+          </FinoraButton>
+        }
+      />
+      <AsyncState loading={loading} error={error} />
+      {data && (
+        <>
+          <div className={styles.metricStrip}>
+            <div>
+              <strong>{String((data.summary as Json)?.events ?? 0)}</strong>
+              <span>Audit events</span>
+            </div>
+            <div>
+              <strong>{String((data.summary as Json)?.agentRuns ?? 0)}</strong>
+              <span>Agent runs</span>
+            </div>
+            <div>
+              <strong>{String((data.summary as Json)?.mutations ?? 0)}</strong>
+              <span>Governed mutations</span>
+            </div>
+          </div>
+          <section className={styles.panel}>
+            <div className={styles.panelHead}>
+              <div className={styles.headerActions}>
+                <FinoraButton
+                  size="small"
+                  variant={tab === 'events' ? 'primary' : 'ghost'}
+                  onClick={() => setTab('events')}
+                >
+                  Site-wide events
+                </FinoraButton>
+                <FinoraButton
+                  size="small"
+                  variant={tab === 'agents' ? 'primary' : 'ghost'}
+                  onClick={() => setTab('agents')}
+                >
+                  Agent runs
+                </FinoraButton>
+              </div>
+              <FinoraInput
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search action, record, actor…"
+              />
+            </div>
+            <div className={styles.auditTimeline}>
+              {tab === 'events'
+                ? visibleEvents.map((event) => {
+                    const actor = (event.actorUser as Json | null) ?? null;
+                    return (
+                      <article key={String(event.id)} className={styles.auditEvent}>
+                        <span className={styles.auditDot} />
+                        <div>
+                          <strong>{String(event.action).replaceAll('_', ' ')}</strong>
+                          <p>
+                            {String(event.entityType)}
+                            {event.entityId ? ` · ${String(event.entityId)}` : ''}
+                          </p>
+                          <small>
+                            {actor
+                              ? `${String(actor.name)} · ${String(actor.email)}`
+                              : String(event.actorType ?? 'SYSTEM')}{' '}
+                            · {String(event.source ?? 'APPLICATION')}
+                          </small>
+                        </div>
+                        <time>
+                          {new Intl.DateTimeFormat('en-IN', {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          }).format(new Date(String(event.createdAt)))}
+                        </time>
+                      </article>
+                    );
+                  })
+                : visibleRuns.map((run) => (
+                    <article key={String(run.id)} className={styles.auditEvent}>
+                      <span className={styles.auditDot} />
+                      <div>
+                        <strong>{String(run.agentType).replaceAll('_', ' ')}</strong>
+                        <p>
+                          {String(run.status)} · {Array.isArray(run.steps) ? run.steps.length : 0}{' '}
+                          controlled steps
+                        </p>
+                        <small>
+                          {run.skill
+                            ? `Skill: ${String((run.skill as Json).name)} v${String((run.skill as Json).version)}`
+                            : 'Finora controller'}
+                        </small>
+                      </div>
+                      <time>
+                        {new Intl.DateTimeFormat('en-IN', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        }).format(new Date(String(run.startedAt)))}
+                      </time>
+                    </article>
+                  ))}
+            </div>
+          </section>
+        </>
+      )}
+    </>
+  );
 }
 
 function OrganizationPage() {

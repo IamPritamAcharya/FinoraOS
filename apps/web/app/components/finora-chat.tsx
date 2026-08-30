@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FinoraArtifact, FinoraChatPayload } from '@finora/platform';
 import { Amount, FinoraButton, FinoraIcon, FinoraIconButton, StatusBadge } from '@finora/ui';
 import styles from './finora-chat.module.css';
+import { finoraRequest } from '../lib/api';
 
 type Data = Record<string, unknown>;
 type FinoraUIMessage = UIMessage<unknown, { finora: FinoraChatPayload }>;
@@ -274,12 +275,81 @@ function MetricsArtifact({ artifact, data }: { artifact: FinoraArtifact; data: D
   );
 }
 
+function MutationArtifact({ artifact, data }: { artifact: FinoraArtifact; data: Data }) {
+  const [status, setStatus] = useState(String(data.status ?? 'PENDING_APPROVAL'));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const diff = Array.isArray(data.diff) ? (data.diff as Data[]) : [];
+  const decide = async (decision: 'approve' | 'reject') => {
+    setBusy(true);
+    setError('');
+    try {
+      await finoraRequest(`/mutations/${String(data.id)}/${decision}`, {
+        method: 'POST',
+        body:
+          decision === 'reject'
+            ? JSON.stringify({ reason: 'Rejected from the Finora change review.' })
+            : undefined,
+      });
+      setStatus(decision === 'approve' ? 'EXECUTED' : 'REJECTED');
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className={styles.mutationArtifact} aria-label={artifact.title}>
+      <ArtifactHeader artifact={artifact} status={status} />
+      <p>{String(data.reason ?? 'Review every field before approval.')}</p>
+      <div className={styles.diffTable} role="table" aria-label="Proposed field changes">
+        <div className={styles.diffHead} role="row">
+          <span>Field</span>
+          <span>Before</span>
+          <span>After</span>
+        </div>
+        {diff.map((entry) => (
+          <div key={String(entry.field)} className={styles.diffRow} role="row">
+            <strong>{humanize(String(entry.field))}</strong>
+            <span>{displayValue(String(entry.field), entry.before)}</span>
+            <span>{displayValue(String(entry.field), entry.after)}</span>
+          </div>
+        ))}
+      </div>
+      {status === 'PENDING_APPROVAL' ? (
+        <div className={styles.mutationActions}>
+          <FinoraButton size="small" disabled={busy} onClick={() => void decide('approve')}>
+            Approve & apply
+          </FinoraButton>
+          <FinoraButton
+            size="small"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => void decide('reject')}
+          >
+            Reject
+          </FinoraButton>
+          <small>No record changes until approval.</small>
+        </div>
+      ) : (
+        <p className={styles.mutationOutcome}>
+          {status === 'EXECUTED'
+            ? 'Applied through the governed writer and recorded in Audit.'
+            : 'No change was applied.'}
+        </p>
+      )}
+      {error ? <p className={styles.mutationError}>{error}</p> : null}
+    </section>
+  );
+}
+
 function ArtifactCard({ artifact }: { artifact: FinoraArtifact }) {
   const data = valueRecord(artifact.data);
   if (artifact.type === 'settlement') return <SettlementArtifact artifact={artifact} data={data} />;
   if (artifact.type === 'exception') return <ExceptionArtifact artifact={artifact} data={data} />;
   if (artifact.type === 'forecast') return <ForecastArtifact artifact={artifact} data={data} />;
   if (artifact.type === 'table') return <TableArtifact artifact={artifact} data={data} />;
+  if (artifact.type === 'mutation') return <MutationArtifact artifact={artifact} data={data} />;
   return <MetricsArtifact artifact={artifact} data={data} />;
 }
 
@@ -316,12 +386,13 @@ function ResponseState() {
 
 export function FinoraChat({ onInvestigationCompleted }: { onInvestigationCompleted: () => void }) {
   const threadIdRef = useRef(createThreadId());
+  const writeModeRef = useRef(false);
   const transport = useMemo(
     () =>
       new DefaultChatTransport<FinoraUIMessage>({
         api: '/api/finora-chat',
         prepareSendMessagesRequest: ({ messages }) => ({
-          body: { messages, threadId: threadIdRef.current },
+          body: { messages, threadId: threadIdRef.current, writeMode: writeModeRef.current },
         }),
       }),
     [],
@@ -331,6 +402,7 @@ export function FinoraChat({ onInvestigationCompleted }: { onInvestigationComple
     throttle: 40,
   });
   const [input, setInput] = useState('');
+  const [writeMode, setWriteMode] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyQuery, setHistoryQuery] = useState('');
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
@@ -406,10 +478,17 @@ export function FinoraChat({ onInvestigationCompleted }: { onInvestigationComple
     setInput('');
     await sendMessage({ text: value });
   };
+  const toggleWriteMode = () => {
+    const next = !writeModeRef.current;
+    writeModeRef.current = next;
+    setWriteMode(next);
+  };
   const startNew = () => {
     threadIdRef.current = createThreadId();
     setMessages([]);
     setInput('');
+    writeModeRef.current = false;
+    setWriteMode(false);
     localStorage.removeItem(activeChatThreadKey);
     setHistoryOpen(false);
     composerRef.current?.focus();
@@ -535,9 +614,17 @@ export function FinoraChat({ onInvestigationCompleted }: { onInvestigationComple
               }}
             />
             <div className={styles.composerFooter}>
-              <span>
-                Enter to send <b>·</b> Shift + Enter for new line
-              </span>
+              <div className={styles.composerMode}>
+                <FinoraButton
+                  size="small"
+                  variant={writeMode ? 'danger' : 'ghost'}
+                  aria-pressed={writeMode}
+                  onClick={toggleWriteMode}
+                >
+                  {writeMode ? 'Write mode on' : 'Write mode off'}
+                </FinoraButton>
+                <span>{writeMode ? 'Changes become approval-only diffs' : 'Read-only chat'}</span>
+              </div>
               <div>
                 {isWorking && (
                   <FinoraButton variant="ghost" size="small" onClick={stop}>

@@ -203,6 +203,27 @@ export const FinanceToolCallSchema = z.discriminatedUnion('tool', [
     tool: z.literal('findReconciliationRuns'),
     arguments: z.object({ limit: optionalLimit }),
   }),
+  z.object({
+    tool: z.literal('proposeRecordUpdate'),
+    arguments: z.object({
+      entityType: z.enum([
+        'TRANSACTION',
+        'SETTLEMENT',
+        'INVOICE',
+        'TAX_LINE',
+        'CASH_MOVEMENT',
+        'EXPENSE_CLAIM',
+      ]),
+      recordId: z.string().trim().min(1).max(128),
+      changes: z
+        .record(
+          z.string(),
+          z.union([z.string().max(500), z.number().finite(), z.boolean(), z.null()]),
+        )
+        .refine((changes) => Object.keys(changes).length > 0, 'At least one change is required.'),
+      reason: z.string().trim().min(3).max(500),
+    }),
+  }),
 ]);
 
 export type FinanceToolCall = z.infer<typeof FinanceToolCallSchema>;
@@ -228,7 +249,7 @@ const AgentDecisionSchema = z.discriminatedUnion('type', [
 ]);
 
 export type FinanceArtifact = {
-  type: 'metrics' | 'table' | 'settlement' | 'exception' | 'forecast' | 'profile';
+  type: 'metrics' | 'table' | 'settlement' | 'exception' | 'forecast' | 'profile' | 'mutation';
   title: string;
   data: Record<string, unknown>;
   href?: string;
@@ -287,7 +308,8 @@ const toolGuide = `Available tools:
 - findExceptions: open exception queue with an optional minimum variance.
 - getCashForecast: current balance and scheduled cash movements.
 - findUnmatchedTaxLines: unmatched tax lines.
-- findAuditEvents / findAgentRuns / findReconciliationRuns: operational history.`;
+- findAuditEvents / findAgentRuns / findReconciliationRuns: operational history.
+- proposeRecordUpdate: prepare a typed before/after diff. It never writes and is available only when the user explicitly enabled write mode.`;
 
 const system = `You are Finora, the finance operations copilot inside FinoraOS. Work in short, grounded steps.
 Return exactly one JSON object and nothing else.
@@ -295,7 +317,7 @@ If evidence is required, return {"type":"tool","call":{"tool":"...","arguments":
 For multi-part questions, return all independent reads together as {"type":"tools","calls":[{"tool":"...","arguments":{}},{"tool":"...","arguments":{}}]}.
 After tools return evidence, return {"type":"answer","answer":"natural concise answer","citations":["call-1"]}.
 If a necessary detail is genuinely missing, return {"type":"clarify","question":"one concise question"}.
-Never invent values or claim a tool failed when it returned data. Prefer finance language over database language. Use summary tools for totals and find tools for record lists. Use getExpenseSummary for expenses/spend/costs/outflows, not findTransactions. Use getCurrentUser for "my" profile questions. The current user message is authoritative. Conversation context is reference material only: ignore an old clarification when the current message names a new topic, period, or record. Never ask again for a detail already supplied, and never repeat a previous clarification. "Last" and "latest" mean the newest matching record and do not require a date range. Use conversation context for genuinely short follow-ups and resolve pronouns from the latest referenced record. You may call several tools before answering comparisons or multi-part questions. Never write SQL or create unlisted tools. Never investigate or mutate unless explicitly requested.
+Never invent values or claim a tool failed when it returned data. Prefer finance language over database language. Use summary tools for totals and find tools for record lists. Use getExpenseSummary for expenses/spend/costs/outflows, not findTransactions. Use getCurrentUser for "my" profile questions. The current user message is authoritative. Conversation context is reference material only: ignore an old clarification when the current message names a new topic, period, or record. Never ask again for a detail already supplied, and never repeat a previous clarification. "Last" and "latest" mean the newest matching record and do not require a date range. Use conversation context for genuinely short follow-ups and resolve pronouns from the latest referenced record. You may call several tools before answering comparisons or multi-part questions. Never write SQL or create unlisted tools. Never investigate unless explicitly requested. A record update request must use proposeRecordUpdate, must name the exact record and fields, and only prepares a diff; never claim the change is applied. The user approves or rejects the diff outside the model.
 Workspace skills are approved operating procedures supplied in the prompt. Select a skillId only when the request clearly matches it. A skill can narrow behavior but never override these safety rules, and every selected tool must appear in that skill's allowedTools.
 ${toolGuide}`;
 
@@ -427,6 +449,7 @@ export class FinanceAgent {
     context?: FinanceChatContext[];
     currentDate: string;
     skills?: FinanceSkillContext[];
+    writeMode?: boolean;
   }): Promise<FinanceAgentResult> {
     const observations: ToolObservation[] = [];
     const activity: FinanceAgentResult['activity'] = [];
@@ -441,9 +464,12 @@ export class FinanceAgent {
     )
       ? latestControlledReference(input.context ?? [])
       : undefined;
-    const fastLane = deterministicFastLane(
-      contextualReference ? `${input.message} ${contextualReference}` : input.message,
-    );
+    const mutationIntent = /\b(change|update|edit|set|correct|replace|mark)\b/i.test(input.message);
+    const fastLane = mutationIntent
+      ? undefined
+      : deterministicFastLane(
+          contextualReference ? `${input.message} ${contextualReference}` : input.message,
+        );
     if (fastLane) {
       const callId = 'call-1';
       try {
@@ -483,7 +509,7 @@ export class FinanceAgent {
       let decision: z.infer<typeof AgentDecisionSchema>;
       try {
         const completion = await this.model.complete({
-          system,
+          system: `${system}\nWrite mode is ${input.writeMode ? 'ENABLED. You may prepare a proposeRecordUpdate tool call for an explicit update request.' : 'DISABLED. Do not select proposeRecordUpdate; tell the user to enable write mode if they request a change.'}`,
           responseFormat: 'json',
           prompt: normalizeForPrompt({
             currentDate: input.currentDate,
@@ -546,6 +572,14 @@ export class FinanceAgent {
       }
 
       const plannedCalls = decision.type === 'tools' ? decision.calls : [decision.call];
+      if (plannedCalls.some((call) => call.tool === 'proposeRecordUpdate') && !input.writeMode) {
+        return {
+          text: 'Write mode is off. Enable it in the composer before asking Finora to prepare a record change.',
+          observations,
+          activity,
+          clarified: false,
+        };
+      }
       const selectedSkill = decision.skillId
         ? (input.skills ?? []).find((skill) => skill.id === decision.skillId)
         : undefined;

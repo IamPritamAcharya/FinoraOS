@@ -14,6 +14,7 @@ import {
 import { AgentReadService } from './agent-read.service.js';
 import { AgentsService } from './agents.service.js';
 import { apiLogger } from '../../common/api-logger.js';
+import { RecordMutationService } from '../mutations/record-mutation.service.js';
 
 const plain = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const label = (value: string) =>
@@ -28,10 +29,15 @@ export class FinanceToolsService {
   constructor(
     private readonly reads: AgentReadService,
     private readonly agents: AgentsService,
+    private readonly mutations: RecordMutationService,
   ) {}
 
-  forPrincipal(principal: RequestPrincipal, asOf: string): FinanceToolExecutor {
-    return { execute: (call, callId) => this.executeFor(principal, call, callId, asOf) };
+  forPrincipal(
+    principal: RequestPrincipal,
+    asOf: string,
+    options: { writeMode?: boolean; threadId?: string } = {},
+  ): FinanceToolExecutor {
+    return { execute: (call, callId) => this.executeFor(principal, call, callId, asOf, options) };
   }
 
   async activeSkills(principal: RequestPrincipal) {
@@ -54,6 +60,7 @@ export class FinanceToolsService {
     call: FinanceToolCall,
     callId: string,
     asOf: string,
+    options: { writeMode?: boolean; threadId?: string },
   ): Promise<ToolObservation> {
     const organizationId = principal.organizationId;
     apiLogger.info('Finance tool selected', {
@@ -555,6 +562,26 @@ export class FinanceToolsService {
             data: { rows: plain(rows) },
             href: '/reconciliation',
           },
+        };
+      }
+      case 'proposeRecordUpdate': {
+        const proposal = await this.mutations.propose(
+          principal,
+          { ...call.arguments, operation: 'UPDATE' },
+          { writeMode: options.writeMode === true, threadId: options.threadId },
+        );
+        return {
+          callId,
+          tool: call.tool,
+          summary: `I prepared a ${Array.isArray(proposal.diff) ? proposal.diff.length : 0}-field change for ${proposal.recordExternalId}. Review the before-and-after diff below; nothing has been written yet.`,
+          data: plain(proposal),
+          artifact: {
+            type: 'mutation',
+            title: `Proposed change · ${proposal.recordExternalId}`,
+            data: plain(proposal),
+            href: '/audit',
+          },
+          references: [proposal.recordExternalId, proposal.id],
         };
       }
     }

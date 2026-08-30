@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { money } from '@finora/platform';
+import { FinancialRecordType, money } from '@finora/platform';
 import {
   Amount,
   FinoraButton,
@@ -16,7 +16,13 @@ import { finoraRequest as request } from '../lib/api';
 
 type Data = Record<string, unknown>;
 type FinanceView = 'overview' | 'records' | 'reconciliation' | 'exceptions';
-type RecordTab = 'transactions' | 'settlements' | 'invoices' | 'tax-lines' | 'cash-movements';
+type RecordTab =
+  | 'transactions'
+  | 'settlements'
+  | 'invoices'
+  | 'tax-lines'
+  | 'cash-movements'
+  | 'expense-claims';
 function PageHeader({
   title,
   eyebrow = 'FINANCE OPERATIONS',
@@ -416,7 +422,17 @@ const tabLabels: Array<{ id: RecordTab; label: string }> = [
   { id: 'invoices', label: 'Invoices' },
   { id: 'tax-lines', label: 'Tax lines' },
   { id: 'cash-movements', label: 'Cash movements' },
+  { id: 'expense-claims', label: 'Expenses' },
 ];
+
+const recordTypes: Record<RecordTab, FinancialRecordType> = {
+  transactions: FinancialRecordType.TRANSACTION,
+  settlements: FinancialRecordType.SETTLEMENT,
+  invoices: FinancialRecordType.INVOICE,
+  'tax-lines': FinancialRecordType.TAX_LINE,
+  'cash-movements': FinancialRecordType.CASH_MOVEMENT,
+  'expense-claims': FinancialRecordType.EXPENSE_CLAIM,
+};
 
 function RecordsPage() {
   const router = useRouter();
@@ -429,10 +445,12 @@ function RecordsPage() {
     invoices: [],
     'tax-lines': [],
     'cash-movements': [],
+    'expense-claims': [],
   });
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
   const [showImport, setShowImport] = useState(false);
+  const [editor, setEditor] = useState<{ mode: 'create' | 'edit'; row?: Data } | null>(null);
   const [importResult, setImportResult] = useState<Data | null>(null);
   const loadRecords = useCallback(
     () =>
@@ -461,9 +479,14 @@ function RecordsPage() {
       <PageHeader
         title="Records"
         action={
-          <FinoraButton onClick={() => setShowImport((value) => !value)}>
-            {showImport ? 'Close import' : 'Import records'}
-          </FinoraButton>
+          <div className={styles.rowActions}>
+            <FinoraButton variant="secondary" onClick={() => setShowImport((value) => !value)}>
+              {showImport ? 'Close import' : 'Import CSV'}
+            </FinoraButton>
+            <FinoraButton onClick={() => setEditor({ mode: 'create' })}>
+              Create one record
+            </FinoraButton>
+          </div>
         }
       />
       {showImport && (
@@ -489,6 +512,17 @@ function RecordsPage() {
             </small>
           ) : null}
         </div>
+      )}
+      {editor && (
+        <RecordEditor
+          tab={tab}
+          row={editor.row}
+          onClose={() => setEditor(null)}
+          onSaved={async () => {
+            setEditor(null);
+            await loadRecords();
+          }}
+        />
       )}
       <div className={styles.recordToolbar}>
         <div className={styles.tabs}>
@@ -521,7 +555,11 @@ function RecordsPage() {
             </div>
             <span className={styles.count}>{visible.length}</span>
           </div>
-          <RecordTable tab={tab} rows={visible} />
+          <RecordTable
+            tab={tab}
+            rows={visible}
+            onEdit={(row) => setEditor({ mode: 'edit', row })}
+          />
         </section>
       )}
     </>
@@ -592,7 +630,15 @@ function RecordImport({ onImported }: { onImported: (result: Data) => Promise<vo
   );
 }
 
-function RecordTable({ tab, rows }: { tab: RecordTab; rows: Data[] }) {
+function RecordTable({
+  tab,
+  rows,
+  onEdit,
+}: {
+  tab: RecordTab;
+  rows: Data[];
+  onEdit: (row: Data) => void;
+}) {
   return (
     <div className={styles.tableWrap}>
       <table>
@@ -603,6 +649,7 @@ function RecordTable({ tab, rows }: { tab: RecordTab; rows: Data[] }) {
             <th>Type</th>
             <th>Status</th>
             <th>Amount</th>
+            <th aria-label="Actions" />
           </tr>
         </thead>
         <tbody>
@@ -638,10 +685,328 @@ function RecordTable({ tab, rows }: { tab: RecordTab; rows: Data[] }) {
               <td>
                 <Amount value={String(item.amount ?? item.receivedAmount ?? '0')} />
               </td>
+              <td>
+                <FinoraButton size="small" variant="ghost" onClick={() => onEdit(item)}>
+                  Edit
+                </FinoraButton>
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+type RecordField = {
+  name: string;
+  label: string;
+  type?: 'text' | 'number' | 'datetime-local' | 'select';
+  required?: boolean;
+  options?: Array<{ value: string; label: string }>;
+};
+
+const categoryOptions = [
+  'COLLECTION',
+  'GATEWAY_FEE',
+  'GST',
+  'REFUND',
+  'VENDOR_PAYMENT',
+  'PAYROLL',
+  'RENT',
+  'TAX_PAYMENT',
+  'TRAVEL',
+  'MEALS',
+  'LODGING',
+  'LOCAL_TRANSPORT',
+  'SOFTWARE',
+  'OFFICE_SUPPLIES',
+  'MARKETING',
+  'PROFESSIONAL_SERVICES',
+  'UTILITIES',
+  'OTHER',
+].map((value) => ({ value, label: value.replaceAll('_', ' ') }));
+
+const fixedOptions = (values: string[]) =>
+  values.map((value) => ({ value, label: value.replaceAll('_', ' ') }));
+
+const fieldsFor = (tab: RecordTab, options: Data): RecordField[] => {
+  const nodes = Array.isArray(options.nodes) ? (options.nodes as Data[]) : [];
+  const users = Array.isArray(options.users) ? (options.users as Data[]) : [];
+  const accounts = Array.isArray(options.accounts) ? (options.accounts as Data[]) : [];
+  const settlements = Array.isArray(options.settlements) ? (options.settlements as Data[]) : [];
+  const commonAmount: RecordField[] = [
+    { name: 'amount', label: 'Amount', type: 'number', required: true },
+    { name: 'currency', label: 'Currency', required: true },
+  ];
+  if (tab === 'transactions')
+    return [
+      ...commonAmount,
+      {
+        name: 'status',
+        label: 'Status',
+        type: 'select',
+        options: fixedOptions(['CAPTURED', 'REFUNDED', 'PENDING']),
+      },
+      { name: 'occurredAt', label: 'Occurred at', type: 'datetime-local', required: true },
+      {
+        name: 'settlementId',
+        label: 'Settlement',
+        type: 'select',
+        options: settlements.map((item) => ({
+          value: String(item.id),
+          label: String(item.externalId),
+        })),
+      },
+    ];
+  if (tab === 'settlements')
+    return [
+      { name: 'expectedAmount', label: 'Expected amount', type: 'number', required: true },
+      { name: 'receivedAmount', label: 'Received amount', type: 'number', required: true },
+      { name: 'feeAmount', label: 'Gateway fee', type: 'number', required: true },
+      { name: 'gstAmount', label: 'GST', type: 'number', required: true },
+      { name: 'refundAmount', label: 'Refunds', type: 'number', required: true },
+      { name: 'settledAt', label: 'Settled at', type: 'datetime-local', required: true },
+    ];
+  if (tab === 'invoices')
+    return [
+      ...commonAmount,
+      { name: 'vendor', label: 'Vendor' },
+      {
+        name: 'direction',
+        label: 'Direction',
+        type: 'select',
+        options: fixedOptions(['PAYABLE', 'RECEIVABLE']),
+      },
+      { name: 'category', label: 'Category', type: 'select', options: categoryOptions },
+      { name: 'status', label: 'Status' },
+      {
+        name: 'nodeId',
+        label: 'Organization node',
+        type: 'select',
+        options: nodes.map((item) => ({
+          value: String(item.id),
+          label: `${String(item.name)} · ${String(item.code)}`,
+        })),
+      },
+      { name: 'issuedAt', label: 'Issued at', type: 'datetime-local', required: true },
+      { name: 'dueAt', label: 'Due at', type: 'datetime-local' },
+    ];
+  if (tab === 'tax-lines')
+    return [
+      { name: 'amount', label: 'Tax amount', type: 'number', required: true },
+      { name: 'taxRate', label: 'Tax rate', type: 'number', required: true },
+      { name: 'taxType', label: 'Tax type', required: true },
+      { name: 'taxPeriod', label: 'Tax period' },
+      { name: 'counterpartyTaxId', label: 'Counterparty tax ID' },
+      {
+        name: 'matchStatus',
+        label: 'Match status',
+        type: 'select',
+        options: fixedOptions(['MATCHED', 'AMBIGUOUS', 'UNMATCHED', 'NEEDS_REVIEW']),
+      },
+    ];
+  if (tab === 'cash-movements')
+    return [
+      ...commonAmount,
+      {
+        name: 'accountId',
+        label: 'Cash account',
+        type: 'select',
+        required: true,
+        options: accounts.map((item) => ({ value: String(item.id), label: String(item.name) })),
+      },
+      {
+        name: 'direction',
+        label: 'Direction',
+        type: 'select',
+        options: fixedOptions(['INFLOW', 'OUTFLOW']),
+      },
+      { name: 'category', label: 'Category', type: 'select', options: categoryOptions },
+      {
+        name: 'status',
+        label: 'Status',
+        type: 'select',
+        options: fixedOptions(['POSTED', 'SCHEDULED', 'CANCELLED']),
+      },
+      { name: 'description', label: 'Description', required: true },
+      { name: 'counterparty', label: 'Counterparty' },
+      { name: 'occurredAt', label: 'Occurred at', type: 'datetime-local', required: true },
+    ];
+  return [
+    ...commonAmount,
+    {
+      name: 'claimantUserId',
+      label: 'Employee',
+      type: 'select',
+      required: true,
+      options: users.map((item) => ({
+        value: String(item.id),
+        label: `${String(item.name)} · ${String(item.email)}`,
+      })),
+    },
+    {
+      name: 'nodeId',
+      label: 'Organization node',
+      type: 'select',
+      required: true,
+      options: nodes.map((item) => ({
+        value: String(item.id),
+        label: `${String(item.name)} · ${String(item.code)}`,
+      })),
+    },
+    { name: 'merchant', label: 'Merchant', required: true },
+    { name: 'category', label: 'Category', type: 'select', options: categoryOptions },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: fixedOptions(['DRAFT', 'RECEIPT_REQUIRED', 'SUBMITTED', 'UNDER_REVIEW']),
+    },
+    { name: 'incurredAt', label: 'Incurred at', type: 'datetime-local', required: true },
+    { name: 'description', label: 'Description', required: true },
+  ];
+};
+
+const inputValue = (row: Data | undefined, name: string) => {
+  const value = row?.[name];
+  if (value === null || value === undefined) return '';
+  if (name.endsWith('At')) {
+    const date = new Date(String(value));
+    return Number.isNaN(date.valueOf()) ? '' : date.toISOString().slice(0, 16);
+  }
+  return String(value);
+};
+
+function RecordEditor({
+  tab,
+  row,
+  onClose,
+  onSaved,
+}: {
+  tab: RecordTab;
+  row?: Data;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const [options, setOptions] = useState<Data>({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    void request('/finance/record-options').then((value) => setOptions(value as Data));
+  }, []);
+  const fields = fieldsFor(tab, options).filter(
+    (field) => !row || (field.name !== 'accountId' && field.name !== 'claimantUserId'),
+  );
+  return (
+    <form
+      className={styles.recordEditor}
+      onSubmit={async (event) => {
+        event.preventDefault();
+        setSaving(true);
+        setError('');
+        const values = new FormData(event.currentTarget);
+        const submitted = Object.fromEntries(
+          fields
+            .map((field) => [field.name, values.get(field.name)])
+            .filter(([, value]) => value !== '' && value !== null),
+        );
+        if (tab === 'tax-lines' && submitted.matchStatus) {
+          submitted.matched = submitted.matchStatus === 'MATCHED';
+        }
+        const data = row
+          ? Object.fromEntries(
+              Object.entries(submitted).filter(
+                ([name, value]) => inputValue(row, name) !== String(value),
+              ),
+            )
+          : submitted;
+        try {
+          if (row) {
+            if (!Object.keys(data).length) {
+              setError('Change at least one field before saving.');
+              return;
+            }
+            await request(`/finance/records/${String(row.id)}`, {
+              method: 'PATCH',
+              body: JSON.stringify({
+                expectedVersion: Number(row.version ?? 1),
+                mutation: {
+                  entityType: recordTypes[tab],
+                  changes: data,
+                  reason: 'Updated from the Records workspace.',
+                },
+              }),
+            });
+          } else {
+            const externalId = String(values.get('externalId') ?? '').trim();
+            await request('/finance/records', {
+              method: 'POST',
+              body: JSON.stringify({
+                entityType: recordTypes[tab],
+                data: { externalId, ...data },
+              }),
+            });
+          }
+          await onSaved();
+        } catch (reason) {
+          setError((reason as Error).message);
+        } finally {
+          setSaving(false);
+        }
+      }}
+    >
+      <div className={styles.panelHead}>
+        <div>
+          <p className={styles.eyebrow}>{row ? 'EDIT TRACEABLE RECORD' : 'CREATE ONE RECORD'}</p>
+          <h2>{row ? String(row.externalId) : tabLabels.find((item) => item.id === tab)?.label}</h2>
+        </div>
+        <FinoraButton size="small" variant="ghost" onClick={onClose}>
+          Close
+        </FinoraButton>
+      </div>
+      <div className={styles.recordEditorGrid}>
+        {!row && (
+          <FinoraField label="Reference">
+            <FinoraInput name="externalId" required placeholder="Unique external reference" />
+          </FinoraField>
+        )}
+        {fields.map((field) => (
+          <FinoraField key={field.name} label={field.label}>
+            {field.type === 'select' ? (
+              <FinoraSelect
+                name={field.name}
+                defaultValue={inputValue(row, field.name)}
+                required={field.required}
+              >
+                <option value="">Select</option>
+                {field.options?.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </FinoraSelect>
+            ) : (
+              <FinoraInput
+                name={field.name}
+                type={field.type ?? 'text'}
+                step={field.type === 'number' ? '0.01' : undefined}
+                defaultValue={inputValue(row, field.name)}
+                required={field.required}
+              />
+            )}
+          </FinoraField>
+        ))}
+      </div>
+      <div className={styles.rowActions}>
+        <FinoraButton type="submit" disabled={saving}>
+          {saving ? 'Saving…' : row ? 'Save audited update' : 'Create record'}
+        </FinoraButton>
+        <span className={styles.muted}>
+          Every create and edit is organization-scoped and added to Audit.
+        </span>
+      </div>
+      {error ? <span className={styles.importError}>{error}</span> : null}
+    </form>
   );
 }

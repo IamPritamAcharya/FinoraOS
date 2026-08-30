@@ -3,6 +3,7 @@ import type { ReactNode, SVGProps } from 'react';
 export type FinoraIconName =
   | 'account'
   | 'add'
+  | 'audit'
   | 'chevronRight'
   | 'check'
   | 'close'
@@ -30,6 +31,13 @@ export function FinoraIcon({ name, ...props }: SVGProps<SVGSVGElement> & { name:
       </>
     ),
     add: <path d="M12 5v14M5 12h14" strokeLinecap="round" />,
+    audit: (
+      <>
+        <path d="M6 3.5h12v17H6z" strokeLinejoin="round" />
+        <path d="M9 8h6M9 12h6M9 16h3" strokeLinecap="round" />
+        <path d="m14.5 16 1.5 1.5 3-3" strokeLinecap="round" strokeLinejoin="round" />
+      </>
+    ),
     chevronRight: <path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />,
     check: <path d="m5 12.5 4.2 4.2L19 7" strokeLinecap="round" strokeLinejoin="round" />,
     close: <path d="m6 6 12 12M18 6 6 18" strokeLinecap="round" />,

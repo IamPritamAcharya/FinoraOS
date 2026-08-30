@@ -33,6 +33,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
     "db:agent-role": "tsx scripts/provision-agent-readonly-role.ts",
+    "db:agent-roles": "tsx scripts/provision-agent-readonly-role.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:if-empty": "tsx prisma/seed.ts --if-empty",
     "db:reset": "prisma migrate reset --force",

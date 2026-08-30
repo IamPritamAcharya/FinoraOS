@@ -13,6 +13,7 @@ export const workspaceViews = [
   'Intelligence',
   'Notifications',
   'Operations',
+  'Audit',
 ] as const;
 export type WorkspaceView = (typeof workspaceViews)[number];
 
@@ -27,6 +28,7 @@ const navigationItems: Array<{ label: string; view: WorkspaceView; icon: FinoraI
   { label: 'Agent control', view: 'Intelligence', icon: 'intelligence' },
   { label: 'Notifications', view: 'Notifications', icon: 'notifications' },
   { label: 'Operations', view: 'Operations', icon: 'operations' },
+  { label: 'Audit', view: 'Audit', icon: 'audit' },
 ];
 
 const employeeViews = new Set<WorkspaceView>(['Chat', 'Expenses', 'Notifications']);

@@ -19,7 +19,7 @@ const messageText = (message: IncomingMessage) =>
     .trim() ?? '';
 
 export async function POST(request: NextRequest) {
-  let payload: { messages?: IncomingMessage[]; threadId?: string };
+  let payload: { messages?: IncomingMessage[]; threadId?: string; writeMode?: boolean };
   try {
     payload = await request.json();
   } catch {
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           message,
           threadId: payload.threadId,
+          writeMode: payload.writeMode === true,
           context: (payload.messages ?? [])
             .slice(-12)
             .filter(

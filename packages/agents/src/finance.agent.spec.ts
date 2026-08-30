@@ -10,6 +10,66 @@ const expenseObservation: ToolObservation = {
 };
 
 describe('FinanceAgent', () => {
+  it('does not allow a mutation proposal while write mode is disabled', async () => {
+    const execute = vi.fn();
+    const model = {
+      complete: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          type: 'tool',
+          call: {
+            tool: 'proposeRecordUpdate',
+            arguments: {
+              entityType: 'TRANSACTION',
+              recordId: 'pay_00008',
+              changes: { status: 'REFUNDED' },
+              reason: 'Correct the payment status.',
+            },
+          },
+        }),
+      ),
+    };
+    const result = await new FinanceAgent(model, { execute }).run({
+      message: 'Change pay_00008 to refunded.',
+      currentDate: '2026-08-28T00:00:00.000Z',
+      writeMode: false,
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(result.text).toContain('Write mode is off');
+  });
+
+  it('prepares a typed mutation proposal when write mode is explicitly enabled', async () => {
+    const execute = vi.fn().mockResolvedValue({
+      callId: 'call-1',
+      tool: 'proposeRecordUpdate',
+      summary: 'Prepared a one-field diff; nothing has been written yet.',
+      data: { id: 'proposal-1', status: 'PENDING_APPROVAL' },
+      artifact: { type: 'mutation', title: 'Proposed change', data: {} },
+    });
+    const model = {
+      complete: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          type: 'tool',
+          call: {
+            tool: 'proposeRecordUpdate',
+            arguments: {
+              entityType: 'TRANSACTION',
+              recordId: 'pay_00008',
+              changes: { status: 'REFUNDED' },
+              reason: 'Correct the payment status.',
+            },
+          },
+        }),
+      ),
+    };
+    const result = await new FinanceAgent(model, { execute }, 1).run({
+      message: 'Change pay_00008 to refunded.',
+      currentDate: '2026-08-28T00:00:00.000Z',
+      writeMode: true,
+    });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(result.text).toContain('nothing has been written');
+  });
+
   it('answers budget questions from deterministic budget evidence without looping', async () => {
     const model = { complete: vi.fn() };
     const execute = vi.fn().mockResolvedValue({
