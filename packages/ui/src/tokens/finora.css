@@ -188,11 +188,24 @@
   color: var(--finora-warning);
 }
 .finora-status--unmatched,
-.finora-status--open,
 .finora-status--unresolved {
   border-color: #f0c7c3;
   background: #fff3f2;
   color: var(--finora-danger);
+}
+.finora-status--open {
+  gap: 5px;
+  border-color: #f0d8a9;
+  background: #fff9ed;
+  color: #9a6614;
+  font-weight: 780;
+}
+.finora-status--open::before {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
 }
 .finora-status--superseded {
   border-color: var(--finora-border);

@@ -186,7 +186,7 @@ function OverviewPage() {
       <div className={styles.overviewGrid}>
         <FinoraSurface className={`${styles.panel} ${styles.coveragePanel}`}>
           <div className={styles.panelHead}>
-            <div>
+            <div className={styles.panelTitle}>
               <h2>Reconciliation coverage</h2>
               <p>
                 {state.run
@@ -206,21 +206,19 @@ function OverviewPage() {
           <div className={styles.coverageLayout}>
             <div className={styles.coverageScore}>
               <strong>{coverage}%</strong>
-              <span>of records matched or approved</span>
-              <small>
-                {processed
-                  ? `${closed} of ${processed} records processed`
-                  : 'No records processed yet'}
-              </small>
+              <span>coverage</span>
             </div>
             <div className={styles.coverageDetails}>
+              <strong>
+                {processed ? `${closed} of ${processed} records` : 'No records processed yet'}
+              </strong>
+              <p>Matched or approved. Ambiguous records remain visible for finance review.</p>
               <div
                 className={styles.coverageProgress}
                 aria-label={`${coverage}% reconciliation coverage`}
               >
                 <span style={{ width: `${coverage}%` }} />
               </div>
-              <p>Ambiguous records remain visible for finance review.</p>
             </div>
           </div>
           <div className={styles.coverageFootnotes}>
@@ -258,17 +256,17 @@ function OverviewPage() {
         </FinoraSurface>
         <FinoraSurface className={`${styles.panel} ${styles.queuePanel}`}>
           <div className={styles.panelHead}>
-            <div>
+            <div className={styles.panelTitle}>
               <h2>Priority queue</h2>
               <p>
-                {open.length
-                  ? `${open.length} exceptions require a decision`
-                  : 'No active exceptions'}
+                {open.length ? 'Ranked by variance and decision state' : 'No active exceptions'}
               </p>
             </div>
-            <FinoraButton size="small" variant="ghost" onClick={() => router.push('/exceptions')}>
-              View queue <FinoraIcon name="arrowUpRight" />
-            </FinoraButton>
+            <div className={styles.queueHeadActions}>
+              <FinoraButton size="small" variant="ghost" onClick={() => router.push('/exceptions')}>
+                View queue <FinoraIcon name="arrowUpRight" />
+              </FinoraButton>
+            </div>
           </div>
           {open.length ? (
             <div className={styles.queueList}>
@@ -285,8 +283,10 @@ function OverviewPage() {
                     onClick={() => router.push('/exceptions')}
                   >
                     <span className={styles.queueReference}>
-                      <strong>{String(item.externalId)}</strong>
-                      <small>{String(item.type).replaceAll('_', ' ')}</small>
+                      <span>
+                        <strong>{String(item.externalId)}</strong>
+                        <small>{String(item.type).replaceAll('_', ' ')}</small>
+                      </span>
                     </span>
                     <span className={styles.queueVariance}>
                       <Amount value={variance} />
@@ -306,7 +306,7 @@ function OverviewPage() {
         </FinoraSurface>
         <FinoraSurface className={`${styles.panel} ${styles.settlementPanel}`}>
           <div className={styles.panelHead}>
-            <div>
+            <div className={styles.panelTitle}>
               <h2>Recent settlements</h2>
               <p>Latest source records received in this workspace</p>
             </div>
@@ -342,7 +342,11 @@ function OverviewPage() {
                     <strong>
                       <Amount value={String(settlement.receivedAmount)} />
                     </strong>
-                    <small>
+                    <small
+                      className={
+                        Number(variance) ? styles.settlementVariance : styles.settlementClear
+                      }
+                    >
                       {Number(variance) ? (
                         <>
                           Variance <Amount value={variance} />
