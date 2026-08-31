@@ -367,7 +367,10 @@ describe('FinanceAgent', () => {
     };
     const result = await new FinanceAgent(model, {
       execute: vi.fn().mockResolvedValue(expenseObservation),
-    }).run({ message: 'Tell me about expenses.', currentDate: '2026-08-26T00:00:00.000Z' });
+    }).run({
+      message: 'Compare expenses and settlements.',
+      currentDate: '2026-08-26T00:00:00.000Z',
+    });
     expect(result.text).toBe(expenseObservation.summary);
     expect(result.fallbackReason).toBe('INVALID_DECISION');
   });
@@ -564,5 +567,73 @@ describe('FinanceAgent', () => {
     });
     expect(execute).toHaveBeenCalledWith({ tool: 'getCashForecast', arguments: {} }, 'call-1');
     expect(result.text).toContain('No shortfall');
+  });
+
+  it('answers a greeting naturally without calling the model or finance tools', async () => {
+    const model = { complete: vi.fn() };
+    const execute = vi.fn();
+    const result = await new FinanceAgent(model, { execute }).run({
+      message: 'Hi Finora',
+      currentDate: '2026-08-26T00:00:00.000Z',
+      actor: { role: 'FINANCE_CONTROLLER', allowedTools: [] },
+    });
+    expect(result.text).toContain('Ask me about payments');
+    expect(model.complete).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('gives employees role-appropriate examples without exposing organization tools', async () => {
+    const model = { complete: vi.fn() };
+    const execute = vi.fn();
+    const result = await new FinanceAgent(model, { execute }).run({
+      message: 'What can you do?',
+      currentDate: '2026-08-26T00:00:00.000Z',
+      actor: { role: 'EMPLOYEE', allowedTools: ['getMyExpenseSummary', 'findMyExpenses'] },
+    });
+    expect(result.text).toContain('your expense claims');
+    expect(result.text).not.toContain('payments, settlements');
+    expect(model.complete).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('routes a last-month expense summary with an exact deterministic period', async () => {
+    const model = { complete: vi.fn() };
+    const execute = vi.fn().mockResolvedValue(expenseObservation);
+    await new FinanceAgent(model, { execute }).run({
+      message: 'Summarise our expenses last month.',
+      currentDate: '2026-08-26T00:00:00.000Z',
+      actor: { role: 'FINANCE_CONTROLLER', allowedTools: ['getExpenseSummary'] },
+    });
+    expect(execute).toHaveBeenCalledWith(
+      {
+        tool: 'getExpenseSummary',
+        arguments: {
+          from: '2026-07-01T00:00:00.000Z',
+          to: '2026-07-31T23:59:59.999Z',
+        },
+      },
+      'call-1',
+    );
+    expect(model.complete).not.toHaveBeenCalled();
+  });
+
+  it('lists transactions above an amount despite a common transaction typo', async () => {
+    const model = { complete: vi.fn() };
+    const execute = vi.fn().mockResolvedValue({
+      callId: 'call-1',
+      tool: 'findTransactions',
+      summary: 'I found 7 transactions above ₹50,000.00.',
+      data: [],
+    });
+    await new FinanceAgent(model, { execute }).run({
+      message: 'Show trasntions above ₹50,000',
+      currentDate: '2026-08-26T00:00:00.000Z',
+      actor: { role: 'FINANCE_CONTROLLER', allowedTools: ['findTransactions'] },
+    });
+    expect(execute).toHaveBeenCalledWith(
+      { tool: 'findTransactions', arguments: { minimumAmount: '50000' } },
+      'call-1',
+    );
+    expect(model.complete).not.toHaveBeenCalled();
   });
 });

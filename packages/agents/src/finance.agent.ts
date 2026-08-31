@@ -498,9 +498,6 @@ const deterministicFastLane = (
   if (invoiceId) return { tool: 'getInvoice', arguments: { invoiceId } };
   const taxLineId = message.match(/\bGST_\d{4}\b/i)?.[0]?.toUpperCase();
   if (taxLineId) return { tool: 'getTaxLine', arguments: { taxLineId } };
-  if (/\bbudget(?:s|ed|ing)?\b/i.test(message)) {
-    return { tool: 'getBudgetSummary', arguments: {} };
-  }
   if (
     /\b(last|latest|most\s+recent)\b/i.test(message) &&
     /\b(trans[a-z]*|tras[a-z]*|payments?)\b/i.test(message)
@@ -513,13 +510,89 @@ const deterministicFastLane = (
 const amountFromMessage = (message: string) =>
   message.match(/(?:₹|INR\s*)\s*([\d,]+(?:\.\d{1,2})?)/i)?.[1]?.replaceAll(',', '');
 
-/** Deterministic recovery for high-frequency intents when a small model emits invalid JSON. */
+const periodFromMessage = (message: string, currentDate: string) => {
+  const match = message.match(/\b(this|current|last|previous)\s+(week|month|quarter|year)\b/i);
+  if (!match) return {};
+  const now = new Date(currentDate);
+  if (Number.isNaN(now.getTime())) return {};
+  const previous = /last|previous/i.test(match[1]);
+  const unit = match[2].toLowerCase();
+  let from: Date;
+  let to: Date;
+
+  if (unit === 'week') {
+    const mondayOffset = (now.getUTCDay() + 6) % 7;
+    from = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - mondayOffset),
+    );
+    if (previous) from.setUTCDate(from.getUTCDate() - 7);
+    to = new Date(from);
+    to.setUTCDate(to.getUTCDate() + 6);
+  } else if (unit === 'month') {
+    const month = now.getUTCMonth() - (previous ? 1 : 0);
+    from = new Date(Date.UTC(now.getUTCFullYear(), month, 1));
+    to = new Date(Date.UTC(now.getUTCFullYear(), month + 1, 0));
+  } else if (unit === 'quarter') {
+    const quarterStart = Math.floor(now.getUTCMonth() / 3) * 3 - (previous ? 3 : 0);
+    from = new Date(Date.UTC(now.getUTCFullYear(), quarterStart, 1));
+    to = new Date(Date.UTC(now.getUTCFullYear(), quarterStart + 3, 0));
+  } else {
+    const year = now.getUTCFullYear() - (previous ? 1 : 0);
+    from = new Date(Date.UTC(year, 0, 1));
+    to = new Date(Date.UTC(year, 11, 31));
+  }
+  to.setUTCHours(23, 59, 59, 999);
+  return { from: from.toISOString(), to: to.toISOString() };
+};
+
+const conversationalResponse = (message: string, role?: string) => {
+  const text = normalizedQuestion(message);
+  if (/^(hi|hello|hey|good morning|good afternoon|good evening)( finora)?$/.test(text)) {
+    return role === 'EMPLOYEE'
+      ? 'Hi! I’m Finora. I can help you check your expenses, reimbursements, and missing receipts.'
+      : 'Hi! I’m Finora. Ask me about payments, settlements, expenses, cash, budgets, or reconciliation.';
+  }
+  if (/\b(who are you|what are you)\b/.test(text)) {
+    return 'I’m Finora, your finance operations copilot. I use verified workspace data to answer questions, investigate exceptions, and prepare auditable actions for your approval.';
+  }
+  if (/\b(what can you do|how can you help|help me|show me what you can do)\b/.test(text)) {
+    if (role === 'EMPLOYEE') {
+      return 'I can show your expense claims, reimbursement status, and missing receipts. Try “Show my expenses this month” or “Which claims need receipts?”';
+    }
+    if (role === 'AUDITOR') {
+      return 'I can inspect payments, settlements, expenses, reconciliation results, and audit history in read-only mode. Try “Show unresolved exceptions” or “Summarise expenses this month.”';
+    }
+    return 'I can analyse payments, settlements, expenses, cash, budgets, tax lines, and reconciliation exceptions. Try “Show transactions above ₹50,000,” “Explain STL_0001,” or “Summarise expenses this month.”';
+  }
+  return undefined;
+};
+
+const isMultiTopicRequest = (message: string) => {
+  if (/\b(compare|versus|vs)\b/i.test(message)) return true;
+  if (!/\b(and|along with)\b/i.test(message)) return false;
+  const topics = [
+    /\b(payments?|trans[a-z]*|tras[a-z]*)\b/i,
+    /\bsettle[a-z]*\b/i,
+    /\b(expenses?|spend|costs?|outflows?|claims?|receipts?)\b/i,
+    /\b(cash|liquidity|runway|forecast)\b/i,
+    /\b(budgets?|allocation)\b/i,
+    /\b(gst|tax)\b/i,
+    /\b(exception|unreconciled|reconcil[a-z]*)\b/i,
+    /\b(members?|users?|people|headcount)\b/i,
+    /\b(email|profile|account|role)\b/i,
+  ];
+  return topics.filter((pattern) => pattern.test(message)).length > 1;
+};
+
+/** Deterministic routing for common finance intents and recovery from invalid model output. */
 const fallbackRoute = (
   message: string,
   allowedTools?: FinanceToolName[],
+  currentDate?: string,
 ): FinanceToolCall | undefined => {
   const allowed = (tool: FinanceToolName) => !allowedTools || allowedTools.includes(tool);
   const text = message.toLowerCase();
+  const period = currentDate ? periodFromMessage(message, currentDate) : {};
   if (/\b(my|mine)\b/.test(text) && /\b(expenses?|claims?|receipts?|reimburse\w*)\b/.test(text)) {
     if (
       /\b(show|list|which|latest|last|missing|receipt|reimburse)\b/.test(text) &&
@@ -528,14 +601,19 @@ const fallbackRoute = (
       return {
         tool: 'findMyExpenses',
         arguments: {
-          ...(text.includes('missing') || text.includes('without receipt')
+          ...period,
+          ...(text.includes('missing') ||
+          text.includes('without receipt') ||
+          /\bneed\w*\s+(?:a\s+)?receipts?\b/.test(text)
             ? { missingReceipt: true }
             : {}),
           ...(/\b(latest|last|most recent)\b/.test(text) ? { limit: 1 } : {}),
         },
       };
     }
-    if (allowed('getMyExpenseSummary')) return { tool: 'getMyExpenseSummary', arguments: {} };
+    if (allowed('getMyExpenseSummary')) {
+      return { tool: 'getMyExpenseSummary', arguments: period };
+    }
   }
   if (/\b(who am i|my (?:email|profile|account|role))\b/.test(text) && allowed('getCurrentUser')) {
     return { tool: 'getCurrentUser', arguments: {} };
@@ -547,7 +625,7 @@ const fallbackRoute = (
     return { tool: 'getOrganizationSummary', arguments: {} };
   }
   if (/\b(budget|budgets|allocation)\b/.test(text) && allowed('getBudgetSummary')) {
-    return { tool: 'getBudgetSummary', arguments: {} };
+    return { tool: 'getBudgetSummary', arguments: period };
   }
   if (/\b(cash|liquidity|runway|forecast)\b/.test(text) && allowed('getCashForecast')) {
     return { tool: 'getCashForecast', arguments: {} };
@@ -569,17 +647,35 @@ const fallbackRoute = (
     }
     if (allowed('getTaxSummary')) return { tool: 'getTaxSummary', arguments: {} };
   }
-  if (/\b(settlement|settlements)\b/.test(text) && allowed('getSettlementSummary')) {
-    return { tool: 'getSettlementSummary', arguments: {} };
+  if (/\b(settle[a-z]*)\b/.test(text) && allowed('getSettlementSummary')) {
+    return { tool: 'getSettlementSummary', arguments: period };
   }
   if (/\b(invoice|invoices|receivable|payable)\b/.test(text) && allowed('getInvoiceSummary')) {
-    return { tool: 'getInvoiceSummary', arguments: {} };
+    return { tool: 'getInvoiceSummary', arguments: period };
   }
   if (/\b(expenses?|spend|costs?|outflows?)\b/.test(text) && allowed('getExpenseSummary')) {
-    return { tool: 'getExpenseSummary', arguments: {} };
+    return { tool: 'getExpenseSummary', arguments: period };
   }
-  if (/\b(payments?|transactions?)\b/.test(text) && allowed('getPaymentSummary')) {
-    return { tool: 'getPaymentSummary', arguments: {} };
+  if (/\b(payments?|trans[a-z]*|tras[a-z]*)\b/.test(text)) {
+    if (/\b(show|list|find|above|over|greater)\b/.test(text) && allowed('findTransactions')) {
+      return {
+        tool: 'findTransactions',
+        arguments: {
+          ...period,
+          ...(amountFromMessage(message) ? { minimumAmount: amountFromMessage(message) } : {}),
+          ...(/\bcaptured\b/.test(text)
+            ? { status: 'CAPTURED' as const }
+            : /\brefunded\b/.test(text)
+              ? { status: 'REFUNDED' as const }
+              : /\bpending\b/.test(text)
+                ? { status: 'PENDING' as const }
+                : {}),
+        },
+      };
+    }
+    if (allowed('getPaymentSummary')) {
+      return { tool: 'getPaymentSummary', arguments: period };
+    }
   }
   return undefined;
 };
@@ -671,6 +767,10 @@ export class FinanceAgent {
     )
       ? latestControlledReference(input.context ?? [])
       : undefined;
+    const conversational = conversationalResponse(input.message, input.actor?.role);
+    if (conversational) {
+      return { text: conversational, observations: [], activity: [], clarified: false };
+    }
     const writeTranscript = mutationTranscript(input);
     const mutationIntent = mutationVerb.test(writeTranscript);
     const proposedMutation = input.writeMode ? deterministicMutation(writeTranscript) : undefined;
@@ -678,10 +778,13 @@ export class FinanceAgent {
       proposedMutation ??
       (mutationIntent
         ? undefined
-        : deterministicFastLane(
+        : (deterministicFastLane(
             contextualReference ? `${input.message} ${contextualReference}` : input.message,
             input.actor?.allowedTools,
-          ));
+          ) ??
+          (isMultiTopicRequest(input.message) || (input.skills?.length ?? 0) > 0
+            ? undefined
+            : fallbackRoute(input.message, input.actor?.allowedTools, input.currentDate))));
     if (fastLane && input.actor && !input.actor.allowedTools.includes(fastLane.tool)) {
       return {
         text:
@@ -889,7 +992,7 @@ export class FinanceAgent {
     }
     const recovered = skillPolicyViolation
       ? undefined
-      : fallbackRoute(input.message, input.actor?.allowedTools);
+      : fallbackRoute(input.message, input.actor?.allowedTools, input.currentDate);
     if (recovered) {
       const callId = 'call-1';
       try {

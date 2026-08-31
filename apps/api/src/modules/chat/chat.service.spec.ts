@@ -35,7 +35,7 @@ describe('ChatService', () => {
     ).toBe(false);
   });
 
-  it('runs a multi-step tool conversation and persists the structured result', async () => {
+  it('runs a controlled finance query and persists the structured result', async () => {
     const ai = {
       complete: vi
         .fn()
@@ -89,13 +89,13 @@ describe('ChatService', () => {
       expect.objectContaining({
         principal,
         threadId: 'thread-1',
-        assistantText: 'Your email is finance@finora.local.',
+        assistantText: 'You are signed in as Aarav Mehta. Your email is finance@finora.local.',
       }),
     );
     expect(result).toMatchObject({
       threadId: 'thread-1',
       messageId: 'message-2',
-      text: 'Your email is finance@finora.local.',
+      text: 'You are signed in as Aarav Mehta. Your email is finance@finora.local.',
     });
     expect(result.artifacts).toHaveLength(1);
   });
