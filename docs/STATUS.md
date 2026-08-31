@@ -1,6 +1,6 @@
 # FinoraOS Status
 
-Last updated: 2026-08-30
+Last updated: 2026-08-31
 Current phase: Finance-hub V1 with governed record mutations and unified audit
 Last verified commit: see `git log -1`
 
@@ -27,7 +27,7 @@ The application now has Keycloak login/RBAC, an editable organization tree/canva
 - Pure `@finora/spend-policy` engine with parent/child allocation checks, subtree/ancestor hard enforcement, soft category warnings, and deterministic tests.
 - Audited Records CSV imports for payable invoices and employee reimbursements, with partial-result error reports, category provenance, and hard-limit rejection.
 - Records can create one transaction, settlement, invoice, tax line, cash movement, or expense claim and edit existing records with full before/after audit evidence.
-- Records uses domain-specific ledger columns and a right-side detail/edit tray. Transaction detail includes its linked settlement’s deterministic fee, GST, refund, expected, and received breakdown; the seed includes varied invoice/vendor/direction/status/due-date and tax-line scenarios.
+- Records uses a consistent, fixed-layout fintech ledger across all six domains with compact rows, visible actions, contextual missing-data states, domain-specific columns, status semantics, pagination, and a right-side detail/edit tray. Transaction detail includes its linked settlement’s deterministic fee, GST, refund, expected, and received breakdown; the seed includes varied invoice/vendor/direction/status/due-date and tax-line scenarios.
 - Finora chat has an explicit, non-persistent write-mode switch. The model can prepare only an expiring typed diff; an authorized user must approve it before the restricted writer applies it atomically. Rejection, expiry, stale records, and failures leave finance data unchanged.
 - Dedicated Audit route combines site-wide events (nodes, limits, budgets, imports, records, approvals) and agent runs under organization scoping.
 - Category overages notify finance controllers/admins and the relevant node owner without dropping the underlying financial record.

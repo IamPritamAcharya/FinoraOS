@@ -176,22 +176,47 @@
   white-space: nowrap;
 }
 .finora-status--matched,
-.finora-status--resolved {
+.finora-status--resolved,
+.finora-status--approved,
+.finora-status--captured,
+.finora-status--extracted,
+.finora-status--paid,
+.finora-status--posted,
+.finora-status--reimbursed,
+.finora-status--active {
   border-color: #b9dfd1;
   background: #edf9f4;
   color: var(--finora-success);
 }
 .finora-status--needs_review,
-.finora-status--proposed {
+.finora-status--proposed,
+.finora-status--ambiguous,
+.finora-status--partially_collected,
+.finora-status--partially_paid,
+.finora-status--pending,
+.finora-status--receipt_required,
+.finora-status--scheduled,
+.finora-status--submitted,
+.finora-status--under_review {
   border-color: #f0d49b;
   background: #fff7e6;
   color: var(--finora-warning);
 }
 .finora-status--unmatched,
-.finora-status--unresolved {
+.finora-status--unresolved,
+.finora-status--cancelled,
+.finora-status--failed,
+.finora-status--overdue,
+.finora-status--refunded,
+.finora-status--rejected {
   border-color: #f0c7c3;
   background: #fff3f2;
   color: var(--finora-danger);
+}
+.finora-status--draft {
+  border-color: var(--finora-border);
+  background: var(--finora-muted);
+  color: var(--finora-text-muted);
 }
 .finora-status--open {
   gap: 5px;

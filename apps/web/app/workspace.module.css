@@ -1240,16 +1240,50 @@
   flex-wrap: wrap;
   gap: 6px;
 }
-.tabs .finora-ui-button {
+.tabs :global(.finora-ui-button) {
   min-height: 36px;
   border-radius: 8px;
   font-size: 12px;
 }
-.recordSearch {
+.recordTabCount {
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgb(84 111 148 / 9%);
+  color: #647590;
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 760;
+  padding: 0 6px;
+}
+.tabs :global(.finora-ui-button--primary) .recordTabCount {
+  background: rgb(255 255 255 / 18%);
+  color: #fff;
+}
+.recordSearchField {
+  position: relative;
+  display: flex;
   width: min(286px, 100%);
+  align-items: center;
+}
+.recordSearchField > svg {
+  position: absolute;
+  left: 12px;
+  z-index: 1;
+  width: 16px;
+  height: 16px;
+  color: #72839c;
+  pointer-events: none;
+}
+.recordSearch {
+  width: 100%;
   min-height: 38px;
   border-radius: 8px;
   font-size: 13px;
+  padding-left: 36px;
 }
 .recordsPanel {
   overflow: hidden;
@@ -1276,56 +1310,80 @@
 .recordsPanel .tableWrap {
   border-top: 1px solid var(--finora-border);
 }
+.recordTable {
+  table-layout: fixed;
+}
 .recordTable th,
 .recordTable td {
-  padding: 11px 22px;
-}
-.recordTable th:nth-last-child(2),
-.recordTable td:nth-last-child(2) {
-  width: 132px;
-}
-.recordTable th:nth-last-child(3),
-.recordTable td:nth-last-child(3) {
-  width: 132px;
-}
-.recordTable th:last-child,
-.recordTable td:last-child {
-  width: 78px;
+  padding: 0 18px;
 }
 .recordTable th {
   background: var(--finora-muted);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.075em;
+  height: 42px;
+  color: #60708a;
+  font-size: 10.5px;
+  font-weight: 760;
+  letter-spacing: 0.065em;
+  line-height: 1;
 }
 .recordTable td {
-  font-size: 13px;
-  line-height: 1.35;
+  height: 54px;
+  overflow: hidden;
+  color: #283a56;
+  font-size: 12.5px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
 }
 .recordTable tbody tr {
-  transition: background 160ms ease;
+  background: var(--finora-surface);
+  transition:
+    background 150ms ease,
+    box-shadow 150ms ease;
 }
 .recordTable tbody tr:hover {
-  background: #f8fbff;
+  background: #f7fbff;
+  box-shadow: inset 3px 0 0 #7cb2ef;
 }
 .recordTable td:first-child strong {
-  font-size: 14px;
-  font-weight: 780;
+  font-size: 13px;
+  font-weight: 760;
   letter-spacing: -0.2px;
 }
 .recordTable td small {
-  margin-top: 2px;
-  font-size: 10px;
+  margin-top: 3px;
+  overflow: hidden;
+  font-size: 10.5px;
+  font-weight: 520;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .recordTable td.recordAmountCell {
-  font-size: 15px;
-  font-weight: 760;
+  color: var(--finora-text);
+  font-size: 13.5px;
+  font-weight: 740;
   font-variant-numeric: tabular-nums;
+}
+.recordCellStack {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+}
+.recordCellStack > strong,
+.recordCellStack > small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recordMissing {
+  color: #8a98aa;
+  font-size: 11.5px;
+  font-weight: 560;
 }
 .recordTable .recordCenterCell {
   text-align: center;
 }
-.recordTable .recordCenterCell .finora-status {
+.recordTable .recordCenterCell :global(.finora-status) {
   justify-content: center;
 }
 .recordLink {
@@ -1355,23 +1413,59 @@
 }
 .recordTable td:last-child,
 .recordTable th:last-child {
-  padding-right: 14px;
-  padding-left: 0;
+  padding-right: 12px;
+  padding-left: 12px;
   white-space: nowrap;
+}
+.recordActionCell {
+  text-align: center;
 }
 .recordActions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  gap: 4px;
 }
-.recordActions .finora-ui-icon-button {
-  width: 30px;
-  min-height: 30px;
-  border-radius: 7px;
+.recordActions :global(.finora-ui-icon-button) {
+  width: 34px;
+  min-height: 34px;
+  border: 1px solid #dfe7f1;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 86%);
+  color: #4b617d;
+  box-shadow: 0 1px 2px rgb(20 55 95 / 4%);
 }
-.recordActions .finora-ui-icon-button svg {
-  width: 15px;
-  height: 15px;
+.recordActions :global(.finora-ui-icon-button):hover:not(:disabled) {
+  border-color: #b9d1ee;
+  background: #eef6ff;
+  color: var(--finora-brand);
+}
+.recordActions :global(.finora-ui-icon-button) svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.9;
+}
+.recordEmptyState {
+  display: grid;
+  min-height: 240px;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  color: var(--finora-text-muted);
+  text-align: center;
+}
+.recordEmptyState svg {
+  width: 25px;
+  height: 25px;
+  margin-bottom: 4px;
+  color: #7693b5;
+}
+.recordEmptyState strong {
+  color: var(--finora-text);
+  font-size: 13px;
+}
+.recordEmptyState span {
+  font-size: 11.5px;
 }
 .recordPagination {
   display: flex;

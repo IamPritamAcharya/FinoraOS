@@ -499,6 +499,15 @@ const tabLabels: Array<{ id: RecordTab; label: string }> = [
   { id: 'expense-claims', label: 'Expenses' },
 ];
 
+const recordDescriptions: Record<RecordTab, string> = {
+  transactions: 'Payment status, settlement linkage, and captured value',
+  settlements: 'Expected funds, receipts, variance, and reconciliation outcome',
+  invoices: 'Payables and receivables by counterparty, due date, and state',
+  'tax-lines': 'Tax evidence, filing period, counterparty GSTIN, and match state',
+  'cash-movements': 'Posted and scheduled movements across connected cash accounts',
+  'expense-claims': 'Employee spend by merchant, owner, category, and approval state',
+};
+
 const recordTypes: Record<RecordTab, FinancialRecordType> = {
   transactions: FinancialRecordType.TRANSACTION,
   settlements: FinancialRecordType.SETTLEMENT,
@@ -676,16 +685,21 @@ function RecordsPage() {
               size="small"
               onClick={() => router.push(`/records?tab=${item.id}`)}
             >
-              {item.label}
+              <span>{item.label}</span>
+              <span className={styles.recordTabCount}>{records[item.id].length}</span>
             </FinoraButton>
           ))}
         </div>
-        <FinoraInput
-          className={styles.recordSearch}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search visible records"
-        />
+        <label className={styles.recordSearchField}>
+          <FinoraIcon name="search" />
+          <FinoraInput
+            className={styles.recordSearch}
+            aria-label={`Search ${tabLabels.find((item) => item.id === tab)?.label.toLowerCase()}`}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={`Search ${tabLabels.find((item) => item.id === tab)?.label.toLowerCase()}`}
+          />
+        </label>
       </div>
       {error ? (
         <ErrorState message={error} />
@@ -694,7 +708,7 @@ function RecordsPage() {
           <div className={styles.panelHead}>
             <div>
               <h2>{tabLabels.find((item) => item.id === tab)?.label}</h2>
-              <p>Organization-scoped, traceable source records</p>
+              <p>{recordDescriptions[tab]}</p>
             </div>
             <span className={styles.recordSummary}>
               {visible.length} {visible.length === 1 ? 'record' : 'records'}
@@ -798,6 +812,13 @@ function RecordTable({
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  type RecordColumn = {
+    label: string;
+    width: string;
+    align?: 'center';
+    numeric?: boolean;
+    cell: (item: Data) => React.ReactNode;
+  };
   const date = (value: unknown) =>
     value
       ? new Intl.DateTimeFormat('en-IN', {
@@ -805,22 +826,32 @@ function RecordTable({
           month: 'short',
           year: 'numeric',
         }).format(new Date(String(value)))
-      : '—';
-  const reference = (item: Data) => (
+      : null;
+  const humanize = (value: unknown) =>
+    String(value ?? '')
+      .toLowerCase()
+      .replaceAll('_', ' ')
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const missing = (label: string) => <span className={styles.recordMissing}>{label}</span>;
+  const stacked = (primary: React.ReactNode, secondary?: React.ReactNode) => (
     <span className={styles.recordCellStack}>
-      <strong>{String(item.externalId ?? item.name ?? 'Record')}</strong>
-      <small>{String(item.currency ?? 'INR')}</small>
+      <strong>{primary}</strong>
+      {secondary ? <small>{secondary}</small> : null}
     </span>
   );
+  const reference = (item: Data, secondary?: React.ReactNode) =>
+    stacked(String(item.externalId ?? item.name ?? 'Record'), secondary);
   const amount = (value: unknown) => <Amount value={String(value ?? '0')} />;
-  const status = (item: Data, value = item.status) => (
+  const status = (item: Data, value?: unknown) => (
     <StatusBadge
       status={
-        item.matched === true
-          ? 'MATCHED'
-          : item.matched === false
-            ? 'NEEDS_REVIEW'
-            : String(value ?? 'PENDING')
+        value !== undefined
+          ? String(value)
+          : item.matched === true
+            ? 'MATCHED'
+            : item.matched === false
+              ? 'NEEDS_REVIEW'
+              : String(item.status ?? 'PENDING')
       }
     />
   );
@@ -829,101 +860,286 @@ function RecordTable({
       .minus(String(item.receivedAmount ?? 0))
       .abs()
       .toFixed(2);
-  const columns =
+  const settlementResult = (item: Data) => {
+    const unexplained = money(String(item.expectedAmount ?? 0))
+      .minus(String(item.receivedAmount ?? 0))
+      .minus(String(item.feeAmount ?? 0))
+      .minus(String(item.gstAmount ?? 0))
+      .minus(String(item.refundAmount ?? 0))
+      .abs();
+    return (
+      <StatusBadge
+        status={unexplained.isZero() ? 'MATCHED' : 'NEEDS_REVIEW'}
+        label={unexplained.isZero() ? 'Explained' : 'Review variance'}
+      />
+    );
+  };
+  const columns: RecordColumn[] =
     tab === 'transactions'
       ? [
-          { label: 'Payment', cell: reference },
+          {
+            label: 'Payment',
+            width: '20%',
+            cell: (item: Data) =>
+              reference(
+                item,
+                String((item.sourceMetadata as Data | null)?.bankReference ?? 'Imported payment'),
+              ),
+          },
           {
             label: 'Settlement',
+            width: '18%',
             cell: (item: Data) => {
-              const reference = String((item.settlement as Data | null)?.externalId ?? '');
-              return reference ? (
+              const settlementReference = String(
+                (item.settlement as Data | null)?.externalId ?? '',
+              );
+              return settlementReference ? (
                 <button
                   className={styles.recordLink}
                   type="button"
-                  onClick={() => router.push(`/records?tab=settlements&record=${reference}`)}
+                  onClick={() =>
+                    router.push(`/records?tab=settlements&record=${settlementReference}`)
+                  }
                 >
-                  {reference} <FinoraIcon name="arrowUpRight" />
+                  {settlementReference} <FinoraIcon name="arrowUpRight" />
                 </button>
               ) : (
-                'Not settled'
+                missing('Not settled')
               );
             },
           },
-          { label: 'Occurred', cell: (item: Data) => date(item.occurredAt) },
-          { label: 'Status', align: 'center', cell: status },
-          { label: 'Amount', align: 'center', cell: (item: Data) => amount(item.amount) },
+          {
+            label: 'Occurred',
+            width: '18%',
+            cell: (item: Data) => date(item.occurredAt) ?? missing('Date unavailable'),
+          },
+          { label: 'Status', width: '18%', align: 'center', cell: status },
+          {
+            label: 'Amount',
+            width: '18%',
+            align: 'center',
+            numeric: true,
+            cell: (item: Data) => amount(item.amount),
+          },
         ]
       : tab === 'settlements'
         ? [
-            { label: 'Settlement', cell: reference },
-            { label: 'Settled', cell: (item: Data) => date(item.settledAt) },
+            {
+              label: 'Settlement',
+              width: '16%',
+              cell: (item: Data) => reference(item, 'Gateway settlement'),
+            },
+            {
+              label: 'Settled',
+              width: '14%',
+              cell: (item: Data) => date(item.settledAt) ?? missing('Date unavailable'),
+            },
             {
               label: 'Expected',
+              width: '15%',
               align: 'center',
+              numeric: true,
               cell: (item: Data) => amount(item.expectedAmount),
             },
             {
               label: 'Received',
+              width: '15%',
               align: 'center',
+              numeric: true,
               cell: (item: Data) => amount(item.receivedAmount),
             },
-            { label: 'Variance', align: 'center', cell: (item: Data) => amount(variance(item)) },
+            {
+              label: 'Variance',
+              width: '14%',
+              align: 'center',
+              numeric: true,
+              cell: (item: Data) => amount(variance(item)),
+            },
+            {
+              label: 'Outcome',
+              width: '18%',
+              align: 'center',
+              cell: settlementResult,
+            },
           ]
         : tab === 'invoices'
           ? [
-              { label: 'Invoice', cell: reference },
-              { label: 'Vendor', cell: (item: Data) => String(item.vendor ?? '—') },
-              { label: 'Direction', cell: (item: Data) => String(item.direction ?? '—') },
-              { label: 'Due date', cell: (item: Data) => date(item.dueAt) },
-              { label: 'Status', align: 'center', cell: status },
-              { label: 'Amount', align: 'center', cell: (item: Data) => amount(item.amount) },
+              {
+                label: 'Invoice',
+                width: '15%',
+                cell: (item: Data) => reference(item, humanize(item.category) || 'Uncategorised'),
+              },
+              {
+                label: 'Counterparty',
+                width: '22%',
+                cell: (item: Data) =>
+                  item.vendor ? String(item.vendor) : missing('Counterparty not provided'),
+              },
+              {
+                label: 'Direction',
+                width: '12%',
+                cell: (item: Data) => humanize(item.direction) || missing('Not classified'),
+              },
+              {
+                label: 'Due date',
+                width: '14%',
+                cell: (item: Data) => date(item.dueAt) ?? missing('No due date'),
+              },
+              { label: 'Status', width: '14%', align: 'center', cell: status },
+              {
+                label: 'Amount',
+                width: '15%',
+                align: 'center',
+                numeric: true,
+                cell: (item: Data) => amount(item.amount),
+              },
             ]
           : tab === 'tax-lines'
             ? [
-                { label: 'Tax line', cell: reference },
+                {
+                  label: 'Tax line',
+                  width: '15%',
+                  cell: (item: Data) =>
+                    reference(
+                      item,
+                      String(
+                        (item.sourceMetadata as Data | null)?.invoiceReference ?? 'Tax record',
+                      ),
+                    ),
+                },
                 {
                   label: 'Tax detail',
+                  width: '15%',
                   cell: (item: Data) =>
                     `${String(item.taxType ?? 'Tax')} · ${String(item.taxRate ?? 0)}%`,
                 },
-                { label: 'Period', cell: (item: Data) => String(item.taxPeriod ?? '—') },
+                {
+                  label: 'Counterparty GSTIN',
+                  width: '21%',
+                  cell: (item: Data) =>
+                    item.counterpartyTaxId
+                      ? String(item.counterpartyTaxId)
+                      : missing('GSTIN not provided'),
+                },
+                {
+                  label: 'Period',
+                  width: '11%',
+                  cell: (item: Data) =>
+                    item.taxPeriod ? String(item.taxPeriod) : missing('No tax period'),
+                },
                 {
                   label: 'Match status',
+                  width: '16%',
                   align: 'center',
                   cell: (item: Data) => status(item, item.matchStatus),
                 },
-                { label: 'Amount', align: 'center', cell: (item: Data) => amount(item.amount) },
+                {
+                  label: 'Amount',
+                  width: '14%',
+                  align: 'center',
+                  numeric: true,
+                  cell: (item: Data) => amount(item.amount),
+                },
               ]
             : tab === 'cash-movements'
               ? [
-                  { label: 'Movement', cell: reference },
+                  {
+                    label: 'Movement',
+                    width: '14%',
+                    cell: (item: Data) =>
+                      reference(item, humanize(item.sourceType) || 'Cash record'),
+                  },
                   {
                     label: 'Description',
-                    cell: (item: Data) => String(item.description ?? item.counterparty ?? '—'),
-                  },
-                  { label: 'Direction', cell: (item: Data) => String(item.direction ?? '—') },
-                  { label: 'Occurred', cell: (item: Data) => date(item.occurredAt) },
-                  { label: 'Status', align: 'center', cell: status },
-                  { label: 'Amount', align: 'center', cell: (item: Data) => amount(item.amount) },
-                ]
-              : [
-                  { label: 'Claim', cell: reference },
-                  { label: 'Merchant', cell: (item: Data) => String(item.merchant ?? '—') },
-                  {
-                    label: 'Employee',
-                    cell: (item: Data) => String((item.claimant as Data | null)?.name ?? '—'),
+                    width: '19%',
+                    cell: (item: Data) =>
+                      stacked(
+                        item.description
+                          ? String(item.description)
+                          : missing('Description unavailable'),
+                        item.counterparty ? String(item.counterparty) : 'No counterparty',
+                      ),
                   },
                   {
                     label: 'Category',
-                    cell: (item: Data) => String(item.category ?? '—').replaceAll('_', ' '),
+                    width: '13%',
+                    cell: (item: Data) => humanize(item.category) || missing('Uncategorised'),
                   },
-                  { label: 'Status', align: 'center', cell: status },
-                  { label: 'Amount', align: 'center', cell: (item: Data) => amount(item.amount) },
+                  {
+                    label: 'Account',
+                    width: '13%',
+                    cell: (item: Data) =>
+                      String((item.account as Data | null)?.name ?? '') || missing('No account'),
+                  },
+                  {
+                    label: 'Occurred',
+                    width: '11%',
+                    cell: (item: Data) => date(item.occurredAt) ?? missing('Date unavailable'),
+                  },
+                  { label: 'Status', width: '11%', align: 'center', cell: status },
+                  {
+                    label: 'Amount',
+                    width: '11%',
+                    align: 'center',
+                    numeric: true,
+                    cell: (item: Data) =>
+                      stacked(
+                        amount(item.amount),
+                        humanize(item.direction) || 'Direction unavailable',
+                      ),
+                  },
+                ]
+              : [
+                  {
+                    label: 'Claim',
+                    width: '14%',
+                    cell: (item: Data) =>
+                      reference(
+                        item,
+                        String((item.node as Data | null)?.name ?? 'No team assigned'),
+                      ),
+                  },
+                  {
+                    label: 'Merchant',
+                    width: '18%',
+                    cell: (item: Data) =>
+                      item.merchant ? String(item.merchant) : missing('Merchant not provided'),
+                  },
+                  {
+                    label: 'Employee',
+                    width: '15%',
+                    cell: (item: Data) =>
+                      String((item.claimant as Data | null)?.name ?? '') ||
+                      missing('Employee unavailable'),
+                  },
+                  {
+                    label: 'Category',
+                    width: '14%',
+                    cell: (item: Data) => humanize(item.category) || missing('Uncategorised'),
+                  },
+                  {
+                    label: 'Incurred',
+                    width: '11%',
+                    cell: (item: Data) => date(item.incurredAt) ?? missing('Date unavailable'),
+                  },
+                  { label: 'Status', width: '10%', align: 'center', cell: status },
+                  {
+                    label: 'Amount',
+                    width: '10%',
+                    align: 'center',
+                    numeric: true,
+                    cell: (item: Data) => amount(item.amount),
+                  },
                 ];
   return (
     <div className={styles.tableWrap}>
-      <table className={styles.recordTable}>
+      <table className={styles.recordTable} style={{ minWidth: columns.length > 6 ? 1120 : 980 }}>
+        <colgroup>
+          {columns.map((column) => (
+            <col key={column.label} style={{ width: column.width }} />
+          ))}
+          <col style={{ width: 92 }} />
+        </colgroup>
         <thead>
           <tr>
             {columns.map((column) => (
@@ -944,7 +1160,7 @@ function RecordTable({
                 <td
                   className={
                     column.align === 'center'
-                      ? `${styles.recordCenterCell} ${column.label === 'Amount' || column.label === 'Expected' || column.label === 'Received' || column.label === 'Variance' ? styles.recordAmountCell : ''}`
+                      ? `${styles.recordCenterCell} ${column.numeric ? styles.recordAmountCell : ''}`
                       : undefined
                   }
                   key={column.label}
@@ -952,28 +1168,39 @@ function RecordTable({
                   {column.cell(item)}
                 </td>
               ))}
-              <td className={styles.recordActions}>
-                <FinoraIconButton
-                  size="small"
-                  variant="ghost"
-                  aria-label={`View ${String(item.externalId ?? 'record')}`}
-                  onClick={() => onView(item)}
-                >
-                  <FinoraIcon name="view" />
-                </FinoraIconButton>
-                <FinoraIconButton
-                  size="small"
-                  variant="ghost"
-                  aria-label={`Edit ${String(item.externalId ?? 'record')}`}
-                  onClick={() => onEdit(item)}
-                >
-                  <FinoraIcon name="edit" />
-                </FinoraIconButton>
+              <td className={styles.recordActionCell}>
+                <div className={styles.recordActions}>
+                  <FinoraIconButton
+                    size="small"
+                    variant="ghost"
+                    aria-label={`View ${String(item.externalId ?? 'record')}`}
+                    title="View details"
+                    onClick={() => onView(item)}
+                  >
+                    <FinoraIcon name="view" />
+                  </FinoraIconButton>
+                  <FinoraIconButton
+                    size="small"
+                    variant="ghost"
+                    aria-label={`Edit ${String(item.externalId ?? 'record')}`}
+                    title="Edit record"
+                    onClick={() => onEdit(item)}
+                  >
+                    <FinoraIcon name="edit" />
+                  </FinoraIconButton>
+                </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      {!pageRows.length ? (
+        <div className={styles.recordEmptyState}>
+          <FinoraIcon name="search" />
+          <strong>No records match this view</strong>
+          <span>Clear the search or choose another record type.</span>
+        </div>
+      ) : null}
       {rows.length > pageSize ? (
         <footer className={styles.recordPagination}>
           <span>
