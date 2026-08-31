@@ -539,6 +539,22 @@ function RecordsPage() {
   useEffect(() => {
     void loadRecords().catch((reason: Error) => setError(reason.message));
   }, [loadRecords]);
+  useEffect(() => {
+    if (!editor) return;
+    const bodyOverflow = document.body.style.overflow;
+    const documentOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setEditor(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = bodyOverflow;
+      document.documentElement.style.overflow = documentOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [editor]);
   const visible = useMemo(
     () =>
       records[tab].filter(
@@ -550,6 +566,7 @@ function RecordsPage() {
     <>
       <PageHeader
         title="Records"
+        description="Traceable source records across payments, settlements, invoices, tax, cash, and expenses."
         action={
           <div className={styles.rowActions}>
             <FinoraButton variant="secondary" onClick={() => setShowImport((value) => !value)}>
@@ -586,15 +603,32 @@ function RecordsPage() {
         </div>
       )}
       {editor && (
-        <RecordEditor
-          tab={tab}
-          row={editor.row}
-          onClose={() => setEditor(null)}
-          onSaved={async () => {
-            setEditor(null);
-            await loadRecords();
-          }}
-        />
+        <div className={styles.recordDrawerLayer}>
+          <button
+            className={styles.recordDrawerBackdrop}
+            type="button"
+            aria-label="Close record editor"
+            onClick={() => setEditor(null)}
+          />
+          <aside
+            className={styles.recordDrawer}
+            aria-label={
+              editor.mode === 'edit' ? 'Edit financial record' : 'Create financial record'
+            }
+            role="dialog"
+            aria-modal="true"
+          >
+            <RecordEditor
+              tab={tab}
+              row={editor.row}
+              onClose={() => setEditor(null)}
+              onSaved={async () => {
+                setEditor(null);
+                await loadRecords();
+              }}
+            />
+          </aside>
+        </div>
       )}
       <div className={styles.recordToolbar}>
         <div className={styles.tabs}>
@@ -609,7 +643,7 @@ function RecordsPage() {
             </FinoraButton>
           ))}
         </div>
-        <input
+        <FinoraInput
           className={styles.recordSearch}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -619,13 +653,15 @@ function RecordsPage() {
       {error ? (
         <ErrorState message={error} />
       ) : (
-        <section className={styles.panel}>
+        <section className={`${styles.panel} ${styles.recordsPanel}`}>
           <div className={styles.panelHead}>
             <div>
               <h2>{tabLabels.find((item) => item.id === tab)?.label}</h2>
               <p>Organization-scoped, traceable source records</p>
             </div>
-            <span className={styles.count}>{visible.length}</span>
+            <span className={styles.recordSummary}>
+              {visible.length} {visible.length === 1 ? 'record' : 'records'}
+            </span>
           </div>
           <RecordTable
             tab={tab}
@@ -711,52 +747,140 @@ function RecordTable({
   rows: Data[];
   onEdit: (row: Data) => void;
 }) {
+  const date = (value: unknown) =>
+    value
+      ? new Intl.DateTimeFormat('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        }).format(new Date(String(value)))
+      : '—';
+  const reference = (item: Data) => (
+    <span className={styles.recordCellStack}>
+      <strong>{String(item.externalId ?? item.name ?? 'Record')}</strong>
+      <small>{String(item.currency ?? 'INR')}</small>
+    </span>
+  );
+  const amount = (value: unknown) => <Amount value={String(value ?? '0')} />;
+  const status = (item: Data, value = item.status) => (
+    <StatusBadge
+      status={
+        item.matched === true
+          ? 'MATCHED'
+          : item.matched === false
+            ? 'NEEDS_REVIEW'
+            : String(value ?? 'PENDING')
+      }
+    />
+  );
+  const variance = (item: Data) =>
+    money(String(item.expectedAmount ?? 0))
+      .minus(String(item.receivedAmount ?? 0))
+      .abs()
+      .toFixed(2);
+  const columns =
+    tab === 'transactions'
+      ? [
+          { label: 'Payment', cell: reference },
+          {
+            label: 'Settlement',
+            cell: (item: Data) =>
+              String((item.settlement as Data | null)?.externalId ?? 'Not settled'),
+          },
+          { label: 'Occurred', cell: (item: Data) => date(item.occurredAt) },
+          { label: 'Status', cell: status },
+          { label: 'Amount', align: 'right', cell: (item: Data) => amount(item.amount) },
+        ]
+      : tab === 'settlements'
+        ? [
+            { label: 'Settlement', cell: reference },
+            { label: 'Settled', cell: (item: Data) => date(item.settledAt) },
+            {
+              label: 'Expected',
+              align: 'right',
+              cell: (item: Data) => amount(item.expectedAmount),
+            },
+            {
+              label: 'Received',
+              align: 'right',
+              cell: (item: Data) => amount(item.receivedAmount),
+            },
+            { label: 'Variance', align: 'right', cell: (item: Data) => amount(variance(item)) },
+          ]
+        : tab === 'invoices'
+          ? [
+              { label: 'Invoice', cell: reference },
+              { label: 'Vendor', cell: (item: Data) => String(item.vendor ?? '—') },
+              { label: 'Direction', cell: (item: Data) => String(item.direction ?? '—') },
+              { label: 'Due date', cell: (item: Data) => date(item.dueAt) },
+              { label: 'Status', cell: status },
+              { label: 'Amount', align: 'right', cell: (item: Data) => amount(item.amount) },
+            ]
+          : tab === 'tax-lines'
+            ? [
+                { label: 'Tax line', cell: reference },
+                {
+                  label: 'Tax detail',
+                  cell: (item: Data) =>
+                    `${String(item.taxType ?? 'Tax')} · ${String(item.taxRate ?? 0)}%`,
+                },
+                { label: 'Period', cell: (item: Data) => String(item.taxPeriod ?? '—') },
+                { label: 'Match status', cell: (item: Data) => status(item, item.matchStatus) },
+                { label: 'Amount', align: 'right', cell: (item: Data) => amount(item.amount) },
+              ]
+            : tab === 'cash-movements'
+              ? [
+                  { label: 'Movement', cell: reference },
+                  {
+                    label: 'Description',
+                    cell: (item: Data) => String(item.description ?? item.counterparty ?? '—'),
+                  },
+                  { label: 'Direction', cell: (item: Data) => String(item.direction ?? '—') },
+                  { label: 'Occurred', cell: (item: Data) => date(item.occurredAt) },
+                  { label: 'Status', cell: status },
+                  { label: 'Amount', align: 'right', cell: (item: Data) => amount(item.amount) },
+                ]
+              : [
+                  { label: 'Claim', cell: reference },
+                  { label: 'Merchant', cell: (item: Data) => String(item.merchant ?? '—') },
+                  {
+                    label: 'Employee',
+                    cell: (item: Data) => String((item.claimant as Data | null)?.name ?? '—'),
+                  },
+                  {
+                    label: 'Category',
+                    cell: (item: Data) => String(item.category ?? '—').replaceAll('_', ' '),
+                  },
+                  { label: 'Status', cell: status },
+                  { label: 'Amount', align: 'right', cell: (item: Data) => amount(item.amount) },
+                ];
   return (
     <div className={styles.tableWrap}>
-      <table>
+      <table className={styles.recordTable}>
         <thead>
           <tr>
-            <th>Reference</th>
-            <th>Description / date</th>
-            <th>Type</th>
-            <th>Status</th>
-            <th>Amount</th>
+            {columns.map((column) => (
+              <th
+                className={column.align === 'right' ? styles.recordAmountCell : undefined}
+                key={column.label}
+              >
+                {column.label}
+              </th>
+            ))}
             <th aria-label="Actions" />
           </tr>
         </thead>
         <tbody>
           {rows.slice(0, 100).map((item, index) => (
             <tr key={String(item.id ?? item.externalId ?? index)}>
-              <td>
-                <strong>{String(item.externalId ?? item.name ?? 'Record')}</strong>
-                <small>{String(item.currency ?? 'INR')}</small>
-              </td>
-              <td>
-                {String(
-                  item.description ??
-                    item.counterparty ??
-                    (item.occurredAt || item.settledAt || item.issuedAt
-                      ? new Date(
-                          String(item.occurredAt ?? item.settledAt ?? item.issuedAt),
-                        ).toLocaleDateString('en-IN')
-                      : '—'),
-                )}
-              </td>
-              <td>{String(item.category ?? item.type ?? tab).replaceAll('_', ' ')}</td>
-              <td>
-                <StatusBadge
-                  status={
-                    item.matched === true
-                      ? 'MATCHED'
-                      : item.matched === false
-                        ? 'NEEDS_REVIEW'
-                        : String(item.status ?? 'POSTED')
-                  }
-                />
-              </td>
-              <td>
-                <Amount value={String(item.amount ?? item.receivedAmount ?? '0')} />
-              </td>
+              {columns.map((column) => (
+                <td
+                  className={column.align === 'right' ? styles.recordAmountCell : undefined}
+                  key={column.label}
+                >
+                  {column.cell(item)}
+                </td>
+              ))}
               <td>
                 <FinoraButton size="small" variant="ghost" onClick={() => onEdit(item)}>
                   Edit
@@ -1028,7 +1152,7 @@ function RecordEditor({
         }
       }}
     >
-      <div className={styles.panelHead}>
+      <div className={styles.recordEditorHead}>
         <div>
           <p className={styles.eyebrow}>{row ? 'EDIT TRACEABLE RECORD' : 'CREATE ONE RECORD'}</p>
           <h2>{row ? String(row.externalId) : tabLabels.find((item) => item.id === tab)?.label}</h2>
@@ -1070,15 +1194,14 @@ function RecordEditor({
           </FinoraField>
         ))}
       </div>
-      <div className={styles.rowActions}>
-        <FinoraButton type="submit" disabled={saving}>
-          {saving ? 'Saving…' : row ? 'Save audited update' : 'Create record'}
-        </FinoraButton>
-        <span className={styles.muted}>
-          Every create and edit is organization-scoped and added to Audit.
-        </span>
+      <div className={styles.recordEditorFooter}>
+        {error ? <span className={styles.importError}>{error}</span> : null}
+        <div className={styles.rowActions}>
+          <FinoraButton type="submit" disabled={saving}>
+            {saving ? 'Saving…' : row ? 'Save changes' : 'Create record'}
+          </FinoraButton>
+        </div>
       </div>
-      {error ? <span className={styles.importError}>{error}</span> : null}
     </form>
   );
 }

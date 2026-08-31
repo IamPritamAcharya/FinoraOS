@@ -55,6 +55,7 @@ export class FinanceService {
         organizationId: principal.organizationId,
         ...(query ? { externalId: { contains: query, mode: 'insensitive' } } : {}),
       },
+      include: { settlement: { select: { externalId: true } } },
       orderBy: { occurredAt: 'desc' },
       take: 100,
     });

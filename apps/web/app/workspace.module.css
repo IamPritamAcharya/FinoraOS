@@ -1229,21 +1229,93 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+  border: 1px solid var(--finora-border);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 72%);
+  padding: 10px;
 }
 .tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
-.recordSearch {
-  width: min(280px, 100%);
+.tabs .finora-ui-button {
   min-height: 36px;
-  border: 1px solid var(--finora-border);
-  border-radius: 9px;
-  background: var(--finora-surface);
-  color: var(--finora-text);
-  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.recordSearch {
+  width: min(286px, 100%);
+  min-height: 38px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.recordsPanel {
+  overflow: hidden;
+  padding: 0;
+}
+.recordsPanel > .panelHead {
+  padding: 19px 22px 15px;
+  margin: 0;
+}
+.recordsPanel > .panelHead h2 {
+  font-size: 20px;
+  letter-spacing: -0.5px;
+}
+.recordsPanel > .panelHead p {
+  margin-top: 3px;
+  font-size: 12px;
+}
+.recordSummary {
+  color: var(--finora-text-muted);
+  font-size: 12px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.recordsPanel .tableWrap {
+  border-top: 1px solid var(--finora-border);
+}
+.recordTable th,
+.recordTable td {
+  padding: 11px 22px;
+}
+.recordTable th {
+  background: var(--finora-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.075em;
+}
+.recordTable td {
+  font-size: 13px;
+  line-height: 1.35;
+}
+.recordTable tbody tr {
+  transition: background 160ms ease;
+}
+.recordTable tbody tr:hover {
+  background: #f8fbff;
+}
+.recordTable td:first-child strong {
+  font-size: 14px;
+  font-weight: 780;
+  letter-spacing: -0.2px;
+}
+.recordTable td small {
+  margin-top: 2px;
+  font-size: 10px;
+}
+.recordTable .recordAmountCell {
+  font-size: 15px;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.recordTable td:last-child,
+.recordTable th:last-child {
+  width: 1%;
+  padding-left: 0;
+  white-space: nowrap;
 }
 .importPanel {
   display: grid;
@@ -1258,19 +1330,109 @@
 }
 
 .recordEditor {
-  margin-bottom: 18px;
-  border: 1px solid var(--finora-border);
-  border-radius: 14px;
-  background: var(--finora-surface);
-  box-shadow: 0 16px 36px -30px rgb(18 23 43 / 28%);
-  padding: 18px;
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .recordEditorGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin: 16px 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 16px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 22px 28px 28px;
+}
+.recordEditorHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--finora-border);
+  padding: 26px 28px 18px;
+}
+.recordEditorHead h2 {
+  margin: 0;
+  color: var(--finora-text);
+  font-size: 23px;
+  letter-spacing: -0.75px;
+}
+.recordEditor .finora-ui-field {
+  gap: 6px;
+  font-size: 12px;
+}
+.recordEditor .finora-ui-input {
+  min-height: 38px;
+  border-radius: 9px;
+  font-size: 13px;
+  padding: 8px 10px;
+}
+.recordEditorFooter {
+  border-top: 1px solid var(--finora-border);
+  padding: 16px 28px;
+  background: var(--finora-surface);
+  box-shadow: 0 -12px 24px -24px rgb(20 48 82 / 50%);
+}
+.recordEditorFooter .rowActions {
+  align-items: center;
+  margin: 0;
+}
+.recordEditorFooter .finora-ui-button {
+  min-height: 38px;
+  font-size: 12px;
+}
+.recordEditorFooter .importError {
+  display: block;
+  margin-bottom: 10px;
+}
+.recordDrawerLayer {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+}
+.recordDrawerBackdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: rgb(12 31 58 / 22%);
+  cursor: default;
+  opacity: 1;
+  animation: drawer-backdrop-in 180ms ease both;
+}
+.recordDrawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  width: min(680px, 100vw);
+  height: 100dvh;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid #d2e0f1;
+  background: var(--finora-surface);
+  box-shadow: -24px 0 54px -34px rgb(13 49 94 / 52%);
+  animation: record-drawer-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes drawer-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes record-drawer-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0.3;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 .importPanel h2,
 .importPanel p {
@@ -1279,7 +1441,7 @@
 .importPanel > div:first-child span,
 .importHelp {
   color: var(--finora-text-muted);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.6;
 }
 .importHelp {
@@ -1394,6 +1556,9 @@
     align-items: stretch;
     flex-direction: column;
   }
+  .recordSearch {
+    width: 100%;
+  }
   .exceptionSummary {
     grid-template-columns: 1fr auto;
   }
@@ -1412,5 +1577,25 @@
 @media (max-width: 900px) {
   .recordEditorGrid {
     grid-template-columns: 1fr;
+  }
+  .recordDrawer {
+    width: 100%;
+  }
+  .recordEditor {
+    min-height: 100%;
+  }
+  .recordEditorHead {
+    padding: 22px 18px 16px;
+  }
+  .recordEditorGrid {
+    padding: 18px;
+  }
+  .recordEditorFooter {
+    padding: 14px 18px;
+  }
+  .recordTable th,
+  .recordTable td {
+    padding-right: 14px;
+    padding-left: 14px;
   }
 }
