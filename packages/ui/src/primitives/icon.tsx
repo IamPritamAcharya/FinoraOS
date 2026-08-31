@@ -8,6 +8,7 @@ export type FinoraIconName =
   | 'chart'
   | 'chevronRight'
   | 'check'
+  | 'edit'
   | 'arrowUpRight'
   | 'close'
   | 'exceptions'
@@ -23,7 +24,8 @@ export type FinoraIconName =
   | 'reconciliation'
   | 'records'
   | 'search'
-  | 'send';
+  | 'send'
+  | 'view';
 
 export function FinoraIcon({ name, ...props }: SVGProps<SVGSVGElement> & { name: FinoraIconName }) {
   const paths = {
@@ -57,6 +59,12 @@ export function FinoraIcon({ name, ...props }: SVGProps<SVGSVGElement> & { name:
     ),
     chevronRight: <path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />,
     check: <path d="m5 12.5 4.2 4.2L19 7" strokeLinecap="round" strokeLinejoin="round" />,
+    edit: (
+      <>
+        <path d="m5 19 3.3-.7L18.6 8a2.1 2.1 0 0 0-3-3L5.3 15.3 5 19Z" strokeLinejoin="round" />
+        <path d="m13.9 6.7 3.4 3.4" strokeLinecap="round" />
+      </>
+    ),
     close: <path d="m6 6 12 12M18 6 6 18" strokeLinecap="round" />,
     exceptions: (
       <>
@@ -155,6 +163,12 @@ export function FinoraIcon({ name, ...props }: SVGProps<SVGSVGElement> & { name:
       />
     ),
     send: <path d="m4 4 16 8-16 8 3-8-3-8Zm3 8h13" strokeLinecap="round" strokeLinejoin="round" />,
+    view: (
+      <>
+        <path d="M3.5 12s3-5 8.5-5 8.5 5 8.5 5-3 5-8.5 5-8.5-5-8.5-5Z" strokeLinejoin="round" />
+        <circle cx="12" cy="12" r="2.2" />
+      </>
+    ),
   } satisfies Record<FinoraIconName, ReactNode>;
 
   return (

@@ -759,15 +759,21 @@ async function main() {
                 ? 'MISSING'
                 : 'AMOUNT_MISMATCH';
     const externalId = `pay_${String(index + 1).padStart(5, '0')}`;
+    const status =
+      index >= 108 && index % 4 === 0
+        ? ('PENDING' as const)
+        : index % 29 === 0
+          ? ('REFUNDED' as const)
+          : ('CAPTURED' as const);
     return {
       id: `txn-${index + 1}`,
       organizationId: orgId,
       externalId,
       amount: (8500 + ((index * 791) % 17800)).toFixed(2),
       currency: 'INR',
-      status: index % 29 === 0 ? ('REFUNDED' as const) : ('CAPTURED' as const),
+      status,
       occurredAt: iso((index % 12) + 1),
-      settlementId: settlements[index % 12].id,
+      settlementId: index >= 110 && index % 3 === 0 ? null : settlements[index % 12].id,
       sourceMetadata: {
         source: 'mock-razorpay',
         bankReference: `bank_ref_${index + 1}`,

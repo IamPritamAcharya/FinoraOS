@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FinancialRecordType, money } from '@finora/platform';
 import {
@@ -8,6 +9,7 @@ import {
   FinoraButton,
   FinoraField,
   FinoraIcon,
+  FinoraIconButton,
   FinoraInput,
   FinoraSelect,
   FinoraSurface,
@@ -510,6 +512,7 @@ function RecordsPage() {
   const router = useRouter();
   const params = useSearchParams();
   const requestedTab = params.get('tab') as RecordTab | null;
+  const requestedRecord = params.get('record');
   const tab = tabLabels.some((item) => item.id === requestedTab) ? requestedTab! : 'transactions';
   const [records, setRecords] = useState<Record<RecordTab, Data[]>>({
     transactions: [],
@@ -520,6 +523,8 @@ function RecordsPage() {
     'expense-claims': [],
   });
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [drawerReady, setDrawerReady] = useState(false);
   const [error, setError] = useState('');
   const [showImport, setShowImport] = useState(false);
   const [editor, setEditor] = useState<{ mode: 'create' | 'edit' | 'detail'; row?: Data } | null>(
@@ -541,6 +546,13 @@ function RecordsPage() {
   useEffect(() => {
     void loadRecords().catch((reason: Error) => setError(reason.message));
   }, [loadRecords]);
+  useEffect(() => setDrawerReady(true), []);
+  useEffect(() => setPage(1), [query, tab]);
+  useEffect(() => {
+    if (!requestedRecord || editor) return;
+    const row = records[tab].find((item) => item.externalId === requestedRecord);
+    if (row) setEditor({ mode: 'detail', row });
+  }, [editor, records, requestedRecord, tab]);
   useEffect(() => {
     if (!editor) return;
     const bodyOverflow = document.body.style.overflow;
@@ -548,7 +560,10 @@ function RecordsPage() {
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setEditor(null);
+      if (event.key === 'Escape') {
+        setEditor(null);
+        if (requestedRecord) router.replace(`/records?tab=${tab}`, { scroll: false });
+      }
     };
     window.addEventListener('keydown', closeOnEscape);
     return () => {
@@ -556,7 +571,7 @@ function RecordsPage() {
       document.documentElement.style.overflow = documentOverflow;
       window.removeEventListener('keydown', closeOnEscape);
     };
-  }, [editor]);
+  }, [editor, requestedRecord, router, tab]);
   const visible = useMemo(
     () =>
       records[tab].filter(
@@ -564,6 +579,10 @@ function RecordsPage() {
       ),
     [query, records, tab],
   );
+  const closeDrawer = () => {
+    setEditor(null);
+    if (requestedRecord) router.replace(`/records?tab=${tab}`, { scroll: false });
+  };
   return (
     <>
       <PageHeader
@@ -604,47 +623,50 @@ function RecordsPage() {
           ) : null}
         </div>
       )}
-      {editor && (
-        <div className={styles.recordDrawerLayer}>
-          <button
-            className={styles.recordDrawerBackdrop}
-            type="button"
-            aria-label="Close record editor"
-            onClick={() => setEditor(null)}
-          />
-          <aside
-            className={styles.recordDrawer}
-            aria-label={
-              editor.mode === 'detail'
-                ? 'Financial record details'
-                : editor.mode === 'edit'
-                  ? 'Edit financial record'
-                  : 'Create financial record'
-            }
-            role="dialog"
-            aria-modal="true"
-          >
-            {editor.mode === 'detail' && editor.row ? (
-              <RecordDetail
-                tab={tab}
-                row={editor.row}
-                onClose={() => setEditor(null)}
-                onEdit={() => setEditor({ mode: 'edit', row: editor.row })}
+      {editor && drawerReady
+        ? createPortal(
+            <div className={styles.recordDrawerLayer}>
+              <button
+                className={styles.recordDrawerBackdrop}
+                type="button"
+                aria-label="Close record editor"
+                onClick={closeDrawer}
               />
-            ) : (
-              <RecordEditor
-                tab={tab}
-                row={editor.row}
-                onClose={() => setEditor(null)}
-                onSaved={async () => {
-                  setEditor(null);
-                  await loadRecords();
-                }}
-              />
-            )}
-          </aside>
-        </div>
-      )}
+              <aside
+                className={styles.recordDrawer}
+                aria-label={
+                  editor.mode === 'detail'
+                    ? 'Financial record details'
+                    : editor.mode === 'edit'
+                      ? 'Edit financial record'
+                      : 'Create financial record'
+                }
+                role="dialog"
+                aria-modal="true"
+              >
+                {editor.mode === 'detail' && editor.row ? (
+                  <RecordDetail
+                    tab={tab}
+                    row={editor.row}
+                    onClose={closeDrawer}
+                    onEdit={() => setEditor({ mode: 'edit', row: editor.row })}
+                  />
+                ) : (
+                  <RecordEditor
+                    tab={tab}
+                    row={editor.row}
+                    onClose={closeDrawer}
+                    onSaved={async () => {
+                      closeDrawer();
+                      await loadRecords();
+                    }}
+                  />
+                )}
+              </aside>
+            </div>,
+            document.body,
+          )
+        : null}
       <div className={styles.recordToolbar}>
         <div className={styles.tabs}>
           {tabLabels.map((item) => (
@@ -681,6 +703,8 @@ function RecordsPage() {
           <RecordTable
             tab={tab}
             rows={visible}
+            page={page}
+            onPageChange={setPage}
             onView={(row) => setEditor({ mode: 'detail', row })}
             onEdit={(row) => setEditor({ mode: 'edit', row })}
           />
@@ -757,14 +781,23 @@ function RecordImport({ onImported }: { onImported: (result: Data) => Promise<vo
 function RecordTable({
   tab,
   rows,
+  page,
+  onPageChange,
   onView,
   onEdit,
 }: {
   tab: RecordTab;
   rows: Data[];
+  page: number;
+  onPageChange: (page: number) => void;
   onView: (row: Data) => void;
   onEdit: (row: Data) => void;
 }) {
+  const router = useRouter();
+  const pageSize = 20;
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const date = (value: unknown) =>
     value
       ? new Intl.DateTimeFormat('en-IN', {
@@ -802,12 +835,24 @@ function RecordTable({
           { label: 'Payment', cell: reference },
           {
             label: 'Settlement',
-            cell: (item: Data) =>
-              String((item.settlement as Data | null)?.externalId ?? 'Not settled'),
+            cell: (item: Data) => {
+              const reference = String((item.settlement as Data | null)?.externalId ?? '');
+              return reference ? (
+                <button
+                  className={styles.recordLink}
+                  type="button"
+                  onClick={() => router.push(`/records?tab=settlements&record=${reference}`)}
+                >
+                  {reference} <FinoraIcon name="arrowUpRight" />
+                </button>
+              ) : (
+                'Not settled'
+              );
+            },
           },
           { label: 'Occurred', cell: (item: Data) => date(item.occurredAt) },
-          { label: 'Status', cell: status },
-          { label: 'Amount', align: 'right', cell: (item: Data) => amount(item.amount) },
+          { label: 'Status', align: 'center', cell: status },
+          { label: 'Amount', align: 'center', cell: (item: Data) => amount(item.amount) },
         ]
       : tab === 'settlements'
         ? [
@@ -815,15 +860,15 @@ function RecordTable({
             { label: 'Settled', cell: (item: Data) => date(item.settledAt) },
             {
               label: 'Expected',
-              align: 'right',
+              align: 'center',
               cell: (item: Data) => amount(item.expectedAmount),
             },
             {
               label: 'Received',
-              align: 'right',
+              align: 'center',
               cell: (item: Data) => amount(item.receivedAmount),
             },
-            { label: 'Variance', align: 'right', cell: (item: Data) => amount(variance(item)) },
+            { label: 'Variance', align: 'center', cell: (item: Data) => amount(variance(item)) },
           ]
         : tab === 'invoices'
           ? [
@@ -831,8 +876,8 @@ function RecordTable({
               { label: 'Vendor', cell: (item: Data) => String(item.vendor ?? '—') },
               { label: 'Direction', cell: (item: Data) => String(item.direction ?? '—') },
               { label: 'Due date', cell: (item: Data) => date(item.dueAt) },
-              { label: 'Status', cell: status },
-              { label: 'Amount', align: 'right', cell: (item: Data) => amount(item.amount) },
+              { label: 'Status', align: 'center', cell: status },
+              { label: 'Amount', align: 'center', cell: (item: Data) => amount(item.amount) },
             ]
           : tab === 'tax-lines'
             ? [
@@ -843,8 +888,12 @@ function RecordTable({
                     `${String(item.taxType ?? 'Tax')} · ${String(item.taxRate ?? 0)}%`,
                 },
                 { label: 'Period', cell: (item: Data) => String(item.taxPeriod ?? '—') },
-                { label: 'Match status', cell: (item: Data) => status(item, item.matchStatus) },
-                { label: 'Amount', align: 'right', cell: (item: Data) => amount(item.amount) },
+                {
+                  label: 'Match status',
+                  align: 'center',
+                  cell: (item: Data) => status(item, item.matchStatus),
+                },
+                { label: 'Amount', align: 'center', cell: (item: Data) => amount(item.amount) },
               ]
             : tab === 'cash-movements'
               ? [
@@ -855,8 +904,8 @@ function RecordTable({
                   },
                   { label: 'Direction', cell: (item: Data) => String(item.direction ?? '—') },
                   { label: 'Occurred', cell: (item: Data) => date(item.occurredAt) },
-                  { label: 'Status', cell: status },
-                  { label: 'Amount', align: 'right', cell: (item: Data) => amount(item.amount) },
+                  { label: 'Status', align: 'center', cell: status },
+                  { label: 'Amount', align: 'center', cell: (item: Data) => amount(item.amount) },
                 ]
               : [
                   { label: 'Claim', cell: reference },
@@ -869,8 +918,8 @@ function RecordTable({
                     label: 'Category',
                     cell: (item: Data) => String(item.category ?? '—').replaceAll('_', ' '),
                   },
-                  { label: 'Status', cell: status },
-                  { label: 'Amount', align: 'right', cell: (item: Data) => amount(item.amount) },
+                  { label: 'Status', align: 'center', cell: status },
+                  { label: 'Amount', align: 'center', cell: (item: Data) => amount(item.amount) },
                 ];
   return (
     <div className={styles.tableWrap}>
@@ -879,7 +928,7 @@ function RecordTable({
           <tr>
             {columns.map((column) => (
               <th
-                className={column.align === 'right' ? styles.recordAmountCell : undefined}
+                className={column.align === 'center' ? styles.recordCenterCell : undefined}
                 key={column.label}
               >
                 {column.label}
@@ -889,28 +938,71 @@ function RecordTable({
           </tr>
         </thead>
         <tbody>
-          {rows.slice(0, 100).map((item, index) => (
+          {pageRows.map((item, index) => (
             <tr key={String(item.id ?? item.externalId ?? index)}>
               {columns.map((column) => (
                 <td
-                  className={column.align === 'right' ? styles.recordAmountCell : undefined}
+                  className={
+                    column.align === 'center'
+                      ? `${styles.recordCenterCell} ${column.label === 'Amount' || column.label === 'Expected' || column.label === 'Received' || column.label === 'Variance' ? styles.recordAmountCell : ''}`
+                      : undefined
+                  }
                   key={column.label}
                 >
                   {column.cell(item)}
                 </td>
               ))}
-              <td>
-                <FinoraButton size="small" variant="ghost" onClick={() => onView(item)}>
-                  View
-                </FinoraButton>
-                <FinoraButton size="small" variant="ghost" onClick={() => onEdit(item)}>
-                  Edit
-                </FinoraButton>
+              <td className={styles.recordActions}>
+                <FinoraIconButton
+                  size="small"
+                  variant="ghost"
+                  aria-label={`View ${String(item.externalId ?? 'record')}`}
+                  onClick={() => onView(item)}
+                >
+                  <FinoraIcon name="view" />
+                </FinoraIconButton>
+                <FinoraIconButton
+                  size="small"
+                  variant="ghost"
+                  aria-label={`Edit ${String(item.externalId ?? 'record')}`}
+                  onClick={() => onEdit(item)}
+                >
+                  <FinoraIcon name="edit" />
+                </FinoraIconButton>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      {rows.length > pageSize ? (
+        <footer className={styles.recordPagination}>
+          <span>
+            {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, rows.length)} of{' '}
+            {rows.length}
+          </span>
+          <div>
+            <FinoraButton
+              size="small"
+              variant="ghost"
+              disabled={currentPage === 1}
+              onClick={() => onPageChange(currentPage - 1)}
+            >
+              Previous
+            </FinoraButton>
+            <span>
+              Page {currentPage} of {pageCount}
+            </span>
+            <FinoraButton
+              size="small"
+              variant="ghost"
+              disabled={currentPage === pageCount}
+              onClick={() => onPageChange(currentPage + 1)}
+            >
+              Next
+            </FinoraButton>
+          </div>
+        </footer>
+      ) : null}
     </div>
   );
 }
