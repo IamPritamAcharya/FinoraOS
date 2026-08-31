@@ -9,6 +9,7 @@ import {
 import {
   type FinanceToolCall,
   type FinanceToolExecutor,
+  type FinanceToolName,
   type ToolObservation,
 } from '@finora/agents';
 import { AgentReadService } from './agent-read.service.js';
@@ -40,6 +41,58 @@ export class FinanceToolsService {
     return { execute: (call, callId) => this.executeFor(principal, call, callId, asOf, options) };
   }
 
+  allowedTools(principal: RequestPrincipal, writeMode = false): FinanceToolName[] {
+    const allowed: FinanceToolName[] = [
+      'getWorkspaceCapabilities',
+      'getCurrentUser',
+      'getMyExpenseSummary',
+      'findMyExpenses',
+    ];
+    if (hasWorkspacePermission(principal, WorkspacePermission.VIEW_ORGANIZATION_FINANCE)) {
+      allowed.push(
+        'getOrganizationSummary',
+        'getBudgetSummary',
+        'getPaymentSummary',
+        'getSettlementSummary',
+        'getInvoiceSummary',
+        'getTaxSummary',
+        'listOrganizationUsers',
+        'getExpenseSummary',
+        'findCashMovements',
+        'findTransactions',
+        'getTransaction',
+        'findSettlements',
+        'findInvoices',
+        'getInvoice',
+        'getTaxLine',
+        'getExpenseClaim',
+        'getSettlement',
+        'getException',
+        'getExceptionEvidence',
+        'findExceptions',
+        'getCashForecast',
+        'findUnmatchedTaxLines',
+        'findReconciliationRuns',
+      );
+    }
+    if (hasWorkspacePermission(principal, WorkspacePermission.REVIEW_EXPENSE)) {
+      allowed.push('investigateException');
+    }
+    if (hasWorkspacePermission(principal, WorkspacePermission.VIEW_AUDIT)) {
+      allowed.push('findAuditEvents');
+    }
+    if (hasWorkspacePermission(principal, WorkspacePermission.VIEW_AGENT_AUDIT)) {
+      allowed.push('findAgentRuns');
+    }
+    if (
+      writeMode &&
+      hasWorkspacePermission(principal, WorkspacePermission.MANAGE_FINANCE_RECORDS)
+    ) {
+      allowed.push('proposeRecordUpdate');
+    }
+    return [...new Set(allowed)];
+  }
+
   async activeSkills(principal: RequestPrincipal) {
     if (!hasWorkspacePermission(principal, WorkspacePermission.VIEW_ORGANIZATION_FINANCE)) {
       return [];
@@ -68,43 +121,51 @@ export class FinanceToolsService {
       callId,
       organizationId,
     });
-    if (
-      !hasWorkspacePermission(principal, WorkspacePermission.VIEW_ORGANIZATION_FINANCE) &&
-      call.tool !== 'getCurrentUser' &&
-      call.tool !== 'getWorkspaceCapabilities'
-    ) {
+    const allowedTools = this.allowedTools(principal, options.writeMode === true);
+    if (!allowedTools.includes(call.tool)) {
       return {
         callId,
         tool: call.tool,
         summary:
-          'Your workspace role can only access your own finance data. Organization-wide finance evidence was not queried.',
-        data: { denied: true, permission: WorkspacePermission.VIEW_ORGANIZATION_FINANCE },
+          'That information is outside your current workspace access. I did not query or expose restricted finance data.',
+        data: { denied: true, role: principal.role, allowedTools },
       };
     }
     switch (call.tool) {
       case 'getWorkspaceCapabilities': {
         const capabilities = {
-          connected: [
-            'payments',
-            'settlements',
-            'invoices',
-            'posted expenses',
-            'cash position and forecast',
-            'tax lines',
-            'reconciliation and exceptions',
-            'organization members',
-            'audit and agent activity',
-          ],
+          role: principal.role ?? 'EMPLOYEE',
+          scope: hasWorkspacePermission(principal, WorkspacePermission.VIEW_ORGANIZATION_FINANCE)
+            ? 'ORGANIZATION'
+            : 'OWN_RECORDS',
+          connected: hasWorkspacePermission(
+            principal,
+            WorkspacePermission.VIEW_ORGANIZATION_FINANCE,
+          )
+            ? [
+                'payments',
+                'settlements',
+                'invoices',
+                'posted expenses',
+                'cash position and forecast',
+                'tax lines',
+                'reconciliation and exceptions',
+                'organization members',
+              ]
+            : ['profile', 'own expense claims', 'own receipts', 'own reimbursement status'],
           unavailable: [],
           requestedTopic: call.arguments.topic,
+          allowedTools,
         };
         const budgetRequested = call.arguments.topic === 'BUDGETS';
         return {
           callId,
           tool: call.tool,
           summary: budgetRequested
-            ? 'Operating budgets are available through the deterministic budget summary tool.'
-            : `This workspace has controlled access to ${capabilities.connected.join(', ')} and organization budgets.`,
+            ? allowedTools.includes('getBudgetSummary')
+              ? 'Operating budgets are available through the deterministic budget summary tool.'
+              : 'Operating budgets are outside your current workspace role. Your own expense claims and receipts remain available.'
+            : `As ${String(capabilities.role).replaceAll('_', ' ').toLowerCase()}, you can ask about ${capabilities.connected.join(', ')}.`,
           data: capabilities,
           artifact: {
             type: 'metrics',
@@ -123,6 +184,55 @@ export class FinanceToolsService {
             : 'I could not find the signed-in user in this organization.',
           data: user,
           artifact: user ? { type: 'profile', title: 'Your profile', data: user } : undefined,
+        };
+      }
+      case 'getMyExpenseSummary': {
+        const result = await this.reads.myExpenseSummary(
+          organizationId,
+          principal.userId,
+          call.arguments,
+        );
+        return {
+          callId,
+          tool: call.tool,
+          summary: result.count
+            ? `You have ${result.count} expense claim${result.count === 1 ? '' : 's'} totaling ${formatInr(result.total.toString())}. ${result.missingReceipts ? `${result.missingReceipts} still ${result.missingReceipts === 1 ? 'needs' : 'need'} receipt evidence.` : 'Every claim has receipt evidence attached.'}`
+            : 'You do not have any expense claims matching that period or status.',
+          data: plain(result),
+          artifact: {
+            type: 'metrics',
+            title: 'My expense claims',
+            data: plain(result),
+            href: '/records?tab=expense-claims',
+          },
+        };
+      }
+      case 'findMyExpenses': {
+        const rows = await this.reads.findMyExpenses(organizationId, principal.userId, {
+          ...call.arguments,
+          take: call.arguments.limit,
+        });
+        const exact = call.arguments.externalId;
+        return {
+          callId,
+          tool: call.tool,
+          summary: rows.length
+            ? exact
+              ? `${rows[0].externalId} is a ${label(rows[0].status).toLowerCase()} expense claim for ${formatInr(rows[0].amount.toString())} at ${rows[0].merchant}. ${rows[0].documents.length ? `${rows[0].documents.length} receipt document${rows[0].documents.length === 1 ? ' is' : 's are'} attached.` : 'It still needs receipt evidence.'}`
+              : `I found ${rows.length} of your expense claim${rows.length === 1 ? '' : 's'}.${call.arguments.missingReceipt ? ' Each still needs receipt evidence.' : ''}`
+            : exact
+              ? `${exact} was not found among your expense claims.`
+              : 'None of your expense claims matched those filters.',
+          data: plain(rows),
+          artifact: {
+            type: 'table',
+            title: exact ?? 'My expense claims',
+            data: { rows: plain(rows) },
+            href: exact
+              ? `/records?tab=expense-claims&record=${exact}`
+              : '/records?tab=expense-claims',
+          },
+          references: rows.map((row) => row.externalId),
         };
       }
       case 'getOrganizationSummary': {
@@ -368,6 +478,71 @@ export class FinanceToolsService {
             href: '/records?tab=invoices',
           },
           references: rows.map((row) => row.externalId),
+        };
+      }
+      case 'getInvoice': {
+        const invoice = await this.reads.getInvoice(organizationId, call.arguments.invoiceId);
+        const data = plain(invoice);
+        return {
+          callId,
+          tool: call.tool,
+          summary: invoice
+            ? `${invoice.externalId} is a ${label(invoice.direction).toLowerCase()} invoice for ${formatInr(invoice.amount.toString())} from ${invoice.vendor ?? 'an unspecified counterparty'}. It is ${label(invoice.status).toLowerCase()}${invoice.dueAt ? ` and due ${new Date(invoice.dueAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}` : ''}.`
+            : `${call.arguments.invoiceId} was not found in this organization.`,
+          data,
+          artifact: invoice
+            ? {
+                type: 'table',
+                title: invoice.externalId,
+                data: { rows: [data] },
+                href: `/records?tab=invoices&record=${invoice.externalId}`,
+              }
+            : undefined,
+          references: invoice ? [invoice.externalId] : [],
+        };
+      }
+      case 'getTaxLine': {
+        const taxLine = await this.reads.getTaxLine(organizationId, call.arguments.taxLineId);
+        const data = plain(taxLine);
+        return {
+          callId,
+          tool: call.tool,
+          summary: taxLine
+            ? `${taxLine.externalId} is a ${label(taxLine.taxType).toLowerCase()} line for ${formatInr(taxLine.amount.toString())} at ${taxLine.taxRate.toString()}%. It is ${taxLine.matched ? 'matched' : 'unmatched'}${taxLine.invoice ? ` and linked to ${taxLine.invoice.externalId}` : ''}.`
+            : `${call.arguments.taxLineId} was not found in this organization.`,
+          data,
+          artifact: taxLine
+            ? {
+                type: 'table',
+                title: taxLine.externalId,
+                data: { rows: [data] },
+                href: `/records?tab=tax-lines&record=${taxLine.externalId}`,
+              }
+            : undefined,
+          references: taxLine
+            ? [taxLine.externalId, ...(taxLine.invoice ? [taxLine.invoice.externalId] : [])]
+            : [],
+        };
+      }
+      case 'getExpenseClaim': {
+        const expense = await this.reads.getExpenseClaim(organizationId, call.arguments.expenseId);
+        const data = plain(expense);
+        return {
+          callId,
+          tool: call.tool,
+          summary: expense
+            ? `${expense.externalId} is a ${label(expense.status).toLowerCase()} expense claim for ${formatInr(expense.amount.toString())} at ${expense.merchant}, submitted by ${expense.claimant.name}. ${expense.documents.length ? `${expense.documents.length} receipt document${expense.documents.length === 1 ? ' is' : 's are'} attached.` : 'Receipt evidence is missing.'}`
+            : `${call.arguments.expenseId} was not found in this organization.`,
+          data,
+          artifact: expense
+            ? {
+                type: 'table',
+                title: expense.externalId,
+                data: { rows: [data] },
+                href: `/records?tab=expense-claims&record=${expense.externalId}`,
+              }
+            : undefined,
+          references: expense ? [expense.externalId] : [],
         };
       }
       case 'getSettlement': {

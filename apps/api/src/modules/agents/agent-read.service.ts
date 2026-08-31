@@ -162,6 +162,89 @@ export class AgentReadService extends PrismaClient implements OnModuleInit, OnMo
     );
   }
 
+  async myExpenseSummary(
+    organizationId: string,
+    userId: string,
+    input: { from?: string; to?: string; status?: string },
+  ) {
+    return this.forOrganization(organizationId, async (tx) => {
+      const rows = await tx.expenseClaim.findMany({
+        where: {
+          claimantUserId: userId,
+          ...(input.status ? { status: input.status as never } : {}),
+          ...(input.from || input.to
+            ? {
+                incurredAt: {
+                  ...(input.from ? { gte: new Date(input.from) } : {}),
+                  ...(input.to ? { lte: new Date(input.to) } : {}),
+                },
+              }
+            : {}),
+        },
+        select: { amount: true, currency: true, status: true, documents: { select: { id: true } } },
+      });
+      const statuses = rows.reduce<Record<string, number>>((result, row) => {
+        result[row.status] = (result[row.status] ?? 0) + 1;
+        return result;
+      }, {});
+      return {
+        count: rows.length,
+        total: rows.reduce((sum, row) => sum.plus(row.amount), new Prisma.Decimal(0)),
+        currency: rows[0]?.currency ?? 'INR',
+        statuses,
+        missingReceipts: rows.filter((row) => row.documents.length === 0).length,
+        ...input,
+      };
+    });
+  }
+
+  async findMyExpenses(
+    organizationId: string,
+    userId: string,
+    input: {
+      externalId?: string;
+      from?: string;
+      to?: string;
+      status?: string;
+      missingReceipt?: boolean;
+      take?: number;
+    },
+  ) {
+    return this.forOrganization(organizationId, (tx) =>
+      tx.expenseClaim.findMany({
+        where: {
+          claimantUserId: userId,
+          ...(input.externalId ? { externalId: input.externalId } : {}),
+          ...(input.status ? { status: input.status as never } : {}),
+          ...(input.missingReceipt === true ? { documents: { none: {} } } : {}),
+          ...(input.from || input.to
+            ? {
+                incurredAt: {
+                  ...(input.from ? { gte: new Date(input.from) } : {}),
+                  ...(input.to ? { lte: new Date(input.to) } : {}),
+                },
+              }
+            : {}),
+        },
+        select: {
+          externalId: true,
+          status: true,
+          amount: true,
+          currency: true,
+          merchant: true,
+          category: true,
+          description: true,
+          incurredAt: true,
+          submittedAt: true,
+          approvedAt: true,
+          documents: { select: { id: true, fileName: true, status: true, createdAt: true } },
+        },
+        orderBy: { incurredAt: 'desc' },
+        take: Math.min(input.take ?? 25, 100),
+      }),
+    );
+  }
+
   async paymentSummary(
     organizationId: string,
     input: { from?: string; to?: string; status?: string },
@@ -477,6 +560,76 @@ export class AgentReadService extends PrismaClient implements OnModuleInit, OnMo
         select: { externalId: true, amount: true, currency: true, issuedAt: true },
         orderBy: { issuedAt: 'desc' },
         take: Math.min(take, 100),
+      }),
+    );
+  }
+
+  async getInvoice(organizationId: string, externalId: string) {
+    return this.forOrganization(organizationId, (tx) =>
+      tx.invoice.findFirst({
+        where: { externalId },
+        select: {
+          externalId: true,
+          vendor: true,
+          direction: true,
+          status: true,
+          amount: true,
+          currency: true,
+          category: true,
+          issuedAt: true,
+          dueAt: true,
+          node: { select: { name: true, code: true } },
+        },
+      }),
+    );
+  }
+
+  async getTaxLine(organizationId: string, externalId: string) {
+    return this.forOrganization(organizationId, async (tx) => {
+      const taxLine = await tx.taxLine.findFirst({
+        where: { externalId },
+        select: {
+          externalId: true,
+          amount: true,
+          taxRate: true,
+          matched: true,
+          matchStatus: true,
+          taxType: true,
+          taxPeriod: true,
+          counterpartyTaxId: true,
+          invoiceId: true,
+        },
+      });
+      if (!taxLine) return null;
+      const invoice = taxLine.invoiceId
+        ? await tx.invoice.findFirst({
+            where: { id: taxLine.invoiceId },
+            select: { externalId: true, vendor: true, amount: true },
+          })
+        : null;
+      return { ...taxLine, currency: 'INR', invoice };
+    });
+  }
+
+  async getExpenseClaim(organizationId: string, externalId: string) {
+    return this.forOrganization(organizationId, (tx) =>
+      tx.expenseClaim.findFirst({
+        where: { externalId },
+        select: {
+          externalId: true,
+          status: true,
+          amount: true,
+          currency: true,
+          merchant: true,
+          category: true,
+          description: true,
+          incurredAt: true,
+          submittedAt: true,
+          approvedAt: true,
+          claimant: { select: { name: true, email: true } },
+          node: { select: { name: true, code: true } },
+          documents: { select: { id: true, fileName: true, status: true, createdAt: true } },
+        },
       }),
     );
   }

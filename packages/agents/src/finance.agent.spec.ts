@@ -213,6 +213,40 @@ describe('FinanceAgent', () => {
     );
   });
 
+  it.each([
+    ['Explain INV_0004', 'getInvoice', { invoiceId: 'INV_0004' }, ['getInvoice'] as const],
+    [
+      'What happened to GST_0007?',
+      'getTaxLine',
+      { taxLineId: 'GST_0007' },
+      ['getTaxLine'] as const,
+    ],
+    [
+      'Investigate EXC_JRIW3B_012',
+      'investigateException',
+      { exceptionId: 'EXC_JRIW3B_012' },
+      ['investigateException'] as const,
+    ],
+  ])(
+    'routes the exact record in “%s” without model ambiguity',
+    async (message, tool, args, allowed) => {
+      const execute = vi.fn().mockResolvedValue({
+        callId: 'call-1',
+        tool,
+        summary: `Loaded ${message}`,
+        data: {},
+      });
+      const model = { complete: vi.fn() };
+      await new FinanceAgent(model, { execute }).run({
+        message,
+        currentDate: '2026-08-26T00:00:00.000Z',
+        actor: { role: 'FINANCE_CONTROLLER', allowedTools: [...allowed] },
+      });
+      expect(execute).toHaveBeenCalledWith({ tool, arguments: args }, 'call-1');
+      expect(model.complete).not.toHaveBeenCalled();
+    },
+  );
+
   it('executes a finance tool and synthesizes its evidence', async () => {
     const model = {
       complete: vi
@@ -449,5 +483,86 @@ describe('FinanceAgent', () => {
       }),
       'call-1',
     );
+  });
+
+  it('routes an employee natural-language receipt question to only their own claims', async () => {
+    const execute = vi.fn().mockResolvedValue({
+      callId: 'call-1',
+      tool: 'findMyExpenses',
+      summary: 'I found 2 of your expense claims. Each still needs receipt evidence.',
+      data: [],
+    });
+    const model = {
+      complete: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          type: 'tool',
+          call: { tool: 'findMyExpenses', arguments: { missingReceipt: true } },
+        }),
+      ),
+    };
+    const result = await new FinanceAgent(model, { execute }, 1).run({
+      message: 'Which of my expenses still need receipts?',
+      currentDate: '2026-08-26T00:00:00.000Z',
+      actor: {
+        role: 'EMPLOYEE',
+        allowedTools: [
+          'getWorkspaceCapabilities',
+          'getCurrentUser',
+          'getMyExpenseSummary',
+          'findMyExpenses',
+        ],
+      },
+    });
+    expect(execute).toHaveBeenCalledWith(
+      { tool: 'findMyExpenses', arguments: { missingReceipt: true } },
+      'call-1',
+    );
+    expect(result.text).toContain('your expense claims');
+  });
+
+  it('does not execute an organization-wide tool selected for an employee', async () => {
+    const execute = vi.fn();
+    const model = {
+      complete: vi
+        .fn()
+        .mockResolvedValue(
+          JSON.stringify({ type: 'tool', call: { tool: 'getOrganizationSummary', arguments: {} } }),
+        ),
+    };
+    const result = await new FinanceAgent(model, { execute }, 2).run({
+      message: 'How many transactions does the company have?',
+      currentDate: '2026-08-26T00:00:00.000Z',
+      actor: {
+        role: 'EMPLOYEE',
+        allowedTools: [
+          'getWorkspaceCapabilities',
+          'getCurrentUser',
+          'getMyExpenseSummary',
+          'findMyExpenses',
+        ],
+      },
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(result.text).toContain('expense claims');
+  });
+
+  it('recovers a common finance intent when the model returns invalid output', async () => {
+    const execute = vi.fn().mockResolvedValue({
+      callId: 'call-1',
+      tool: 'getCashForecast',
+      summary: 'No shortfall appears in the known cash schedule.',
+      data: [],
+    });
+    const result = await new FinanceAgent(
+      { complete: vi.fn().mockResolvedValue('not-json') },
+      { execute },
+      2,
+    ).run({
+      message: 'Do we have enough cash runway?',
+      currentDate: '2026-08-26T00:00:00.000Z',
+      actor: { role: 'FINANCE_CONTROLLER', allowedTools: ['getCashForecast'] },
+    });
+    expect(execute).toHaveBeenCalledWith({ tool: 'getCashForecast', arguments: {} }, 'call-1');
+    expect(result.text).toContain('No shortfall');
   });
 });

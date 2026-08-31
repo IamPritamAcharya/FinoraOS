@@ -73,6 +73,47 @@ export const FinanceToolCallSchema = z.discriminatedUnion('tool', [
     }),
   }),
   z.object({ tool: z.literal('getCurrentUser'), arguments: z.object({}) }),
+  z.object({
+    tool: z.literal('getMyExpenseSummary'),
+    arguments: z.object({
+      ...optionalPeriod,
+      status: z
+        .enum([
+          'DRAFT',
+          'RECEIPT_REQUIRED',
+          'SUBMITTED',
+          'UNDER_REVIEW',
+          'APPROVED',
+          'REJECTED',
+          'REIMBURSED',
+        ])
+        .optional(),
+    }),
+  }),
+  z.object({
+    tool: z.literal('findMyExpenses'),
+    arguments: z.object({
+      ...optionalPeriod,
+      externalId: z
+        .string()
+        .regex(/^EXP_\d{4}$/i)
+        .transform((value) => value.toUpperCase())
+        .optional(),
+      status: z
+        .enum([
+          'DRAFT',
+          'RECEIPT_REQUIRED',
+          'SUBMITTED',
+          'UNDER_REVIEW',
+          'APPROVED',
+          'REJECTED',
+          'REIMBURSED',
+        ])
+        .optional(),
+      missingReceipt: z.boolean().optional(),
+      limit: optionalLimit,
+    }),
+  }),
   z.object({ tool: z.literal('getOrganizationSummary'), arguments: z.object({}) }),
   z.object({
     tool: z.literal('getBudgetSummary'),
@@ -176,20 +217,47 @@ export const FinanceToolCallSchema = z.discriminatedUnion('tool', [
   }),
   z.object({ tool: z.literal('findInvoices'), arguments: z.object({ limit: optionalLimit }) }),
   z.object({
+    tool: z.literal('getInvoice'),
+    arguments: z.object({
+      invoiceId: z
+        .string()
+        .regex(/^INV_\d{4}$/i)
+        .transform((value) => value.toUpperCase()),
+    }),
+  }),
+  z.object({
+    tool: z.literal('getTaxLine'),
+    arguments: z.object({
+      taxLineId: z
+        .string()
+        .regex(/^GST_\d{4}$/i)
+        .transform((value) => value.toUpperCase()),
+    }),
+  }),
+  z.object({
+    tool: z.literal('getExpenseClaim'),
+    arguments: z.object({
+      expenseId: z
+        .string()
+        .regex(/^EXP_\d{4}$/i)
+        .transform((value) => value.toUpperCase()),
+    }),
+  }),
+  z.object({
     tool: z.literal('getSettlement'),
     arguments: z.object({ settlementId: z.string().regex(/^STL_\d{4}$/) }),
   }),
   z.object({
     tool: z.literal('getException'),
-    arguments: z.object({ exceptionId: z.string().regex(/^EXC_\d{3}$/) }),
+    arguments: z.object({ exceptionId: z.string().regex(/^EXC_(?:[A-Z0-9]+_)?\d{3}$/i) }),
   }),
   z.object({
     tool: z.literal('getExceptionEvidence'),
-    arguments: z.object({ exceptionId: z.string().regex(/^EXC_\d{3}$/) }),
+    arguments: z.object({ exceptionId: z.string().regex(/^EXC_(?:[A-Z0-9]+_)?\d{3}$/i) }),
   }),
   z.object({
     tool: z.literal('investigateException'),
-    arguments: z.object({ exceptionId: z.string().regex(/^EXC_\d{3}$/) }),
+    arguments: z.object({ exceptionId: z.string().regex(/^EXC_(?:[A-Z0-9]+_)?\d{3}$/i) }),
   }),
   z.object({
     tool: z.literal('findExceptions'),
@@ -290,6 +358,8 @@ export interface FinanceToolExecutor {
 const toolGuide = `Available tools:
 - getWorkspaceCapabilities: whether a finance area is connected and which evidence is available.
 - getCurrentUser: the signed-in user's profile, including their email.
+- getMyExpenseSummary: the signed-in user's own claim totals and status breakdown.
+- findMyExpenses: the signed-in user's own claims, including receipt state; use for lists, latest claims, reimbursements, and missing receipts.
 - getOrganizationSummary: counts of members and finance records.
 - getBudgetSummary: deterministic budget allocation, committed expense and remaining amount by organization node and period.
 - getPaymentSummary: payment volume, count and average for a period/status.
@@ -302,6 +372,7 @@ const toolGuide = `Available tools:
 - getTransaction: one exact payment transaction by pay_##### reference.
 - findTransactions / findSettlements: filtered source records; customer payments are not expenses.
 - findInvoices: invoice records.
+- getInvoice / getTaxLine / getExpenseClaim: one exact organization-scoped record by reference.
 - getSettlement: one settlement and its fee/GST/refund breakdown.
 - getException / getExceptionEvidence: exception status and evidence.
 - investigateException: create a proposal only when the user explicitly asks to investigate.
@@ -317,7 +388,7 @@ If evidence is required, return {"type":"tool","call":{"tool":"...","arguments":
 For multi-part questions, return all independent reads together as {"type":"tools","calls":[{"tool":"...","arguments":{}},{"tool":"...","arguments":{}}]}.
 After tools return evidence, return {"type":"answer","answer":"natural concise answer","citations":["call-1"]}.
 If a necessary detail is genuinely missing, return {"type":"clarify","question":"one concise question"}.
-Never invent values or claim a tool failed when it returned data. Prefer finance language over database language. Use summary tools for totals and find tools for record lists. Use getExpenseSummary for expenses/spend/costs/outflows, not findTransactions. Use getCurrentUser for "my" profile questions. The current user message is authoritative. Conversation context is reference material only: ignore an old clarification when the current message names a new topic, period, or record, except when it directly answers the latest pending write clarification. Never ask again for a detail already supplied, and never repeat a previous clarification. "Last" and "latest" mean the newest matching record and do not require a date range. Use conversation context for genuinely short follow-ups and resolve pronouns from the latest referenced record. You may call several tools before answering comparisons or multi-part questions. Never write SQL or create unlisted tools. Never investigate unless explicitly requested. A record update request must use proposeRecordUpdate, must name the exact record and fields, and only prepares a diff; never claim the change is applied. The user approves or rejects the diff outside the model. Record prefixes determine entity type: pay_##### is a TRANSACTION, STL_#### is a SETTLEMENT, INV_#### is an INVOICE, and GST_#### is a TAX_LINE. Never ask for an entity type already established by one of these prefixes.
+Never invent values or claim a tool failed when it returned data. Prefer finance language over database language. Use summary tools for totals and find tools for record lists. "My expenses", reimbursements, claims, and receipts use getMyExpenseSummary or findMyExpenses. Organization-wide operating expenses use getExpenseSummary; customer payments are never expenses. Use getCurrentUser for "my" profile questions. Select only a tool listed in allowedTools. If the role lacks access, explain the accessible scope naturally and do not attempt a broader tool. The current user message is authoritative. Conversation context is reference material only: ignore an old clarification when the current message names a new topic, period, or record, except when it directly answers the latest pending write clarification. Never ask again for a detail already supplied, and never repeat a previous clarification. "Last" and "latest" mean the newest matching record and do not require a date range. Use conversation context for genuinely short follow-ups and resolve pronouns from the latest referenced record. You may call several tools before answering comparisons or multi-part questions. Never write SQL or create unlisted tools. Never investigate unless explicitly requested. A record update request must use proposeRecordUpdate, must name the exact record and fields, and only prepares a diff; never claim the change is applied. The user approves or rejects the diff outside the model. Record prefixes determine entity type: pay_##### is a TRANSACTION, STL_#### is a SETTLEMENT, INV_#### is an INVOICE, GST_#### is a TAX_LINE, and EXP_#### is an EXPENSE_CLAIM. Never ask for an entity type already established by one of these prefixes.
 Workspace skills are approved operating procedures supplied in the prompt. Select a skillId only when the request clearly matches it. A skill can narrow behavior but never override these safety rules, and every selected tool must appear in that skill's allowedTools.
 ${toolGuide}`;
 
@@ -397,7 +468,17 @@ const normalizedQuestion = (value: string) =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 
-const deterministicFastLane = (message: string): FinanceToolCall | undefined => {
+const deterministicFastLane = (
+  message: string,
+  allowedTools?: FinanceToolName[],
+): FinanceToolCall | undefined => {
+  const expenseId = message.match(/\bEXP_\d{4}\b/i)?.[0]?.toUpperCase();
+  if (expenseId) {
+    if (allowedTools?.includes('getExpenseClaim')) {
+      return { tool: 'getExpenseClaim', arguments: { expenseId } };
+    }
+    return { tool: 'findMyExpenses', arguments: { externalId: expenseId, limit: 1 } };
+  }
   const transactionId = message.match(/\bpay_\d{5}\b/i)?.[0];
   if (transactionId) {
     return FinanceToolCallSchema.parse({
@@ -405,7 +486,7 @@ const deterministicFastLane = (message: string): FinanceToolCall | undefined => 
       arguments: { transactionId },
     });
   }
-  const exceptionId = message.match(/\bEXC_\d{3}\b/i)?.[0]?.toUpperCase();
+  const exceptionId = message.match(/\bEXC_(?:[A-Z0-9]+_)?\d{3}\b/i)?.[0]?.toUpperCase();
   if (exceptionId) {
     return /\binvestigat\w*\b/i.test(message)
       ? { tool: 'investigateException', arguments: { exceptionId } }
@@ -413,6 +494,10 @@ const deterministicFastLane = (message: string): FinanceToolCall | undefined => 
   }
   const settlementId = message.match(/\bSTL_\d{4}\b/i)?.[0]?.toUpperCase();
   if (settlementId) return { tool: 'getSettlement', arguments: { settlementId } };
+  const invoiceId = message.match(/\bINV_\d{4}\b/i)?.[0]?.toUpperCase();
+  if (invoiceId) return { tool: 'getInvoice', arguments: { invoiceId } };
+  const taxLineId = message.match(/\bGST_\d{4}\b/i)?.[0]?.toUpperCase();
+  if (taxLineId) return { tool: 'getTaxLine', arguments: { taxLineId } };
   if (/\bbudget(?:s|ed|ing)?\b/i.test(message)) {
     return { tool: 'getBudgetSummary', arguments: {} };
   }
@@ -421,6 +506,80 @@ const deterministicFastLane = (message: string): FinanceToolCall | undefined => 
     /\b(trans[a-z]*|tras[a-z]*|payments?)\b/i.test(message)
   ) {
     return { tool: 'findTransactions', arguments: { limit: 1 } };
+  }
+  return undefined;
+};
+
+const amountFromMessage = (message: string) =>
+  message.match(/(?:₹|INR\s*)\s*([\d,]+(?:\.\d{1,2})?)/i)?.[1]?.replaceAll(',', '');
+
+/** Deterministic recovery for high-frequency intents when a small model emits invalid JSON. */
+const fallbackRoute = (
+  message: string,
+  allowedTools?: FinanceToolName[],
+): FinanceToolCall | undefined => {
+  const allowed = (tool: FinanceToolName) => !allowedTools || allowedTools.includes(tool);
+  const text = message.toLowerCase();
+  if (/\b(my|mine)\b/.test(text) && /\b(expenses?|claims?|receipts?|reimburse\w*)\b/.test(text)) {
+    if (
+      /\b(show|list|which|latest|last|missing|receipt|reimburse)\b/.test(text) &&
+      allowed('findMyExpenses')
+    ) {
+      return {
+        tool: 'findMyExpenses',
+        arguments: {
+          ...(text.includes('missing') || text.includes('without receipt')
+            ? { missingReceipt: true }
+            : {}),
+          ...(/\b(latest|last|most recent)\b/.test(text) ? { limit: 1 } : {}),
+        },
+      };
+    }
+    if (allowed('getMyExpenseSummary')) return { tool: 'getMyExpenseSummary', arguments: {} };
+  }
+  if (/\b(who am i|my (?:email|profile|account|role))\b/.test(text) && allowed('getCurrentUser')) {
+    return { tool: 'getCurrentUser', arguments: {} };
+  }
+  if (
+    /\b(member|members|users|people|headcount)\b/.test(text) &&
+    allowed('getOrganizationSummary')
+  ) {
+    return { tool: 'getOrganizationSummary', arguments: {} };
+  }
+  if (/\b(budget|budgets|allocation)\b/.test(text) && allowed('getBudgetSummary')) {
+    return { tool: 'getBudgetSummary', arguments: {} };
+  }
+  if (/\b(cash|liquidity|runway|forecast)\b/.test(text) && allowed('getCashForecast')) {
+    return { tool: 'getCashForecast', arguments: {} };
+  }
+  if (
+    /\b(exception|exceptions|unreconciled|unmatched transactions?)\b/.test(text) &&
+    allowed('findExceptions')
+  ) {
+    return {
+      tool: 'findExceptions',
+      arguments: {
+        ...(amountFromMessage(message) ? { minimumAmount: amountFromMessage(message) } : {}),
+      },
+    };
+  }
+  if (/\b(gst|tax)\b/.test(text)) {
+    if (/\b(unmatched|failed|missing)\b/.test(text) && allowed('findUnmatchedTaxLines')) {
+      return { tool: 'findUnmatchedTaxLines', arguments: {} };
+    }
+    if (allowed('getTaxSummary')) return { tool: 'getTaxSummary', arguments: {} };
+  }
+  if (/\b(settlement|settlements)\b/.test(text) && allowed('getSettlementSummary')) {
+    return { tool: 'getSettlementSummary', arguments: {} };
+  }
+  if (/\b(invoice|invoices|receivable|payable)\b/.test(text) && allowed('getInvoiceSummary')) {
+    return { tool: 'getInvoiceSummary', arguments: {} };
+  }
+  if (/\b(expenses?|spend|costs?|outflows?)\b/.test(text) && allowed('getExpenseSummary')) {
+    return { tool: 'getExpenseSummary', arguments: {} };
+  }
+  if (/\b(payments?|transactions?)\b/.test(text) && allowed('getPaymentSummary')) {
+    return { tool: 'getPaymentSummary', arguments: {} };
   }
   return undefined;
 };
@@ -471,7 +630,9 @@ const deterministicMutation = (message: string): FinanceToolCall | undefined => 
 
 const latestControlledReference = (context: FinanceChatContext[]) => {
   for (const item of context.slice(-2).reverse()) {
-    const reference = item.text.match(/\b(?:pay_\d{5}|STL_\d{4}|EXC_\d{3})\b/i)?.[0];
+    const reference = item.text.match(
+      /\b(?:pay_\d{5}|STL_\d{4}|EXC_(?:[A-Z0-9]+_)?\d{3}|INV_\d{4}|GST_\d{4}|EXP_\d{4})\b/i,
+    )?.[0];
     if (reference) return reference;
   }
   return undefined;
@@ -494,6 +655,7 @@ export class FinanceAgent {
     currentDate: string;
     skills?: FinanceSkillContext[];
     writeMode?: boolean;
+    actor?: { role: string; allowedTools: FinanceToolName[] };
   }): Promise<FinanceAgentResult> {
     const observations: ToolObservation[] = [];
     const activity: FinanceAgentResult['activity'] = [];
@@ -502,6 +664,7 @@ export class FinanceAgent {
     let diagnostics: string[] | undefined;
     let routingFeedback: string | undefined;
     let skillId: string | undefined;
+    let skillPolicyViolation = false;
 
     const contextualReference = /\b(it|that|those|them|same)\b|^\s*(everything|more|yes)\b/i.test(
       input.message,
@@ -517,7 +680,20 @@ export class FinanceAgent {
         ? undefined
         : deterministicFastLane(
             contextualReference ? `${input.message} ${contextualReference}` : input.message,
+            input.actor?.allowedTools,
           ));
+    if (fastLane && input.actor && !input.actor.allowedTools.includes(fastLane.tool)) {
+      return {
+        text:
+          input.actor.role === 'EMPLOYEE'
+            ? 'Your employee access is limited to your profile and your own expense claims and receipts. I did not query organization-wide finance records.'
+            : 'Your workspace role does not permit that finance operation.',
+        observations: [],
+        activity: [],
+        clarified: false,
+        fallbackReason: 'UNSUPPORTED',
+      };
+    }
     if (fastLane) {
       const callId = 'call-1';
       try {
@@ -557,7 +733,7 @@ export class FinanceAgent {
       let decision: z.infer<typeof AgentDecisionSchema>;
       try {
         const completion = await this.model.complete({
-          system: `${system}\nWrite mode is ${input.writeMode ? 'ENABLED. You may prepare a proposeRecordUpdate tool call for an explicit update request.' : 'DISABLED. Do not select proposeRecordUpdate; tell the user to enable write mode if they request a change.'}`,
+          system: `${system}\nSigned-in role: ${input.actor?.role ?? 'UNKNOWN'}. Allowed tools for this request: ${(input.actor?.allowedTools ?? []).join(', ') || 'use the catalogue above'}.\nWrite mode is ${input.writeMode ? 'ENABLED. You may prepare a proposeRecordUpdate tool call for an explicit update request if it is in allowedTools.' : 'DISABLED. Do not select proposeRecordUpdate; tell the user to enable write mode if they request a change.'}`,
           responseFormat: 'json',
           prompt: normalizeForPrompt({
             currentDate: input.currentDate,
@@ -579,7 +755,8 @@ export class FinanceAgent {
             .slice(0, 4)
             .map((issue) => `${issue.path.join('.') || 'decision'}: ${issue.message}`);
           lastFailure = 'INVALID_DECISION';
-          break;
+          routingFeedback = `Your previous response did not match the required JSON contract: ${diagnostics.join('; ')}. Return one valid decision using only allowedTools.`;
+          continue;
         }
         decision = parsed.data;
       } catch {
@@ -620,6 +797,14 @@ export class FinanceAgent {
       }
 
       const plannedCalls = decision.type === 'tools' ? decision.calls : [decision.call];
+      if (
+        input.actor &&
+        plannedCalls.some((call) => !input.actor?.allowedTools.includes(call.tool))
+      ) {
+        routingFeedback = `That tool is unavailable to the ${input.actor.role} role. Choose only from: ${input.actor.allowedTools.join(', ')}.`;
+        lastFailure = 'INVALID_DECISION';
+        continue;
+      }
       if (plannedCalls.some((call) => call.tool === 'proposeRecordUpdate') && !input.writeMode) {
         return {
           text: 'Write mode is off. Enable it in the composer before asking Finora to prepare a record change.',
@@ -632,6 +817,7 @@ export class FinanceAgent {
         ? (input.skills ?? []).find((skill) => skill.id === decision.skillId)
         : undefined;
       if (decision.skillId && !selectedSkill) {
+        skillPolicyViolation = true;
         routingFeedback =
           'The selected skillId is not active in this workspace. Continue without it.';
         lastFailure = 'INVALID_DECISION';
@@ -641,6 +827,7 @@ export class FinanceAgent {
         selectedSkill &&
         plannedCalls.some((call) => !selectedSkill.allowedTools.includes(call.tool))
       ) {
+        skillPolicyViolation = true;
         routingFeedback = `Skill ${selectedSkill.name} only permits these tools: ${selectedSkill.allowedTools.join(', ')}. Choose only from that allowlist or continue without the skill.`;
         lastFailure = 'INVALID_DECISION';
         continue;
@@ -700,8 +887,37 @@ export class FinanceAgent {
         skillId,
       };
     }
+    const recovered = skillPolicyViolation
+      ? undefined
+      : fallbackRoute(input.message, input.actor?.allowedTools);
+    if (recovered) {
+      const callId = 'call-1';
+      try {
+        const observation = await this.tools.execute(recovered, callId);
+        return {
+          text: observation.summary,
+          observations: [observation],
+          activity: [
+            {
+              callId,
+              tool: recovered.tool,
+              status: 'COMPLETED',
+              label: observation.summary,
+            },
+          ],
+          clarified: false,
+          fallbackReason: lastFailure,
+          diagnostics,
+        };
+      } catch {
+        lastFailure = 'MODEL_ERROR';
+      }
+    }
     return {
-      text: 'I can answer questions grounded in the financial records connected to this workspace. I could not safely map that request to available evidence yet—try adding the record, period, or finance topic you mean.',
+      text:
+        input.actor?.role === 'EMPLOYEE'
+          ? 'I can help with your profile, expense claims, reimbursement status, and missing receipts. Try “Show my latest expense claim” or “Which of my claims need receipts?”'
+          : 'I could not map that request to verified workspace evidence. Try naming the finance area, period, or record reference—for example, “Summarise expenses this month” or “Explain STL_0001.”',
       observations,
       activity,
       clarified: false,

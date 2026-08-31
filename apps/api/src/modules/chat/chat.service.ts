@@ -6,9 +6,10 @@ import { AI_GATEWAY, type AiGateway } from '../../gateways/ai/ai.gateway.js';
 import { FinanceToolsService } from '../agents/finance-tools.service.js';
 import { ChatRepository } from './chat.repository.js';
 
-const explicitRecord = /\b(?:pay_\d{5}|STL_\d{4}|EXC_\d{3}|INV_\d{4}|GST_\d{4})\b/i;
+const explicitRecord =
+  /\b(?:pay_\d{5}|STL_\d{4}|EXC_(?:[A-Z0-9]+_)?\d{3}|INV_\d{4}|GST_\d{4}|EXP_\d{4})\b/i;
 const explicitFinanceTopic =
-  /\b(?:budget?|trans[a-z]*|tras[a-z]*|payments?|expenses?|spend|costs?|outflows?|settlements?|cash|forecast|tax|GST|invoices?|exceptions?|reconciliation|members?|users?|email|profile|organization)\b/i;
+  /\b(?:budgets?|trans[a-z]*|tras[a-z]*|payments?|expenses?|claims?|receipts?|reimburse\w*|spend|costs?|outflows?|settlements?|cash|liquidity|runway|forecast|tax|GST|invoices?|exceptions?|reconciliation|members?|users?|email|profile|organization|audit|agents?)\b/i;
 const followUpReference = /\b(?:it|that|those|them|same|the former|the latter)\b/i;
 
 export const shouldUseConversationContext = (message: string) => {
@@ -64,6 +65,13 @@ export class ChatService {
     });
     const currentDate = new Date().toISOString();
     const skills = await this.tools.activeSkills(principal);
+    const allowedTools = this.tools.allowedTools(principal, writeMode);
+    apiLogger.info('Finora routing context prepared', {
+      threadId: thread.id,
+      organizationId: principal.organizationId,
+      role: principal.role ?? 'EMPLOYEE',
+      allowedToolCount: allowedTools.length,
+    });
     let gateway: { provider: string; model: string; fallbackFrom?: string } | undefined;
     const result = await new FinanceAgent(
       {
@@ -75,7 +83,14 @@ export class ChatService {
       },
       this.tools.forPrincipal(principal, currentDate, { writeMode, threadId: thread.id }),
       5,
-    ).run({ message, context, currentDate, skills, writeMode });
+    ).run({
+      message,
+      context,
+      currentDate,
+      skills,
+      writeMode,
+      actor: { role: principal.role ?? 'EMPLOYEE', allowedTools },
+    });
     const artifacts = result.observations.flatMap((item) => (item.artifact ? [item.artifact] : []));
     const references = [...new Set(result.observations.flatMap((item) => item.references ?? []))];
     const payload = {

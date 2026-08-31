@@ -68,6 +68,7 @@ describe('ChatService', () => {
     const tools = {
       forPrincipal: vi.fn().mockReturnValue({ execute }),
       activeSkills: vi.fn().mockResolvedValue([]),
+      allowedTools: vi.fn().mockReturnValue(['getCurrentUser']),
     };
     const chats = {
       getOrCreateThread: vi.fn().mockResolvedValue({ id: 'thread-1' }),
