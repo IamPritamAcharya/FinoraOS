@@ -13,6 +13,7 @@ The application now has Keycloak login/RBAC, an editable organization tree/canva
 ## Completed
 
 - pnpm/Turbo workspace with graceful `pnpm dev` Docker lifecycle and preflight port checks.
+- Lean GitHub Actions CI on pull requests and `main`: frozen pnpm install, enum synchronization, formatting, lint, typecheck, unit tests, and production build in one resource-bounded job. It does not start Docker, Keycloak, databases, or Ollama.
 - PostgreSQL/Redis/Keycloak Compose stack; Prisma 7 config, migrations, reproducible seed, shared enums, Decimal money rules, and enum synchronization.
 - Pure deterministic reconciliation package and transactional run/match/exception/evidence/audit persistence.
 - Reconciliation reruns supersede the prior active reconciliation exception snapshot atomically before persisting the new one. Historical evidence remains auditable, while Overview and Exceptions show only the current active queue.
