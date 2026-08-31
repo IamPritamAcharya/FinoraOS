@@ -96,7 +96,7 @@ The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, cl
 6. Ask: `Show unresolved exceptions above ₹25,000.`, `What is our expected cash position this week?`, or `Which GST lines failed to match?`
 7. Open **Reconciliation** to inspect the latest measured run.
 8. Open **Exceptions** to inspect the queue and its supporting reasons.
-9. Open **Records** to create one record, edit an existing record, or import a CSV batch. Every mutation appears in **Audit** with its actor and before/after evidence.
+9. Open **Records** to create or edit a record, import a CSV batch, or manage expense receipts and reviews. Employees receive only their own expense ledger; every mutation and review appears in **Audit** with its actor and evidence.
 10. In **Finora**, enable **Write mode**, ask `Change pay_00008 status to REFUNDED`, inspect the proposed diff, then approve or reject it. No record changes before approval.
 11. Open **Organization** to edit nodes or use the canvas and set a hard/category limit. Hard breaches are rejected; category overages notify Finance and the node owner.
 12. Run the evaluation harness to demonstrate batch-level accuracy—not a cherry-picked result.

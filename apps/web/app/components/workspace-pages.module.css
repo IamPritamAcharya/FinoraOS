@@ -1,32 +1,33 @@
 .header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 30px 34px 24px;
-  border-bottom: 1px solid var(--finora-border);
+  margin-bottom: 28px;
 }
 .header p,
 .eyebrow {
   margin: 0 0 7px;
-  color: var(--finora-brand);
-  font-size: 10px;
+  color: var(--finora-text-muted);
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.1em;
 }
 .header h1 {
   margin: 0;
   color: var(--finora-text);
-  font-size: 27px;
-  line-height: 1.2;
-  letter-spacing: -0.7px;
+  font-size: 34px;
+  font-weight: 780;
+  line-height: 1.18;
+  letter-spacing: -1.1px;
 }
 .header span {
   display: block;
   max-width: 680px;
   margin-top: 8px;
   color: var(--finora-text-muted);
-  font-size: 13px;
+  font-size: 15px;
+  line-height: 1.55;
 }
 .headerActions,
 .hierarchyActions,
@@ -37,14 +38,14 @@
 }
 .panel,
 .formPanel {
-  margin: 18px 28px;
+  margin: 0 0 18px;
   border: 1px solid var(--finora-border);
   border-radius: 12px;
   background: var(--finora-surface);
-  box-shadow: 0 8px 24px rgb(32 69 118 / 4%);
+  box-shadow: 0 5px 14px rgb(23 43 77 / 4%);
 }
 .panel {
-  padding: 20px;
+  padding: 20px 22px;
 }
 .panelHead {
   display: flex;
@@ -53,17 +54,20 @@
   gap: 16px;
   padding-bottom: 16px;
 }
+.panelHead > :global(.finora-ui-input) {
+  width: min(300px, 38vw);
+}
 .panelHead h2,
 .formPanel h2 {
   margin: 0;
   color: var(--finora-text);
-  font-size: 16px;
-  letter-spacing: -0.25px;
+  font-size: 18px;
+  letter-spacing: -0.35px;
 }
 .panelHead p {
   margin: 4px 0 0;
   color: var(--finora-text-muted);
-  font-size: 12px;
+  font-size: 11.5px;
 }
 .count {
   display: grid;
@@ -80,14 +84,14 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
-  margin: 18px 28px;
+  margin: 0 0 16px;
   overflow: hidden;
   border: 1px solid var(--finora-border);
   border-radius: 12px;
   background: var(--finora-border);
 }
 .metricStrip > div {
-  padding: 18px 20px;
+  padding: 17px 20px;
   background: var(--finora-surface);
 }
 .metricStrip strong,
@@ -96,7 +100,7 @@
 }
 .metricStrip strong {
   color: var(--finora-text);
-  font-size: 20px;
+  font-size: 22px;
   font-variant-numeric: tabular-nums;
 }
 .metricStrip span {
@@ -110,9 +114,9 @@
 }
 .organizationLayout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 18px;
-  margin: 18px 28px;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 16px;
+  margin: 0 0 18px;
 }
 .organizationLayout .panel {
   margin: 0;
@@ -132,18 +136,19 @@
   grid-template-columns: 28px 34px minmax(150px, 1fr) minmax(130px, 0.75fr) minmax(150px, 0.8fr);
   align-items: center;
   gap: 12px;
-  min-height: 66px;
+  min-height: 60px;
   border: 1px solid var(--finora-border);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--finora-surface);
+  padding: 8px 12px;
   transition:
     border-color 0.18s ease,
     box-shadow 0.18s ease;
 }
 .nodeSelected {
-  border-color: #8eb9ed;
-  background: linear-gradient(90deg, var(--finora-brand-subtle), #fff 42%);
-  box-shadow: 0 10px 26px rgb(36 117 215 / 10%);
+  border-color: #a7c8ef;
+  background: linear-gradient(90deg, #edf5ff, #fff 56%);
+  box-shadow: inset 3px 0 0 var(--finora-brand);
 }
 .collapseButton {
   width: 26px;
@@ -153,7 +158,7 @@
 }
 .node:hover {
   border-color: #bed2ec;
-  box-shadow: 0 9px 22px rgb(36 117 215 / 7%);
+  background: #f8fbff;
 }
 .nodeGlyph,
 .notificationIcon,
@@ -181,7 +186,7 @@
   display: block;
 }
 .nodeIdentity strong {
-  font-size: 13px;
+  font-size: 13.5px;
 }
 .nodeIdentity span,
 .nodeMember span,
@@ -222,12 +227,12 @@
   position: sticky;
   top: 18px;
   display: grid;
-  gap: 18px;
+  gap: 16px;
   border: 1px solid var(--finora-border);
   border-radius: 12px;
   background: var(--finora-surface);
-  padding: 20px;
-  box-shadow: 0 10px 26px rgb(32 69 118 / 5%);
+  padding: 20px 21px;
+  box-shadow: 0 5px 14px rgb(23 43 77 / 4%);
 }
 .inspectorHead {
   display: flex;
@@ -246,7 +251,7 @@
   letter-spacing: 0.1em;
 }
 .inspectorHead h2 {
-  font-size: 16px;
+  font-size: 18px;
 }
 .inspectorHead small,
 .limitSummary small {
@@ -260,9 +265,8 @@
   margin: 0;
 }
 .nodeFacts div {
-  border-radius: 8px;
-  background: var(--finora-muted);
-  padding: 10px;
+  border-top: 1px solid var(--finora-border);
+  padding: 10px 0 0;
 }
 .nodeFacts dt,
 .nodeFacts dd {
@@ -273,6 +277,9 @@
   font-size: 9px;
 }
 .nodeFacts dd {
+  display: flex;
+  min-height: 22px;
+  align-items: center;
   margin-top: 3px;
   font-size: 11px;
   font-weight: 700;
@@ -370,7 +377,7 @@
   grid-template-columns: repeat(5, minmax(130px, 1fr)) auto;
   align-items: end;
   gap: 14px;
-  margin: 18px 28px;
+  margin: 0 0 18px;
   border: 1px solid #bed5f2;
   border-radius: 12px;
   background: linear-gradient(135deg, #f8fbff, #fff);
@@ -413,7 +420,7 @@
   grid-template-columns: 1fr 1fr 1fr 1fr auto;
   align-items: end;
   gap: 14px;
-  padding: 18px;
+  padding: 20px 22px;
 }
 .formPanel > div:first-child {
   align-self: center;
@@ -572,8 +579,8 @@
 .twoColumn {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
-  margin: 18px 28px;
+  gap: 16px;
+  margin: 0 0 18px;
 }
 .twoColumn .panel {
   min-width: 0;
@@ -581,16 +588,26 @@
 }
 .cardList {
   display: grid;
-  gap: 10px;
+  overflow: hidden;
+  border: 1px solid var(--finora-border);
+  border-radius: 10px;
 }
 .skillCard,
 .jobCard {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 9px;
-  border: 1px solid var(--finora-border);
-  border-radius: 10px;
-  padding: 14px;
+  border-top: 1px solid var(--finora-border);
+  background: var(--finora-surface);
+  padding: 14px 15px;
+}
+.skillCard:first-child,
+.jobCard:first-child {
+  border-top: 0;
+}
+.skillCard:hover,
+.jobCard:hover {
+  background: #f8fbff;
 }
 .skillCard > div:first-child span,
 .jobCard > div:first-child span {
@@ -601,7 +618,7 @@
 }
 .skillCard strong,
 .jobCard strong {
-  font-size: 13px;
+  font-size: 13.5px;
 }
 .skillCard p,
 .jobCard p {
@@ -621,8 +638,8 @@
   border-radius: 5px;
   background: var(--finora-muted);
   color: #41536d;
-  font-size: 9px;
-  padding: 4px 6px;
+  font-size: 9.5px;
+  padding: 4px 7px;
 }
 .cardFooter {
   display: flex;
@@ -698,87 +715,126 @@
   justify-content: space-between;
   gap: 16px;
   border-top: 1px solid var(--finora-border);
-  padding: 11px 2px;
+  min-height: 54px;
+  padding: 10px 2px;
 }
 .auditGrid strong,
 .auditGrid span {
   display: block;
 }
 .auditGrid strong {
-  font-size: 11px;
+  font-size: 12px;
 }
 .auditGrid span,
 .auditGrid time {
   color: var(--finora-text-muted);
-  font-size: 9px;
+  font-size: 10px;
 }
 .notificationList {
   display: grid;
+  overflow: hidden;
+  border: 1px solid var(--finora-border);
+  border-radius: 10px;
 }
 .notificationList article {
   display: grid;
-  grid-template-columns: 36px 1fr auto;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   border-top: 1px solid var(--finora-border);
-  padding: 15px 2px;
+  background: var(--finora-surface);
+  padding: 15px 16px;
+}
+.notificationList article:first-child {
+  border-top: 0;
+}
+.notificationList article:hover {
+  background: #f8fbff;
 }
 .notificationList strong {
-  font-size: 12px;
+  font-size: 13px;
 }
 .notificationList p {
   margin: 3px 0;
   color: var(--finora-text-muted);
-  font-size: 11px;
+  font-size: 11.5px;
+  line-height: 1.5;
 }
 .notificationList small {
   color: var(--finora-text-muted);
-  font-size: 9px;
+  font-size: 10px;
 }
 .notificationRead {
-  opacity: 0.62;
+  opacity: 0.66;
+}
+.notificationState {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--finora-brand);
+}
+.notificationRead .notificationState {
+  background: #a7b2c1;
+}
+.notificationActions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 .connectionGrid {
   display: grid;
-  gap: 8px;
+  overflow: hidden;
+  border: 1px solid var(--finora-border);
+  border-radius: 10px;
 }
 .connectionGrid article {
   display: grid;
-  grid-template-columns: 34px 1fr auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 10px;
-  border: 1px solid var(--finora-border);
-  border-radius: 9px;
-  padding: 11px;
+  gap: 14px;
+  border-top: 1px solid var(--finora-border);
+  padding: 13px 14px;
+}
+.connectionGrid article:first-child {
+  border-top: 0;
+}
+.connectionGrid article:hover {
+  background: #f8fbff;
 }
 .connectionGrid strong,
 .connectionGrid span {
   display: block;
 }
 .connectionGrid strong {
-  font-size: 12px;
+  font-size: 13px;
 }
 .connectionGrid span {
   margin-top: 2px;
   color: var(--finora-text-muted);
-  font-size: 9px;
+  font-size: 10px;
 }
 .policyGrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-.policyGrid article {
+  overflow: hidden;
   border: 1px solid var(--finora-border);
   border-radius: 10px;
-  padding: 14px;
+}
+.policyGrid article {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.25fr) minmax(0, 2fr);
+  gap: 24px;
+  border-top: 1px solid var(--finora-border);
+  padding: 15px 16px;
+}
+.policyGrid article:first-child {
+  border-top: 0;
 }
 .policyGrid strong,
 .policyGrid span {
   display: block;
 }
 .policyGrid strong {
-  font-size: 12px;
+  font-size: 13px;
 }
 .policyGrid span {
   margin-top: 3px;
@@ -789,11 +845,11 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  margin: 14px 0 0;
+  margin: 0;
 }
 .policyGrid dl div {
-  border-top: 1px solid var(--finora-border);
-  padding-top: 8px;
+  border-left: 1px solid var(--finora-border);
+  padding-left: 12px;
 }
 .policyGrid dt {
   color: var(--finora-text-muted);
@@ -801,13 +857,13 @@
 }
 .policyGrid dd {
   margin: 2px 0 0;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
 }
 .error {
   display: grid;
   gap: 5px;
-  margin: 20px 28px;
+  margin: 0 0 18px;
   border: 1px solid #f0c4c0;
   border-radius: 10px;
   background: #fff5f4;
@@ -818,7 +874,7 @@
 .loading {
   display: grid;
   gap: 10px;
-  margin: 20px 28px;
+  margin: 0 0 18px;
 }
 .loading span {
   height: 58px;
@@ -830,7 +886,27 @@
 
 .auditTimeline {
   display: grid;
-  margin-top: 8px;
+  overflow: hidden;
+  border: 1px solid var(--finora-border);
+  border-radius: 10px;
+}
+
+.emptyState {
+  display: grid;
+  grid-column: 1 / -1;
+  place-items: center;
+  gap: 4px;
+  min-height: 116px;
+  padding: 24px;
+  color: var(--finora-text-muted);
+  text-align: center;
+}
+.emptyState strong {
+  color: var(--finora-text);
+  font-size: 13px;
+}
+.emptyState span {
+  font-size: 11px;
 }
 
 .auditEvent {
@@ -838,8 +914,16 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
   align-items: start;
+  min-height: 62px;
   border-top: 1px solid var(--finora-border);
-  padding: 13px 2px;
+  background: var(--finora-surface);
+  padding: 13px 14px;
+}
+.auditEvent:first-child {
+  border-top: 0;
+}
+.auditEvent:hover {
+  background: #f8fbff;
 }
 
 .auditDot {
@@ -853,7 +937,7 @@
 
 .auditEvent strong {
   color: var(--finora-text);
-  font-size: 12px;
+  font-size: 13px;
   text-transform: capitalize;
 }
 
@@ -862,7 +946,7 @@
   display: block;
   margin: 2px 0 0;
   color: var(--finora-text-muted);
-  font-size: 11px;
+  font-size: 10.5px;
 }
 
 .auditEvent time {
@@ -891,6 +975,10 @@
   .policyGrid {
     grid-template-columns: 1fr;
   }
+  .policyGrid article {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
   .organizationLayout {
     grid-template-columns: 1fr;
   }
@@ -906,21 +994,16 @@
 }
 @media (max-width: 720px) {
   .header {
-    padding: 22px 18px;
+    align-items: flex-start;
+    flex-direction: column;
+    margin-bottom: 20px;
   }
-  .panel,
-  .metricStrip,
-  .formPanel,
-  .twoColumn,
-  .loading,
-  .error {
-    margin-right: 14px;
-    margin-left: 14px;
+  .header h1 {
+    font-size: 29px;
   }
-  .organizationLayout,
-  .editorPanel {
-    margin-right: 14px;
-    margin-left: 14px;
+  .headerActions {
+    width: 100%;
+    flex-wrap: wrap;
   }
   .metricStrip {
     grid-template-columns: 1fr;
@@ -944,8 +1027,39 @@
     grid-template-columns: 1fr;
   }
   .hierarchyActions {
-    align-items: flex-end;
+    width: 100%;
+    align-items: flex-start;
     flex-direction: column;
+  }
+  .panel {
+    padding: 17px;
+  }
+  .panelHead {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .panelHead > :global(.finora-ui-input) {
+    width: 100%;
+  }
+  .notificationList article {
+    grid-template-columns: 8px minmax(0, 1fr);
+  }
+  .notificationActions {
+    grid-column: 2;
+  }
+  .auditEvent {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .auditEvent time {
+    grid-column: 2;
+  }
+  .policyGrid dl {
+    grid-template-columns: 1fr;
+  }
+  .policyGrid dl div {
+    border-left: 0;
+    border-top: 1px solid var(--finora-border);
+    padding: 9px 0 0;
   }
   .editorPanel,
   .categoryLimits {

@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { money, type RequestPrincipal } from '@finora/platform';
+import {
+  WorkspacePermission,
+  hasWorkspacePermission,
+  money,
+  type RequestPrincipal,
+} from '@finora/platform';
 import { PrismaService } from '../../prisma/prisma.service.js';
 
 @Injectable()
@@ -100,18 +105,32 @@ export class FinanceService {
     });
   }
   expenseClaims(principal: RequestPrincipal) {
+    const canViewOrganization = hasWorkspacePermission(
+      principal,
+      WorkspacePermission.VIEW_ORGANIZATION_FINANCE,
+    );
     return this.prisma.expenseClaim.findMany({
-      where: { organizationId: principal.organizationId },
+      where: {
+        organizationId: principal.organizationId,
+        ...(canViewOrganization ? {} : { claimantUserId: principal.userId }),
+      },
       include: {
         claimant: { select: { id: true, name: true, email: true } },
         node: { select: { id: true, name: true, code: true } },
+        budget: { select: { id: true, name: true } },
+        documents: {
+          select: { id: true, fileName: true, mimeType: true, status: true, createdAt: true },
+        },
+        receiptRequests: {
+          select: { id: true, status: true, channel: true, dueAt: true, attempts: true },
+        },
       },
       orderBy: { incurredAt: 'desc' },
       take: 200,
     });
   }
   async recordOptions(principal: RequestPrincipal) {
-    const [users, nodes, accounts, settlements] = await Promise.all([
+    const [users, nodes, accounts, settlements, invoices] = await Promise.all([
       this.prisma.user.findMany({
         where: { organizationId: principal.organizationId },
         select: { id: true, name: true, email: true },
@@ -133,8 +152,14 @@ export class FinanceService {
         orderBy: { settledAt: 'desc' },
         take: 100,
       }),
+      this.prisma.invoice.findMany({
+        where: { organizationId: principal.organizationId },
+        select: { id: true, externalId: true, vendor: true },
+        orderBy: { issuedAt: 'desc' },
+        take: 100,
+      }),
     ]);
-    return { users, nodes, accounts, settlements };
+    return { users, nodes, accounts, settlements, invoices };
   }
   async forecast(principal: RequestPrincipal) {
     const [accounts, posted, scheduled] = await Promise.all([

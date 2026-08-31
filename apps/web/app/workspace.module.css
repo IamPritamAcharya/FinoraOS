@@ -1171,53 +1171,146 @@
 }
 .exceptionList {
   display: grid;
-  gap: 10px;
+  overflow-x: auto;
 }
-.exceptionRow {
-  border: 1px solid var(--finora-border);
-  border-radius: 10px;
-  background: var(--finora-surface);
-  padding: 15px;
-}
-.exceptionSummary {
+.exceptionSummaryStrip {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto auto;
-  align-items: center;
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 16px;
+  overflow: hidden;
+  border: 1px solid var(--finora-border);
+  border-radius: 12px;
+  background: var(--finora-surface);
 }
-.exceptionSummary strong,
-.exceptionSummary span,
-.proposal strong,
-.proposal span,
-.proposal small {
+.exceptionSummaryStrip > div {
+  border-left: 1px solid var(--finora-border);
+  padding: 17px 20px;
+}
+.exceptionSummaryStrip > div:first-child {
+  border-left: 0;
+}
+.exceptionSummaryStrip strong,
+.exceptionSummaryStrip span {
   display: block;
 }
-.exceptionSummary strong {
+.exceptionSummaryStrip strong {
   color: var(--finora-text);
-  font-size: 13px;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.6px;
 }
-.exceptionSummary span,
-.exceptionRow > p,
-.proposal span,
-.proposal small {
+.exceptionSummaryStrip span {
+  margin-top: 3px;
   color: var(--finora-text-muted);
   font-size: 11px;
 }
-.exceptionRow > p {
-  margin: 10px 0 0;
-  line-height: 1.5;
+.exceptionsPanel {
+  overflow: hidden;
+  padding: 0;
 }
-.proposal {
+.exceptionToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+}
+.exceptionToolbar h2,
+.exceptionToolbar p {
+  margin: 0;
+}
+.exceptionToolbar h2 {
+  font-size: 18px;
+  letter-spacing: -0.35px;
+}
+.exceptionToolbar p {
+  margin-top: 3px;
+  color: var(--finora-text-muted);
+  font-size: 11.5px;
+}
+.exceptionTableHead,
+.exceptionRow {
   display: grid;
-  gap: 3px;
-  margin-top: 12px;
-  border-left: 3px solid var(--finora-brand);
-  border-radius: 0 8px 8px 0;
-  background: var(--finora-brand-subtle);
-  padding: 10px 12px;
+  grid-template-columns: minmax(150px, 0.9fr) minmax(260px, 1.8fr) 130px 150px 190px;
+  align-items: center;
+  column-gap: 18px;
 }
-.proposal strong {
-  font-size: 12px;
+.exceptionTableHead {
+  min-width: 980px;
+  border-top: 1px solid var(--finora-border);
+  border-bottom: 1px solid var(--finora-border);
+  background: var(--finora-muted);
+  color: #60708a;
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.065em;
+  padding: 12px 18px;
+  text-transform: uppercase;
+}
+.exceptionRow {
+  min-width: 980px;
+  min-height: 72px;
+  border-bottom: 1px solid var(--finora-border);
+  background: var(--finora-surface);
+  padding: 12px 18px;
+  transition: background 150ms ease;
+}
+.exceptionRow:hover {
+  background: #f8fbff;
+}
+.exceptionIdentity strong,
+.exceptionIdentity span,
+.exceptionProposal strong,
+.exceptionProposal span,
+.exceptionProposal small {
+  display: block;
+}
+.exceptionIdentity strong {
+  color: var(--finora-text);
+  font-size: 13.5px;
+  font-weight: 760;
+}
+.exceptionIdentity span,
+.exceptionReason,
+.exceptionProposal span,
+.exceptionProposal small {
+  color: var(--finora-text-muted);
+  font-size: 10.5px;
+}
+.exceptionIdentity span {
+  margin-top: 3px;
+}
+.exceptionReason {
+  margin: 0;
+  overflow: hidden;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+}
+.exceptionVariance {
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.exceptionStatus {
+  text-align: center;
+}
+.exceptionActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.exceptionProposal {
+  display: grid;
+  grid-column: 2 / -1;
+  gap: 3px;
+  margin-top: 8px;
+  border-radius: 8px;
+  background: var(--finora-brand-subtle);
+  padding: 9px 11px;
+}
+.exceptionProposal strong {
+  color: var(--finora-text);
+  font-size: 11.5px;
 }
 .rowActions {
   display: flex;
@@ -1362,6 +1455,26 @@
   font-size: 13.5px;
   font-weight: 740;
   font-variant-numeric: tabular-nums;
+}
+.recordEvidenceReady,
+.recordEvidenceMissing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 680;
+  white-space: nowrap;
+}
+.recordEvidenceReady {
+  color: var(--finora-success);
+}
+.recordEvidenceMissing {
+  color: var(--finora-warning);
+}
+.recordEvidenceReady svg {
+  width: 13px;
+  height: 13px;
 }
 .recordCellStack {
   display: block;
@@ -1681,8 +1794,111 @@
 .recordDetailList dd {
   overflow-wrap: anywhere;
 }
-.recordDetailList .finora-status {
+.recordDetailList :global(.finora-status) {
   font-size: 10px;
+}
+.expenseEvidence {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+  border: 1px solid #d6e3f3;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 17px;
+}
+.expenseEvidenceHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.expenseEvidenceHead span,
+.expenseEvidenceHead strong {
+  display: block;
+}
+.expenseEvidenceHead span {
+  color: var(--finora-text-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.expenseEvidenceHead strong {
+  margin-top: 3px;
+  color: var(--finora-text);
+  font-size: 13px;
+}
+.expenseDocumentList {
+  display: grid;
+  gap: 6px;
+}
+.expenseDocumentList > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--finora-border);
+  border-radius: 9px;
+  background: var(--finora-surface);
+  padding: 10px 12px;
+}
+.expenseDocumentList svg {
+  width: 17px;
+  height: 17px;
+  color: var(--finora-brand);
+}
+.expenseDocumentList span,
+.expenseDocumentList strong,
+.expenseDocumentList small {
+  display: block;
+  min-width: 0;
+}
+.expenseDocumentList strong {
+  overflow: hidden;
+  color: var(--finora-text);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.expenseDocumentList small,
+.expenseEvidenceCopy,
+.recordDetailReadOnly {
+  color: var(--finora-text-muted);
+  font-size: 10.5px;
+}
+.expenseDocumentList small {
+  margin-top: 2px;
+}
+.expenseEvidenceCopy {
+  margin: 0;
+  line-height: 1.55;
+}
+.expenseUploadControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.expenseUploadControls :global(.finora-ui-input) {
+  min-height: 38px;
+}
+.expenseFileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.expenseReview {
+  border-top: 1px solid #d6e3f3;
+  padding-top: 14px;
+}
+.expenseReview form {
+  display: grid;
+  gap: 11px;
+}
+.expenseReviewActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .recordDetailFooter {
   border-top: 1px solid var(--finora-border);

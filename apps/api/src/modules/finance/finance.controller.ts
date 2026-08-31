@@ -34,9 +34,7 @@ export class FinanceController {
     return this.finance.taxLines(this.auth.require(WorkspacePermission.VIEW_ORGANIZATION_FINANCE));
   }
   @Get('expense-claims') expenseClaims() {
-    return this.finance.expenseClaims(
-      this.auth.require(WorkspacePermission.VIEW_ORGANIZATION_FINANCE),
-    );
+    return this.finance.expenseClaims(this.auth.require(WorkspacePermission.VIEW_OWN_FINANCE));
   }
   @Get('record-options') recordOptions() {
     return this.finance.recordOptions(

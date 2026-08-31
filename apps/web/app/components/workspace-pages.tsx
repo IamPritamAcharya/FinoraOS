@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Amount,
   FinoraButton,
@@ -8,6 +9,7 @@ import {
   FinoraIcon,
   FinoraInput,
   FinoraSelect,
+  FinoraTextarea,
   StatusBadge,
 } from '@finora/ui';
 import { finoraRequest } from '../lib/api';
@@ -75,6 +77,15 @@ function AsyncState({ loading, error }: { loading: boolean; error: string }) {
   return null;
 }
 
+function EmptyState({ title, copy }: { title: string; copy: string }) {
+  return (
+    <div className={styles.emptyState}>
+      <strong>{title}</strong>
+      <span>{copy}</span>
+    </div>
+  );
+}
+
 function useWorkspaceData<T>(path: string) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
@@ -98,7 +109,6 @@ function useWorkspaceData<T>(path: string) {
 
 export function WorkspacePage({ view }: { view: string }) {
   if (view === 'organization') return <OrganizationPage />;
-  if (view === 'expenses') return <ExpensesPage />;
   if (view === 'intelligence') return <IntelligencePage />;
   if (view === 'notifications') return <NotificationsPage />;
   if (view === 'audit') return <AuditPage />;
@@ -171,6 +181,12 @@ function AuditPage() {
               />
             </div>
             <div className={styles.auditTimeline}>
+              {(tab === 'events' ? visibleEvents.length : visibleRuns.length) === 0 ? (
+                <EmptyState
+                  title="No matching audit activity"
+                  copy="Try a broader search or switch audit views."
+                />
+              ) : null}
               {tab === 'events'
                 ? visibleEvents.map((event) => {
                     const actor = (event.actorUser as Json | null) ?? null;
@@ -389,7 +405,9 @@ function OrganizationPage() {
                 </div>
                 <div>
                   <dt>Status</dt>
-                  <dd>{selected.active ? 'Active' : 'Inactive'}</dd>
+                  <dd>
+                    <StatusBadge status={selected.active ? 'ACTIVE' : 'DISABLED'} />
+                  </dd>
                 </div>
                 <div>
                   <dt>Children</dt>
@@ -763,162 +781,6 @@ function SpendLimitForm({ node, onSaved }: { node: Json; onSaved: () => Promise<
   );
 }
 
-function ExpensesPage() {
-  const { data: expenses, loading, error, load } = useWorkspaceData<Json[]>('/workspace/expenses');
-  return (
-    <>
-      <Header
-        eyebrow="EMPLOYEE OPERATIONS"
-        title="Expenses & receipts"
-        copy="A single queue for employee evidence, finance review and reimbursement readiness."
-      />
-      <AsyncState loading={loading} error={error} />
-      {expenses && (
-        <div className={styles.metricStrip}>
-          <div>
-            <strong>{expenses.length}</strong>
-            <span>Visible claims</span>
-          </div>
-          <div>
-            <strong>{expenses.filter((item) => item.status === 'RECEIPT_REQUIRED').length}</strong>
-            <span>Receipts missing</span>
-          </div>
-          <div>
-            <strong>
-              <Amount
-                value={expenses.reduce((sum, item) => sum + Number(item.amount), 0).toFixed(2)}
-              />
-            </strong>
-            <span>Total value</span>
-          </div>
-        </div>
-      )}
-      <section className={styles.panel}>
-        <div className={styles.panelHead}>
-          <div>
-            <h2>Expense evidence queue</h2>
-            <p>Employee access is automatically limited to their own claims.</p>
-          </div>
-        </div>
-        <div className={styles.tableWrap}>
-          <table>
-            <thead>
-              <tr>
-                <th>Claim</th>
-                <th>Employee</th>
-                <th>Merchant</th>
-                <th>Node / budget</th>
-                <th>Evidence</th>
-                <th>Status</th>
-                <th className={styles.numeric}>Amount</th>
-                <th aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {expenses?.map((expense) => (
-                <tr key={expense.id}>
-                  <td>
-                    <strong>{expense.externalId}</strong>
-                    <small>{new Date(expense.incurredAt).toLocaleDateString('en-IN')}</small>
-                  </td>
-                  <td>
-                    {expense.claimant.name}
-                    <small>{expense.claimant.email}</small>
-                  </td>
-                  <td>
-                    {expense.merchant}
-                    <small>{String(expense.category).replaceAll('_', ' ')}</small>
-                  </td>
-                  <td>
-                    {expense.node.name}
-                    <small>{expense.budget?.name ?? 'Unallocated'}</small>
-                  </td>
-                  <td>
-                    {expense.documents.length ? (
-                      <span className={styles.evidenceOk}>
-                        <FinoraIcon name="check" /> {expense.documents.length} attached
-                      </span>
-                    ) : (
-                      <span className={styles.evidenceMissing}>Receipt required</span>
-                    )}
-                  </td>
-                  <td>
-                    <StatusBadge status={expense.status} />
-                  </td>
-                  <td className={styles.numeric}>
-                    <Amount value={expense.amount} />
-                  </td>
-                  <td>
-                    <ReceiptUpload expenseId={expense.externalId} onUploaded={load} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </>
-  );
-}
-
-function ReceiptUpload({
-  expenseId,
-  onUploaded,
-}: {
-  expenseId: string;
-  onUploaded: () => Promise<void>;
-}) {
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
-  const [category, setCategory] = useState('AUTO');
-  return (
-    <div className={styles.receiptAction}>
-      <FinoraSelect
-        aria-label="Receipt expense category"
-        value={category}
-        onChange={(event) => setCategory(event.target.value)}
-      >
-        <option value="AUTO">Auto-detect category</option>
-        {spendCategories.map((item) => (
-          <option key={item} value={item}>
-            {item.replaceAll('_', ' ')}
-          </option>
-        ))}
-      </FinoraSelect>
-      <label className={styles.uploadButton}>
-        <input
-          type="file"
-          accept="application/pdf,image/jpeg,image/png,image/webp"
-          disabled={uploading}
-          onChange={async (event) => {
-            const file = event.target.files?.[0];
-            if (!file) return;
-            setUploading(true);
-            setError('');
-            const body = new FormData();
-            body.append('file', file);
-            if (category !== 'AUTO') body.append('category', category);
-            try {
-              await finoraRequest(`/workspace/expenses/${expenseId}/receipt`, {
-                method: 'POST',
-                body,
-              });
-              await onUploaded();
-            } catch (reason) {
-              setError((reason as Error).message);
-            } finally {
-              setUploading(false);
-              event.target.value = '';
-            }
-          }}
-        />
-        <span>{uploading ? 'Uploading…' : 'Upload receipt'}</span>
-        {error && <small title={error}>Failed</small>}
-      </label>
-    </div>
-  );
-}
-
 function IntelligencePage() {
   const skills = useWorkspaceData<Json[]>('/workspace/skills');
   const audit = useWorkspaceData<{ runs: Json[]; auditEvents: Json[] }>('/workspace/agent-audit');
@@ -946,6 +808,27 @@ function IntelligencePage() {
           }}
         />
       )}
+      {skills.data && audit.data ? (
+        <div className={styles.metricStrip}>
+          <div>
+            <strong>{skills.data.filter((skill) => skill.status === 'ACTIVE').length}</strong>
+            <span>Active custom skills</span>
+          </div>
+          <div>
+            <strong>{audit.data.runs.length}</strong>
+            <span>Recorded agent runs</span>
+          </div>
+          <div>
+            <strong>
+              {audit.data.runs.reduce(
+                (total, run) => total + (Array.isArray(run.steps) ? run.steps.length : 0),
+                0,
+              )}
+            </strong>
+            <span>Controlled tool steps</span>
+          </div>
+        </div>
+      ) : null}
       <div className={styles.twoColumn}>
         <section className={styles.panel}>
           <div className={styles.panelHead}>
@@ -959,6 +842,12 @@ function IntelligencePage() {
             <AsyncState loading error="" />
           ) : (
             <div className={styles.cardList}>
+              {!skills.data?.length ? (
+                <EmptyState
+                  title="No custom skills yet"
+                  copy="Create a bounded procedure with an explicit tool allowlist."
+                />
+              ) : null}
               {skills.data?.map((skill) => (
                 <article className={styles.skillCard} key={skill.id}>
                   <div>
@@ -1024,6 +913,12 @@ function IntelligencePage() {
             <AsyncState loading error="" />
           ) : (
             <div className={styles.timeline}>
+              {!audit.data?.runs.length ? (
+                <EmptyState
+                  title="No agent runs yet"
+                  copy="Controlled model and tool activity will appear here."
+                />
+              ) : null}
               {audit.data?.runs.map((run) => (
                 <article key={run.id}>
                   <i
@@ -1065,6 +960,12 @@ function IntelligencePage() {
           </div>
         </div>
         <div className={styles.auditGrid}>
+          {!audit.data?.auditEvents.length ? (
+            <EmptyState
+              title="No financial activity yet"
+              copy="Audited changes will appear here."
+            />
+          ) : null}
           {audit.data?.auditEvents.map((event) => (
             <article key={event.id}>
               <div>
@@ -1115,29 +1016,28 @@ function SkillForm({ onSaved }: { onSaved: () => Promise<void> }) {
         <p className={styles.eyebrow}>CUSTOM PROCEDURE</p>
         <h2>Create an agent skill</h2>
       </div>
-      <label>
-        Name
-        <input name="name" minLength={3} required placeholder="Month-end variance review" />
-      </label>
-      <label>
-        Description
-        <input
+      <FinoraField label="Name">
+        <FinoraInput name="name" minLength={3} required placeholder="Month-end variance review" />
+      </FinoraField>
+      <FinoraField label="Description">
+        <FinoraInput
           name="description"
           minLength={10}
           required
           placeholder="Investigates unexplained settlement variances"
         />
-      </label>
-      <label className={styles.wide}>
-        Instructions
-        <textarea
-          name="instructions"
-          minLength={20}
-          required
-          rows={3}
-          placeholder="When a settlement has an unexplained variance, gather its evidence…"
-        />
-      </label>
+      </FinoraField>
+      <div className={styles.wide}>
+        <FinoraField label="Instructions">
+          <FinoraTextarea
+            name="instructions"
+            minLength={20}
+            required
+            rows={3}
+            placeholder="When a settlement has an unexplained variance, gather its evidence…"
+          />
+        </FinoraField>
+      </div>
       <fieldset className={styles.wide}>
         <legend>Allowed tools</legend>
         <div className={styles.checkboxGrid}>
@@ -1157,6 +1057,7 @@ function SkillForm({ onSaved }: { onSaved: () => Promise<void> }) {
 }
 
 function NotificationsPage() {
+  const router = useRouter();
   const notifications = useWorkspaceData<Json[]>('/workspace/notifications');
   const unread = notifications.data?.filter((item) => item.status !== 'READ').length ?? 0;
   return (
@@ -1177,14 +1078,15 @@ function NotificationsPage() {
           </div>
         </div>
         <div className={styles.notificationList}>
+          {!notifications.data?.length ? (
+            <EmptyState title="You're all caught up" copy="New finance alerts will appear here." />
+          ) : null}
           {notifications.data?.map((item) => (
             <article
               className={item.status === 'READ' ? styles.notificationRead : ''}
               key={item.id}
             >
-              <span className={styles.notificationIcon}>
-                <FinoraIcon name="notifications" />
-              </span>
+              <span className={styles.notificationState} aria-hidden="true" />
               <div>
                 <strong>{item.title}</strong>
                 <p>{item.body}</p>
@@ -1192,20 +1094,31 @@ function NotificationsPage() {
                   {item.channel} · {new Date(item.createdAt).toLocaleString('en-IN')}
                 </small>
               </div>
-              {item.status !== 'READ' && (
-                <FinoraButton
-                  variant="ghost"
-                  size="small"
-                  onClick={async () => {
-                    await finoraRequest(`/workspace/notifications/${item.id}/read`, {
-                      method: 'POST',
-                    });
-                    await notifications.load();
-                  }}
-                >
-                  Mark read
-                </FinoraButton>
-              )}
+              <div className={styles.notificationActions}>
+                {item.actionUrl ? (
+                  <FinoraButton
+                    variant="secondary"
+                    size="small"
+                    onClick={() => router.push(String(item.actionUrl))}
+                  >
+                    Open
+                  </FinoraButton>
+                ) : null}
+                {item.status !== 'READ' ? (
+                  <FinoraButton
+                    variant="ghost"
+                    size="small"
+                    onClick={async () => {
+                      await finoraRequest(`/workspace/notifications/${item.id}/read`, {
+                        method: 'POST',
+                      });
+                      await notifications.load();
+                    }}
+                  >
+                    Mark read
+                  </FinoraButton>
+                ) : null}
+              </div>
             </article>
           ))}
         </div>
@@ -1227,6 +1140,26 @@ function OperationsPage() {
         copy="Connections, scheduled finance jobs and human approval boundaries in one control plane."
       />
       <AsyncState loading={operations.loading} error={operations.error} />
+      {operations.data ? (
+        <div className={styles.metricStrip}>
+          <div>
+            <strong>
+              {operations.data.integrations.filter((item) => item.status === 'CONNECTED').length}
+            </strong>
+            <span>Connected sources</span>
+          </div>
+          <div>
+            <strong>
+              {operations.data.jobs.filter((item) => item.status === 'ACTIVE').length}
+            </strong>
+            <span>Active automation jobs</span>
+          </div>
+          <div>
+            <strong>{operations.data.policies.filter((item) => !item.autoApprove).length}</strong>
+            <span>Human-controlled policies</span>
+          </div>
+        </div>
+      ) : null}
       {operations.data && (
         <div className={styles.twoColumn}>
           <section className={styles.panel}>
@@ -1239,9 +1172,6 @@ function OperationsPage() {
             <div className={styles.connectionGrid}>
               {operations.data.integrations.map((connection) => (
                 <article key={connection.id}>
-                  <span className={styles.connectionIcon}>
-                    <FinoraIcon name="operations" />
-                  </span>
                   <div>
                     <strong>{connection.displayName}</strong>
                     <span>

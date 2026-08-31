@@ -28,6 +28,7 @@ The application now has Keycloak login/RBAC, an editable organization tree/canva
 - Audited Records CSV imports for payable invoices and employee reimbursements, with partial-result error reports, category provenance, and hard-limit rejection.
 - Records can create one transaction, settlement, invoice, tax line, cash movement, or expense claim and edit existing records with full before/after audit evidence.
 - Records uses a consistent, fixed-layout fintech ledger across all six domains with compact rows, visible actions, contextual missing-data states, domain-specific columns, status semantics, pagination, and a right-side detail/edit tray. Transaction detail includes its linked settlement’s deterministic fee, GST, refund, expected, and received breakdown; the seed includes varied invoice/vendor/direction/status/due-date and tax-line scenarios.
+- Expense operations now live in Records instead of a duplicate route. Employees see only their own claims and can attach additional receipt evidence; finance reviewers can inspect evidence and approve or reject submitted claims with optimistic concurrency, claimant notification, and a tenant-scoped audit event. `/expenses` redirects to the Expenses ledger.
 - Finora chat has an explicit, non-persistent write-mode switch. The model can prepare only an expiring typed diff; an authorized user must approve it before the restricted writer applies it atomically. Rejection, expiry, stale records, and failures leave finance data unchanged.
 - Dedicated Audit route combines site-wide events (nodes, limits, budgets, imports, records, approvals) and agent runs under organization scoping.
 - Category overages notify finance controllers/admins and the relevant node owner without dropping the underlying financial record.
@@ -36,7 +37,7 @@ The application now has Keycloak login/RBAC, an editable organization tree/canva
 - User-scoped notifications inbox and operations UI for connectors, jobs, job outcomes, and approval policies.
 - Scheduled/manual receipt reminders. Mock delivery works locally; the Slack adapter uses `chat.postMessage` when configured.
 - Razorpay sandbox-only adapter for payments, settlements, refunds, fees, tax, and UTR. Live-mode keys are rejected.
-- Responsive routes for Finora, Overview, Records, Exceptions, Organization, Expenses, Agent control, Notifications, Operations, and Audit. Overview is the reconciliation command center; the legacy `/reconciliation` route redirects to Overview.
+- Responsive routes for Finora, Overview, Records, Exceptions, Organization, Agent control, Notifications, Operations, and Audit. Overview is the reconciliation command center; the legacy `/reconciliation` route redirects to Overview.
 - Local Keycloak realm import/health, NextAuth provider discovery and PKCE redirect, branded login, unauthenticated API 401, migration/seed, RLS verification, graceful shutdown, and production web build smoke-tested.
 
 ## In progress
@@ -67,7 +68,7 @@ No partial code task is intentionally left in progress at this checkpoint.
 - `pnpm check:enums`
 - `pnpm lint`
 - `pnpm typecheck`
-- `pnpm test` (65 tests)
+- `pnpm test` (69 tests)
 - `pnpm eval:reconciliation`
 - `pnpm build`
 - `pnpm format:check`

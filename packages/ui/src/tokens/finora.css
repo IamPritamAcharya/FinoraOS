@@ -179,10 +179,14 @@
 .finora-status--resolved,
 .finora-status--approved,
 .finora-status--captured,
+.finora-status--completed,
+.finora-status--connected,
 .finora-status--extracted,
 .finora-status--paid,
 .finora-status--posted,
 .finora-status--reimbursed,
+.finora-status--received,
+.finora-status--sent,
 .finora-status--active {
   border-color: #b9dfd1;
   background: #edf9f4;
@@ -197,7 +201,8 @@
 .finora-status--receipt_required,
 .finora-status--scheduled,
 .finora-status--submitted,
-.finora-status--under_review {
+.finora-status--under_review,
+.finora-status--uploaded {
   border-color: #f0d49b;
   background: #fff7e6;
   color: var(--finora-warning);
@@ -205,6 +210,7 @@
 .finora-status--unmatched,
 .finora-status--unresolved,
 .finora-status--cancelled,
+.finora-status--error,
 .finora-status--failed,
 .finora-status--overdue,
 .finora-status--refunded,
@@ -217,6 +223,20 @@
   border-color: var(--finora-border);
   background: var(--finora-muted);
   color: var(--finora-text-muted);
+}
+.finora-status--disabled,
+.finora-status--disconnected,
+.finora-status--idle,
+.finora-status--read {
+  border-color: var(--finora-border);
+  background: var(--finora-muted);
+  color: var(--finora-text-muted);
+}
+.finora-status--processing,
+.finora-status--running {
+  border-color: #bfd8f5;
+  background: #eef6ff;
+  color: var(--finora-brand);
 }
 .finora-status--open {
   gap: 5px;

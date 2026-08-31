@@ -26,6 +26,19 @@ const serviceWith = (overrides: Record<string, unknown> = {}) => {
         periodEnd: new Date('2026-08-31T00:00:00.000Z'),
       }),
     },
+    expenseClaim: {
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'expense-a',
+        externalId: 'EXP_0001',
+        status: 'SUBMITTED',
+        version: 2,
+        documents: [{ id: 'document-a' }],
+        claimant: { id: 'employee-a', name: 'Employee A' },
+      }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      findUnique: vi.fn().mockResolvedValue({ id: 'expense-a', status: 'APPROVED' }),
+    },
+    notification: { create: vi.fn().mockResolvedValue({ id: 'notification-a' }) },
     auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit-a' }) },
   };
   const prisma = {
@@ -114,6 +127,31 @@ describe('WorkspaceService authorization and tenant scope', () => {
     expect(prisma.notification.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { organizationId: 'org-a', userId: 'employee-a' },
+      }),
+    );
+  });
+
+  it('approves only a tenant-scoped submitted expense with receipt evidence and audits it', async () => {
+    const { service, tx } = serviceWith();
+    await service.reviewExpense(controller, 'EXP_0001', {
+      decision: 'APPROVE',
+      reason: 'Receipt and claim details verified.',
+      version: 2,
+    });
+    expect(tx.expenseClaim.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: 'org-a', externalId: 'EXP_0001' },
+      }),
+    );
+    expect(tx.expenseClaim.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organizationId: 'org-a', version: 2 }),
+        data: expect.objectContaining({ status: 'APPROVED', approvedById: 'controller-a' }),
+      }),
+    );
+    expect(tx.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'EXPENSE_APPROVED', entityId: 'expense-a' }),
       }),
     );
   });

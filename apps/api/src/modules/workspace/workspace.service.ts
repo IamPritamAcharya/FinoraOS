@@ -42,6 +42,7 @@ import type {
   CreateBudgetInput,
   CreateOrganizationNodeInput,
   RegisterReceiptInput,
+  ReviewExpenseInput,
   UpdateOrganizationNodeInput,
   UpsertSpendLimitInput,
 } from './workspace.schemas.js';
@@ -432,6 +433,98 @@ export class WorkspaceService {
         },
       },
       orderBy: { incurredAt: 'desc' },
+    });
+  }
+
+  async reviewExpense(
+    principal: RequestPrincipal,
+    expenseExternalId: string,
+    input: ReviewExpenseInput,
+  ) {
+    this.require(principal, WorkspacePermission.REVIEW_EXPENSE);
+    return this.prisma.$transaction(async (tx) => {
+      const expense = await tx.expenseClaim.findFirst({
+        where: {
+          organizationId: principal.organizationId,
+          externalId: expenseExternalId,
+        },
+        include: {
+          documents: { select: { id: true } },
+          claimant: { select: { id: true, name: true } },
+        },
+      });
+      if (!expense) throw new NotFoundException('Expense claim not found.');
+      if (!['SUBMITTED', 'UNDER_REVIEW'].includes(expense.status)) {
+        throw new ConflictException('Only submitted expenses can be reviewed.');
+      }
+      if (input.decision === 'APPROVE' && !expense.documents.length) {
+        throw new BadRequestException('A receipt is required before approving this expense.');
+      }
+      const status = input.decision === 'APPROVE' ? ('APPROVED' as const) : ('REJECTED' as const);
+      const updated = await tx.expenseClaim.updateMany({
+        where: {
+          id: expense.id,
+          organizationId: principal.organizationId,
+          version: input.version,
+          status: { in: ['SUBMITTED', 'UNDER_REVIEW'] },
+        },
+        data: {
+          status,
+          approvedById: input.decision === 'APPROVE' ? principal.userId : null,
+          approvedAt: input.decision === 'APPROVE' ? new Date() : null,
+          version: { increment: 1 },
+        },
+      });
+      if (updated.count !== 1) {
+        throw new ConflictException(
+          'This expense changed while you were reviewing it. Refresh and try again.',
+        );
+      }
+      await tx.auditLog.create({
+        data: {
+          organizationId: principal.organizationId,
+          actor: principal.userId,
+          action: input.decision === 'APPROVE' ? 'EXPENSE_APPROVED' : 'EXPENSE_REJECTED',
+          entityType: 'ExpenseClaim',
+          entityId: expense.id,
+          details: {
+            externalId: expense.externalId,
+            beforeStatus: expense.status,
+            afterStatus: status,
+            reason: input.reason,
+            documentIds: expense.documents.map((document) => document.id),
+          },
+        },
+      });
+      await tx.notification.create({
+        data: {
+          organizationId: principal.organizationId,
+          userId: expense.claimant.id,
+          type: `EXPENSE_${status}`,
+          status: 'SENT',
+          title: `${expense.externalId} ${status === 'APPROVED' ? 'approved' : 'rejected'}`,
+          body: input.reason,
+          actionUrl: `/records?tab=expense-claims&record=${expense.externalId}`,
+          entityType: 'ExpenseClaim',
+          entityId: expense.id,
+          dedupeKey: `expense-review:${expense.id}:${input.version}:${status}`,
+          sentAt: new Date(),
+        },
+      });
+      return tx.expenseClaim.findUnique({
+        where: { id: expense.id },
+        include: {
+          claimant: { select: { id: true, name: true, email: true } },
+          node: { select: { id: true, name: true, code: true } },
+          budget: { select: { id: true, name: true } },
+          documents: {
+            select: { id: true, fileName: true, mimeType: true, status: true, createdAt: true },
+          },
+          receiptRequests: {
+            select: { id: true, status: true, channel: true, dueAt: true, attempts: true },
+          },
+        },
+      });
     });
   }
 
@@ -1287,7 +1380,7 @@ export class WorkspaceService {
               status: 'SENT',
               title: `Receipt needed for ${request.expenseClaim.externalId}`,
               body: text,
-              actionUrl: `/expenses?id=${request.expenseClaim.externalId}`,
+              actionUrl: `/records?tab=expense-claims&record=${request.expenseClaim.externalId}`,
               entityType: 'ExpenseClaim',
               entityId: request.expenseClaim.id,
               sentAt: new Date(),

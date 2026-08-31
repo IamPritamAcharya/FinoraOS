@@ -16,7 +16,7 @@
 - Slack inbound receipts: signed events, idempotency, threaded request matching, file download, document persistence, and employee confirmation.
 - Connector synchronization: Razorpay cursors/webhooks, persisted bank statements, generic ERP contracts, provenance, retry, and sync audit.
 - Production document storage, malware scanning, OCR/extraction, duplicate detection, and review.
-- Expense review/approval/reimbursement transitions and policy-aware escalation.
+- Reimbursement payout transitions and policy-aware escalation after the completed receipt review/approval flow.
 - Richer tax matching/evaluation and evidence views.
 - Forecast scenarios and deterministic variance tracking.
 - Policy evaluator for narrowly scoped autonomous closure with kill switches and post-action reconciliation.

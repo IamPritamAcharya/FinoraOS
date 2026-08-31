@@ -18,6 +18,7 @@ import {
   CreateOrganizationNodeSchema,
   FinanceImportSchema,
   ReceiptCategorySchema,
+  ReviewExpenseSchema,
   UpdateOrganizationNodeSchema,
   UpsertSpendLimitSchema,
   UpdateAgentSkillSchema,
@@ -83,6 +84,14 @@ export class WorkspaceController {
       id,
       file,
       ReceiptCategorySchema.parse(body).category,
+    );
+  }
+  @Post('expenses/:id/review')
+  reviewExpense(@Param('id') id: string, @Body() body: unknown) {
+    return this.workspace.reviewExpense(
+      this.auth.currentPrincipal(),
+      id,
+      ReviewExpenseSchema.parse(body),
     );
   }
   @Post('imports')

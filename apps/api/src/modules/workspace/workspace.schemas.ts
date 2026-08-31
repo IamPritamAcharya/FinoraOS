@@ -81,6 +81,12 @@ export const ReceiptCategorySchema = z.object({
   category: z.nativeEnum(CashMovementCategory).optional(),
 });
 
+export const ReviewExpenseSchema = z.object({
+  decision: z.enum(['APPROVE', 'REJECT']),
+  reason: z.string().trim().min(3).max(500),
+  version: z.number().int().positive(),
+});
+
 export const CreateBudgetSchema = z
   .object({
     nodeId: z.string().cuid(),
@@ -120,3 +126,4 @@ export type UpdateOrganizationNodeInput = z.infer<typeof UpdateOrganizationNodeS
 export type UpsertSpendLimitInput = z.infer<typeof UpsertSpendLimitSchema>;
 export type CreateBudgetInput = z.infer<typeof CreateBudgetSchema>;
 export type RegisterReceiptInput = z.infer<typeof RegisterReceiptSchema>;
+export type ReviewExpenseInput = z.infer<typeof ReviewExpenseSchema>;

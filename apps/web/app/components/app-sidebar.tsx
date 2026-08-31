@@ -8,7 +8,6 @@ export const workspaceViews = [
   'Records',
   'Exceptions',
   'Organization',
-  'Expenses',
   'Intelligence',
   'Notifications',
   'Operations',
@@ -22,14 +21,13 @@ const navigationItems: Array<{ label: string; view: WorkspaceView; icon: FinoraI
   { label: 'Records', view: 'Records', icon: 'records' },
   { label: 'Exceptions', view: 'Exceptions', icon: 'exceptions' },
   { label: 'Organization', view: 'Organization', icon: 'organization' },
-  { label: 'Expenses', view: 'Expenses', icon: 'expenses' },
   { label: 'Agent control', view: 'Intelligence', icon: 'intelligence' },
   { label: 'Notifications', view: 'Notifications', icon: 'notifications' },
   { label: 'Operations', view: 'Operations', icon: 'operations' },
   { label: 'Audit', view: 'Audit', icon: 'audit' },
 ];
 
-const employeeViews = new Set<WorkspaceView>(['Chat', 'Expenses', 'Notifications']);
+const employeeViews = new Set<WorkspaceView>(['Chat', 'Records', 'Notifications']);
 
 export function AppSidebar({
   activeView,

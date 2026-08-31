@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { FinancialRecordType, money } from '@finora/platform';
 import {
   Amount,
@@ -372,6 +373,7 @@ function ExceptionsPage() {
   const [items, setItems] = useState<Data[]>([]);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
   const load = useCallback(
     () =>
       request('/reconciliation/exceptions')
@@ -394,20 +396,64 @@ function ExceptionsPage() {
       setBusy('');
     }
   };
+  const visible = items.filter(
+    (item) => !query || JSON.stringify(item).toLowerCase().includes(query.toLowerCase()),
+  );
+  const awaitingInvestigation = items.filter((item) => item.status === 'OPEN').length;
+  const awaitingApproval = items.filter((item) => item.status === 'PROPOSED').length;
+  const needsReview = items.filter((item) => item.status === 'NEEDS_REVIEW').length;
   return (
     <>
-      <PageHeader title="Exceptions" eyebrow="CONTROLLED CLOSURE" />
+      <PageHeader
+        title="Exceptions"
+        eyebrow="CONTROLLED CLOSURE"
+        description="Investigate ambiguous records, review evidence, and approve typed resolutions without modifying source data."
+      />
       {error && <ErrorState message={error} />}
-      <section className={styles.panel}>
-        <div className={styles.panelHead}>
+      <div className={styles.exceptionSummaryStrip}>
+        <div>
+          <strong>{items.length}</strong>
+          <span>Active exceptions</span>
+        </div>
+        <div>
+          <strong>{awaitingInvestigation}</strong>
+          <span>Awaiting investigation</span>
+        </div>
+        <div>
+          <strong>{awaitingApproval}</strong>
+          <span>Approval pending</span>
+        </div>
+        <div>
+          <strong>{needsReview}</strong>
+          <span>Human review</span>
+        </div>
+      </div>
+      <section className={`${styles.panel} ${styles.exceptionsPanel}`}>
+        <div className={styles.exceptionToolbar}>
           <div>
-            <h2>Investigate and close safely</h2>
-            <p>Evidence, proposal, approval, adjustment, rerun</p>
+            <h2>Review queue</h2>
+            <p>Highest-value unresolved records remain visible until a decision is made.</p>
           </div>
-          <span className={styles.count}>{items.length}</span>
+          <label className={styles.recordSearchField}>
+            <FinoraIcon name="search" />
+            <FinoraInput
+              className={styles.recordSearch}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search exceptions"
+              aria-label="Search exceptions"
+            />
+          </label>
+        </div>
+        <div className={styles.exceptionTableHead} aria-hidden="true">
+          <span>Exception</span>
+          <span>Reason</span>
+          <span>Variance</span>
+          <span>Status</span>
+          <span>Action</span>
         </div>
         <div className={styles.exceptionList}>
-          {items.map((item) => {
+          {visible.map((item) => {
             const variance = money(String(item.expectedAmount))
               .minus(String(item.receivedAmount))
               .abs()
@@ -418,27 +464,19 @@ function ExceptionsPage() {
                 : null;
             return (
               <article className={styles.exceptionRow} key={String(item.id)}>
-                <div className={styles.exceptionSummary}>
-                  <div>
-                    <strong>{String(item.externalId)}</strong>
-                    <span>{String(item.type).replaceAll('_', ' ')}</span>
-                  </div>
+                <div className={styles.exceptionIdentity}>
+                  <strong>{String(item.externalId)}</strong>
+                  <span>{String(item.type).replaceAll('_', ' ')}</span>
+                </div>
+                <p className={styles.exceptionReason}>{String(item.reason)}</p>
+                <strong className={styles.exceptionVariance}>
                   <Amount value={variance} />
+                </strong>
+                <div className={styles.exceptionStatus}>
                   <StatusBadge status={String(item.status)} />
                 </div>
-                <p>{String(item.reason)}</p>
-                {resolution && (
-                  <div className={styles.proposal}>
-                    <span>Proposed resolution</span>
-                    <strong>{String(resolution.reason ?? 'Validated finance action')}</strong>
-                    <small>
-                      Confidence {Math.round(Number(resolution.confidence ?? 0) * 100)}% · no raw
-                      record mutation
-                    </small>
-                  </div>
-                )}
-                <div className={styles.rowActions}>
-                  {item.status === 'OPEN' && (
+                <div className={styles.exceptionActions}>
+                  {item.status === 'OPEN' ? (
                     <FinoraButton
                       size="small"
                       variant="secondary"
@@ -447,10 +485,10 @@ function ExceptionsPage() {
                         void mutate(String(item.id), `/agents/exceptions/${item.id}/investigate`)
                       }
                     >
-                      Investigate
+                      {busy === item.id ? 'Investigating…' : 'Investigate'}
                     </FinoraButton>
-                  )}
-                  {item.status === 'PROPOSED' && (
+                  ) : null}
+                  {item.status === 'PROPOSED' ? (
                     <>
                       <FinoraButton
                         size="small"
@@ -462,7 +500,7 @@ function ExceptionsPage() {
                           )
                         }
                       >
-                        Approve & rerun
+                        Approve
                       </FinoraButton>
                       <FinoraButton
                         size="small"
@@ -479,11 +517,28 @@ function ExceptionsPage() {
                         Reject
                       </FinoraButton>
                     </>
-                  )}
+                  ) : null}
                 </div>
+                {resolution && (
+                  <div className={styles.exceptionProposal}>
+                    <span>Proposed resolution</span>
+                    <strong>{String(resolution.reason ?? 'Validated finance action')}</strong>
+                    <small>
+                      {Math.round(Number(resolution.confidence ?? 0) * 100)}% confidence · source
+                      record remains unchanged
+                    </small>
+                  </div>
+                )}
               </article>
             );
           })}
+          {!visible.length ? (
+            <div className={styles.recordEmptyState}>
+              <FinoraIcon name="check" />
+              <strong>No exceptions match this view</strong>
+              <span>Clear the search to return to the active queue.</span>
+            </div>
+          ) : null}
         </div>
       </section>
     </>
@@ -520,9 +575,20 @@ const recordTypes: Record<RecordTab, FinancialRecordType> = {
 function RecordsPage() {
   const router = useRouter();
   const params = useSearchParams();
+  const { data: session, status: sessionStatus } = useSession();
+  const identityReady =
+    process.env.NEXT_PUBLIC_AUTH_MODE !== 'keycloak' || sessionStatus === 'authenticated';
+  const employeeOnly = session?.user?.role === 'EMPLOYEE';
+  const visibleTabs = employeeOnly
+    ? tabLabels.filter((item) => item.id === 'expense-claims')
+    : tabLabels;
   const requestedTab = params.get('tab') as RecordTab | null;
   const requestedRecord = params.get('record');
-  const tab = tabLabels.some((item) => item.id === requestedTab) ? requestedTab! : 'transactions';
+  const tab = visibleTabs.some((item) => item.id === requestedTab)
+    ? requestedTab!
+    : employeeOnly
+      ? 'expense-claims'
+      : 'transactions';
   const [records, setRecords] = useState<Record<RecordTab, Data[]>>({
     transactions: [],
     settlements: [],
@@ -540,21 +606,22 @@ function RecordsPage() {
     null,
   );
   const [importResult, setImportResult] = useState<Data | null>(null);
-  const loadRecords = useCallback(
-    () =>
-      Promise.all(tabLabels.map((item) => request(`/finance/${item.id}`))).then((values) =>
-        setRecords(
-          Object.fromEntries(tabLabels.map((item, index) => [item.id, values[index]])) as Record<
-            RecordTab,
-            Data[]
-          >,
-        ),
-      ),
-    [],
-  );
+  const loadRecords = useCallback(() => {
+    setError('');
+    const tabsToLoad = employeeOnly
+      ? tabLabels.filter((item) => item.id === 'expense-claims')
+      : tabLabels;
+    return Promise.all(tabsToLoad.map((item) => request(`/finance/${item.id}`))).then((values) =>
+      setRecords((current) => ({
+        ...current,
+        ...Object.fromEntries(tabsToLoad.map((item, index) => [item.id, values[index]])),
+      })),
+    );
+  }, [employeeOnly]);
   useEffect(() => {
+    if (!identityReady) return;
     void loadRecords().catch((reason: Error) => setError(reason.message));
-  }, [loadRecords]);
+  }, [identityReady, loadRecords]);
   useEffect(() => setDrawerReady(true), []);
   useEffect(() => setPage(1), [query, tab]);
   useEffect(() => {
@@ -598,14 +665,16 @@ function RecordsPage() {
         title="Records"
         description="Traceable source records across payments, settlements, invoices, tax, cash, and expenses."
         action={
-          <div className={styles.rowActions}>
-            <FinoraButton variant="secondary" onClick={() => setShowImport((value) => !value)}>
-              {showImport ? 'Close import' : 'Import CSV'}
-            </FinoraButton>
-            <FinoraButton onClick={() => setEditor({ mode: 'create' })}>
-              Create one record
-            </FinoraButton>
-          </div>
+          !employeeOnly ? (
+            <div className={styles.rowActions}>
+              <FinoraButton variant="secondary" onClick={() => setShowImport((value) => !value)}>
+                {showImport ? 'Close import' : 'Import CSV'}
+              </FinoraButton>
+              <FinoraButton onClick={() => setEditor({ mode: 'create' })}>
+                Create one record
+              </FinoraButton>
+            </div>
+          ) : undefined
         }
       />
       {showImport && (
@@ -659,6 +728,12 @@ function RecordsPage() {
                     row={editor.row}
                     onClose={closeDrawer}
                     onEdit={() => setEditor({ mode: 'edit', row: editor.row })}
+                    onChanged={async () => {
+                      await loadRecords();
+                      closeDrawer();
+                    }}
+                    canReviewExpense={!employeeOnly}
+                    canEdit={!employeeOnly}
                   />
                 ) : (
                   <RecordEditor
@@ -678,7 +753,7 @@ function RecordsPage() {
         : null}
       <div className={styles.recordToolbar}>
         <div className={styles.tabs}>
-          {tabLabels.map((item) => (
+          {visibleTabs.map((item) => (
             <FinoraButton
               key={item.id}
               variant={tab === item.id ? 'primary' : 'ghost'}
@@ -721,6 +796,7 @@ function RecordsPage() {
             onPageChange={setPage}
             onView={(row) => setEditor({ mode: 'detail', row })}
             onEdit={(row) => setEditor({ mode: 'edit', row })}
+            canEdit={!employeeOnly}
           />
         </section>
       )}
@@ -799,6 +875,7 @@ function RecordTable({
   onPageChange,
   onView,
   onEdit,
+  canEdit,
 }: {
   tab: RecordTab;
   rows: Data[];
@@ -806,6 +883,7 @@ function RecordTable({
   onPageChange: (page: number) => void;
   onView: (row: Data) => void;
   onEdit: (row: Data) => void;
+  canEdit: boolean;
 }) {
   const router = useRouter();
   const pageSize = 20;
@@ -1092,7 +1170,7 @@ function RecordTable({
               : [
                   {
                     label: 'Claim',
-                    width: '14%',
+                    width: '13%',
                     cell: (item: Data) =>
                       reference(
                         item,
@@ -1101,28 +1179,43 @@ function RecordTable({
                   },
                   {
                     label: 'Merchant',
-                    width: '18%',
+                    width: '15%',
                     cell: (item: Data) =>
                       item.merchant ? String(item.merchant) : missing('Merchant not provided'),
                   },
                   {
                     label: 'Employee',
-                    width: '15%',
+                    width: '13%',
                     cell: (item: Data) =>
                       String((item.claimant as Data | null)?.name ?? '') ||
                       missing('Employee unavailable'),
                   },
                   {
                     label: 'Category',
-                    width: '14%',
+                    width: '11%',
                     cell: (item: Data) => humanize(item.category) || missing('Uncategorised'),
                   },
                   {
                     label: 'Incurred',
-                    width: '11%',
+                    width: '10%',
                     cell: (item: Data) => date(item.incurredAt) ?? missing('Date unavailable'),
                   },
-                  { label: 'Status', width: '10%', align: 'center', cell: status },
+                  {
+                    label: 'Evidence',
+                    width: '11%',
+                    align: 'center',
+                    cell: (item: Data) => {
+                      const count = Array.isArray(item.documents) ? item.documents.length : 0;
+                      return count ? (
+                        <span className={styles.recordEvidenceReady}>
+                          <FinoraIcon name="check" /> {count} attached
+                        </span>
+                      ) : (
+                        <span className={styles.recordEvidenceMissing}>Receipt needed</span>
+                      );
+                    },
+                  },
+                  { label: 'Status', width: '9%', align: 'center', cell: status },
                   {
                     label: 'Amount',
                     width: '10%',
@@ -1179,15 +1272,17 @@ function RecordTable({
                   >
                     <FinoraIcon name="view" />
                   </FinoraIconButton>
-                  <FinoraIconButton
-                    size="small"
-                    variant="ghost"
-                    aria-label={`Edit ${String(item.externalId ?? 'record')}`}
-                    title="Edit record"
-                    onClick={() => onEdit(item)}
-                  >
-                    <FinoraIcon name="edit" />
-                  </FinoraIconButton>
+                  {canEdit ? (
+                    <FinoraIconButton
+                      size="small"
+                      variant="ghost"
+                      aria-label={`Edit ${String(item.externalId ?? 'record')}`}
+                      title="Edit record"
+                      onClick={() => onEdit(item)}
+                    >
+                      <FinoraIcon name="edit" />
+                    </FinoraIconButton>
+                  ) : null}
                 </div>
               </td>
             </tr>
@@ -1239,11 +1334,17 @@ function RecordDetail({
   row,
   onClose,
   onEdit,
+  onChanged,
+  canReviewExpense,
+  canEdit,
 }: {
   tab: RecordTab;
   row: Data;
   onClose: () => void;
   onEdit: () => void;
+  onChanged: () => Promise<void>;
+  canReviewExpense: boolean;
+  canEdit: boolean;
 }) {
   const date = (value: unknown) =>
     value
@@ -1366,12 +1467,202 @@ function RecordDetail({
             </div>
           ))}
         </dl>
+        {tab === 'expense-claims' ? (
+          <ExpenseEvidenceWorkflow row={row} canReview={canReviewExpense} onChanged={onChanged} />
+        ) : null}
       </div>
       <footer className={styles.recordDetailFooter}>
-        <FinoraButton variant="secondary" onClick={onEdit}>
-          Edit record
-        </FinoraButton>
+        {canEdit ? (
+          <FinoraButton variant="secondary" onClick={onEdit}>
+            Edit record
+          </FinoraButton>
+        ) : (
+          <span className={styles.recordDetailReadOnly}>Employee-scoped expense record</span>
+        )}
       </footer>
+    </section>
+  );
+}
+
+function ExpenseEvidenceWorkflow({
+  row,
+  canReview,
+  onChanged,
+}: {
+  row: Data;
+  canReview: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [category, setCategory] = useState('AUTO');
+  const [busy, setBusy] = useState('');
+  const [decision, setDecision] = useState<'APPROVE' | 'REJECT' | null>(null);
+  const [error, setError] = useState('');
+  const documents = Array.isArray(row.documents) ? (row.documents as Data[]) : [];
+  const reviewable = ['SUBMITTED', 'UNDER_REVIEW'].includes(String(row.status));
+  const closed = ['APPROVED', 'REJECTED', 'REIMBURSED'].includes(String(row.status));
+  const uploadReceipt = async (file: File) => {
+    setBusy('upload');
+    setError('');
+    const body = new FormData();
+    body.append('file', file);
+    if (category !== 'AUTO') body.append('category', category);
+    try {
+      await request(`/workspace/expenses/${String(row.externalId)}/receipt`, {
+        method: 'POST',
+        body,
+      });
+      await onChanged();
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setBusy('');
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+  return (
+    <section className={styles.expenseEvidence}>
+      <div className={styles.expenseEvidenceHead}>
+        <div>
+          <span>Receipt evidence</span>
+          <strong>
+            {documents.length
+              ? `${documents.length} ${documents.length === 1 ? 'document' : 'documents'} attached`
+              : 'No receipt attached'}
+          </strong>
+        </div>
+        <StatusBadge
+          status={
+            documents.length ? String(documents[0]?.status ?? 'UPLOADED') : 'RECEIPT_REQUIRED'
+          }
+          label={documents.length ? 'Receipt attached' : undefined}
+        />
+      </div>
+      {documents.length ? (
+        <div className={styles.expenseDocumentList}>
+          {documents.map((document) => (
+            <div key={String(document.id)}>
+              <FinoraIcon name="records" />
+              <span>
+                <strong>{String(document.fileName)}</strong>
+                <small>
+                  {String(document.mimeType).replace('application/', '').replace('image/', '')} ·{' '}
+                  {new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(
+                    new Date(String(document.createdAt)),
+                  )}
+                </small>
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className={styles.expenseEvidenceCopy}>
+          Attach PDF, JPEG, PNG, or WebP evidence before finance approval.
+        </p>
+      )}
+      {!closed ? (
+        <div className={styles.expenseUploadControls}>
+          <FinoraSelect
+            aria-label="Receipt expense category"
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+          >
+            <option value="AUTO">Auto-detect category</option>
+            {categoryOptions.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </FinoraSelect>
+          <input
+            ref={fileRef}
+            className={styles.expenseFileInput}
+            type="file"
+            accept="application/pdf,image/jpeg,image/png,image/webp"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void uploadReceipt(file);
+            }}
+          />
+          <FinoraButton
+            variant="secondary"
+            disabled={busy === 'upload'}
+            onClick={() => fileRef.current?.click()}
+          >
+            {busy === 'upload' ? 'Uploading…' : documents.length ? 'Add receipt' : 'Upload receipt'}
+          </FinoraButton>
+        </div>
+      ) : null}
+      {canReview && reviewable ? (
+        <div className={styles.expenseReview}>
+          {!decision ? (
+            <div className={styles.expenseReviewActions}>
+              <FinoraButton disabled={!documents.length} onClick={() => setDecision('APPROVE')}>
+                Approve claim
+              </FinoraButton>
+              <FinoraButton variant="danger" onClick={() => setDecision('REJECT')}>
+                Reject claim
+              </FinoraButton>
+            </div>
+          ) : (
+            <form
+              onSubmit={async (event) => {
+                event.preventDefault();
+                setBusy('review');
+                setError('');
+                const values = new FormData(event.currentTarget);
+                try {
+                  await request(`/workspace/expenses/${String(row.externalId)}/review`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      decision,
+                      reason: values.get('reason'),
+                      version: Number(row.version),
+                    }),
+                  });
+                  await onChanged();
+                } catch (reason) {
+                  setError((reason as Error).message);
+                } finally {
+                  setBusy('');
+                }
+              }}
+            >
+              <FinoraField
+                label={decision === 'APPROVE' ? 'Approval note' : 'Reason for rejection'}
+              >
+                <FinoraInput
+                  name="reason"
+                  required
+                  minLength={3}
+                  placeholder={
+                    decision === 'APPROVE'
+                      ? 'Receipt and claim details verified'
+                      : 'Explain what the employee needs to correct'
+                  }
+                />
+              </FinoraField>
+              <div className={styles.expenseReviewActions}>
+                <FinoraButton
+                  type="submit"
+                  variant={decision === 'REJECT' ? 'danger' : 'primary'}
+                  disabled={busy === 'review'}
+                >
+                  {busy === 'review'
+                    ? 'Saving decision…'
+                    : decision === 'APPROVE'
+                      ? 'Confirm approval'
+                      : 'Confirm rejection'}
+                </FinoraButton>
+                <FinoraButton variant="ghost" onClick={() => setDecision(null)}>
+                  Cancel
+                </FinoraButton>
+              </div>
+            </form>
+          )}
+        </div>
+      ) : null}
+      {error ? <span className={styles.importError}>{error}</span> : null}
     </section>
   );
 }
@@ -1413,6 +1704,7 @@ const fieldsFor = (tab: RecordTab, options: Data): RecordField[] => {
   const users = Array.isArray(options.users) ? (options.users as Data[]) : [];
   const accounts = Array.isArray(options.accounts) ? (options.accounts as Data[]) : [];
   const settlements = Array.isArray(options.settlements) ? (options.settlements as Data[]) : [];
+  const invoices = Array.isArray(options.invoices) ? (options.invoices as Data[]) : [];
   const commonAmount: RecordField[] = [
     { name: 'amount', label: 'Amount', type: 'number', required: true },
     { name: 'currency', label: 'Currency', required: true },
@@ -1449,7 +1741,7 @@ const fieldsFor = (tab: RecordTab, options: Data): RecordField[] => {
   if (tab === 'invoices')
     return [
       ...commonAmount,
-      { name: 'vendor', label: 'Vendor' },
+      { name: 'vendor', label: 'Counterparty', required: true },
       {
         name: 'direction',
         label: 'Direction',
@@ -1457,7 +1749,12 @@ const fieldsFor = (tab: RecordTab, options: Data): RecordField[] => {
         options: fixedOptions(['PAYABLE', 'RECEIVABLE']),
       },
       { name: 'category', label: 'Category', type: 'select', options: categoryOptions },
-      { name: 'status', label: 'Status' },
+      {
+        name: 'status',
+        label: 'Status',
+        type: 'select',
+        options: fixedOptions(['OPEN', 'PARTIALLY_PAID', 'PARTIALLY_COLLECTED', 'PAID', 'OVERDUE']),
+      },
       {
         name: 'nodeId',
         label: 'Organization node',
@@ -1472,6 +1769,15 @@ const fieldsFor = (tab: RecordTab, options: Data): RecordField[] => {
     ];
   if (tab === 'tax-lines')
     return [
+      {
+        name: 'invoiceId',
+        label: 'Linked invoice',
+        type: 'select',
+        options: invoices.map((item) => ({
+          value: String(item.id),
+          label: `${String(item.externalId)}${item.vendor ? ` · ${String(item.vendor)}` : ''}`,
+        })),
+      },
       { name: 'amount', label: 'Tax amount', type: 'number', required: true },
       { name: 'taxRate', label: 'Tax rate', type: 'number', required: true },
       { name: 'taxType', label: 'Tax type', required: true },
