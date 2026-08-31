@@ -522,7 +522,9 @@ function RecordsPage() {
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
   const [showImport, setShowImport] = useState(false);
-  const [editor, setEditor] = useState<{ mode: 'create' | 'edit'; row?: Data } | null>(null);
+  const [editor, setEditor] = useState<{ mode: 'create' | 'edit' | 'detail'; row?: Data } | null>(
+    null,
+  );
   const [importResult, setImportResult] = useState<Data | null>(null);
   const loadRecords = useCallback(
     () =>
@@ -613,20 +615,33 @@ function RecordsPage() {
           <aside
             className={styles.recordDrawer}
             aria-label={
-              editor.mode === 'edit' ? 'Edit financial record' : 'Create financial record'
+              editor.mode === 'detail'
+                ? 'Financial record details'
+                : editor.mode === 'edit'
+                  ? 'Edit financial record'
+                  : 'Create financial record'
             }
             role="dialog"
             aria-modal="true"
           >
-            <RecordEditor
-              tab={tab}
-              row={editor.row}
-              onClose={() => setEditor(null)}
-              onSaved={async () => {
-                setEditor(null);
-                await loadRecords();
-              }}
-            />
+            {editor.mode === 'detail' && editor.row ? (
+              <RecordDetail
+                tab={tab}
+                row={editor.row}
+                onClose={() => setEditor(null)}
+                onEdit={() => setEditor({ mode: 'edit', row: editor.row })}
+              />
+            ) : (
+              <RecordEditor
+                tab={tab}
+                row={editor.row}
+                onClose={() => setEditor(null)}
+                onSaved={async () => {
+                  setEditor(null);
+                  await loadRecords();
+                }}
+              />
+            )}
           </aside>
         </div>
       )}
@@ -666,6 +681,7 @@ function RecordsPage() {
           <RecordTable
             tab={tab}
             rows={visible}
+            onView={(row) => setEditor({ mode: 'detail', row })}
             onEdit={(row) => setEditor({ mode: 'edit', row })}
           />
         </section>
@@ -741,10 +757,12 @@ function RecordImport({ onImported }: { onImported: (result: Data) => Promise<vo
 function RecordTable({
   tab,
   rows,
+  onView,
   onEdit,
 }: {
   tab: RecordTab;
   rows: Data[];
+  onView: (row: Data) => void;
   onEdit: (row: Data) => void;
 }) {
   const date = (value: unknown) =>
@@ -882,6 +900,9 @@ function RecordTable({
                 </td>
               ))}
               <td>
+                <FinoraButton size="small" variant="ghost" onClick={() => onView(item)}>
+                  View
+                </FinoraButton>
                 <FinoraButton size="small" variant="ghost" onClick={() => onEdit(item)}>
                   Edit
                 </FinoraButton>
@@ -891,6 +912,148 @@ function RecordTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function RecordDetail({
+  tab,
+  row,
+  onClose,
+  onEdit,
+}: {
+  tab: RecordTab;
+  row: Data;
+  onClose: () => void;
+  onEdit: () => void;
+}) {
+  const date = (value: unknown) =>
+    value
+      ? new Intl.DateTimeFormat('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        }).format(new Date(String(value)))
+      : '—';
+  const amount = (value: unknown) => <Amount value={String(value ?? '0')} />;
+  const status = (value: unknown) => <StatusBadge status={String(value ?? 'PENDING')} />;
+  const settlement = (row.settlement as Data | null) ?? null;
+  const summaryAmount =
+    tab === 'settlements' ? row.receivedAmount : (row.amount ?? row.receivedAmount ?? '0');
+  const rows =
+    tab === 'transactions'
+      ? [
+          ['Occurred', date(row.occurredAt)],
+          ['Payment status', status(row.status)],
+          ['Linked settlement', String(settlement?.externalId ?? 'Not settled')],
+        ]
+      : tab === 'settlements'
+        ? [
+            ['Settled on', date(row.settledAt)],
+            ['Expected', amount(row.expectedAmount)],
+            ['Received', amount(row.receivedAmount)],
+            ['Gateway fee', amount(row.feeAmount)],
+            ['GST on fee', amount(row.gstAmount)],
+            ['Refunds', amount(row.refundAmount)],
+          ]
+        : tab === 'invoices'
+          ? [
+              ['Vendor', String(row.vendor ?? '—')],
+              ['Direction', String(row.direction ?? '—')],
+              ['Category', String(row.category ?? '—').replaceAll('_', ' ')],
+              ['Issued on', date(row.issuedAt)],
+              ['Due on', date(row.dueAt)],
+              ['Invoice status', status(row.status)],
+              ['Organization node', String((row.node as Data | null)?.name ?? '—')],
+            ]
+          : tab === 'tax-lines'
+            ? [
+                ['Tax type', String(row.taxType ?? '—')],
+                ['Tax rate', `${String(row.taxRate ?? 0)}%`],
+                ['Tax period', String(row.taxPeriod ?? '—')],
+                ['Counterparty tax ID', String(row.counterpartyTaxId ?? '—')],
+                ['Match status', status(row.matchStatus)],
+              ]
+            : tab === 'cash-movements'
+              ? [
+                  ['Description', String(row.description ?? '—')],
+                  ['Counterparty', String(row.counterparty ?? '—')],
+                  ['Direction', String(row.direction ?? '—')],
+                  ['Category', String(row.category ?? '—').replaceAll('_', ' ')],
+                  ['Cash account', String((row.account as Data | null)?.name ?? '—')],
+                  ['Occurred on', date(row.occurredAt)],
+                  ['Movement status', status(row.status)],
+                ]
+              : [
+                  ['Merchant', String(row.merchant ?? '—')],
+                  ['Employee', String((row.claimant as Data | null)?.name ?? '—')],
+                  ['Organization node', String((row.node as Data | null)?.name ?? '—')],
+                  ['Category', String(row.category ?? '—').replaceAll('_', ' ')],
+                  ['Incurred on', date(row.incurredAt)],
+                  ['Claim status', status(row.status)],
+                  ['Description', String(row.description ?? '—')],
+                ];
+  return (
+    <section className={styles.recordDetail}>
+      <header className={styles.recordDetailHead}>
+        <div>
+          <p className={styles.eyebrow}>RECORD DETAILS</p>
+          <h2>{String(row.externalId ?? 'Financial record')}</h2>
+          <span>{String(row.currency ?? 'INR')}</span>
+        </div>
+        <FinoraButton size="small" variant="ghost" onClick={onClose}>
+          Close
+        </FinoraButton>
+      </header>
+      <div className={styles.recordDetailBody}>
+        <div className={styles.recordDetailAmount}>
+          <span>{tab === 'settlements' ? 'Received amount' : 'Record amount'}</span>
+          <strong>{amount(summaryAmount)}</strong>
+        </div>
+        {tab === 'transactions' && settlement ? (
+          <section className={styles.recordDetailBreakdown}>
+            <div>
+              <span>Settlement breakdown</span>
+              <strong>{String(settlement.externalId)}</strong>
+            </div>
+            <dl>
+              <div>
+                <dt>Expected</dt>
+                <dd>{amount(settlement.expectedAmount)}</dd>
+              </div>
+              <div>
+                <dt>Received</dt>
+                <dd>{amount(settlement.receivedAmount)}</dd>
+              </div>
+              <div>
+                <dt>Gateway fee</dt>
+                <dd>{amount(settlement.feeAmount)}</dd>
+              </div>
+              <div>
+                <dt>GST</dt>
+                <dd>{amount(settlement.gstAmount)}</dd>
+              </div>
+              <div>
+                <dt>Refunds</dt>
+                <dd>{amount(settlement.refundAmount)}</dd>
+              </div>
+            </dl>
+          </section>
+        ) : null}
+        <dl className={styles.recordDetailList}>
+          {rows.map(([label, value]) => (
+            <div key={String(label)}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+      <footer className={styles.recordDetailFooter}>
+        <FinoraButton variant="secondary" onClick={onEdit}>
+          Edit record
+        </FinoraButton>
+      </footer>
+    </section>
   );
 }
 

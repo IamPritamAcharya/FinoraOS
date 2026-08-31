@@ -778,27 +778,68 @@ async function main() {
   });
   await prisma.transaction.createMany({ data: transactions });
   await prisma.invoice.createMany({
-    data: Array.from({ length: 18 }, (_, index) => ({
-      organizationId: orgId,
-      externalId: `INV_${String(index + 1).padStart(4, '0')}`,
-      amount: (27000 + index * 4300).toFixed(2),
-      currency: 'INR',
-      issuedAt: iso((index % 12) + 1),
-    })),
+    data: Array.from({ length: 18 }, (_, index) => {
+      const payable = index % 3 !== 0;
+      const vendor = [
+        'Nimbus Cloud India',
+        'Swift Logistics',
+        'Orbit Properties',
+        'SupportDesk Systems',
+        'Paperplane Marketing',
+        'Cobalt Legal',
+      ][index % 6];
+      const category = [
+        'SOFTWARE',
+        'VENDOR_PAYMENT',
+        'RENT',
+        'PROFESSIONAL_SERVICES',
+        'MARKETING',
+        'OFFICE_SUPPLIES',
+      ][index % 6] as const;
+      const status = payable
+        ? ['OPEN', 'PARTIALLY_PAID', 'OVERDUE', 'PAID'][index % 4]
+        : ['OPEN', 'PARTIALLY_COLLECTED', 'PAID'][index % 3];
+      return {
+        id: `invoice-${index + 1}`,
+        organizationId: orgId,
+        externalId: `INV_${String(index + 1).padStart(4, '0')}`,
+        amount: (27000 + index * 4300).toFixed(2),
+        currency: 'INR',
+        vendor: payable ? vendor : ['Northstar Retail', 'Crescent Stores', 'Mango Mart'][index % 3],
+        direction: payable ? ('PAYABLE' as const) : ('RECEIVABLE' as const),
+        category,
+        status,
+        nodeId: index % 2 === 0 ? 'node-operations' : 'node-finance',
+        issuedAt: iso((index % 12) + 1),
+        dueAt: iso(((index + 4) % 12) + 1),
+        sourceMetadata: {
+          source: index % 2 ? 'mock-erp' : 'mock-razorpayx',
+          deterministicSeed: true,
+        },
+      };
+    }),
   });
   await prisma.taxLine.createMany({
     data: Array.from({ length: 18 }, (_, index) => {
-      const matched = index % 6 !== 0;
+      const matchStatus = ['MATCHED', 'MATCHED', 'AMBIGUOUS', 'NEEDS_REVIEW', 'UNMATCHED'][
+        index % 5
+      ] as const;
       return {
         organizationId: orgId,
         externalId: `GST_${String(index + 1).padStart(4, '0')}`,
+        invoiceId: `invoice-${index + 1}`,
         amount: (4860 + index * 774).toFixed(2),
-        taxRate: '18.00',
-        matched,
-        matchStatus: matched ? ('MATCHED' as const) : ('NEEDS_REVIEW' as const),
-        taxType: 'GST',
-        taxPeriod: '2026-08',
-        sourceMetadata: { source: 'mock-erp', deterministicSeed: true },
+        taxRate: ['5.00', '12.00', '18.00'][index % 3],
+        matched: matchStatus === 'MATCHED',
+        matchStatus,
+        taxType: ['GST', 'IGST', 'CGST + SGST'][index % 3],
+        taxPeriod: index < 6 ? '2026-07' : index < 15 ? '2026-08' : '2026-09',
+        counterpartyTaxId: `27${['AABCN', 'AACCS', 'AABCO'][index % 3]}${String(1200 + index).padStart(4, '0')}Z${index % 9}`,
+        sourceMetadata: {
+          source: 'mock-erp',
+          deterministicSeed: true,
+          invoiceReference: `INV_${String(index + 1).padStart(4, '0')}`,
+        },
       };
     }),
   });

@@ -55,7 +55,19 @@ export class FinanceService {
         organizationId: principal.organizationId,
         ...(query ? { externalId: { contains: query, mode: 'insensitive' } } : {}),
       },
-      include: { settlement: { select: { externalId: true } } },
+      include: {
+        settlement: {
+          select: {
+            externalId: true,
+            expectedAmount: true,
+            receivedAmount: true,
+            feeAmount: true,
+            gstAmount: true,
+            refundAmount: true,
+            settledAt: true,
+          },
+        },
+      },
       orderBy: { occurredAt: 'desc' },
       take: 100,
     });
@@ -69,12 +81,14 @@ export class FinanceService {
   invoices(principal: RequestPrincipal) {
     return this.prisma.invoice.findMany({
       where: { organizationId: principal.organizationId },
+      include: { node: { select: { name: true, code: true } } },
       orderBy: { issuedAt: 'desc' },
     });
   }
   cashMovements(principal: RequestPrincipal) {
     return this.prisma.cashMovement.findMany({
       where: { organizationId: principal.organizationId },
+      include: { account: { select: { name: true } } },
       orderBy: { occurredAt: 'desc' },
       take: 200,
     });
