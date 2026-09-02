@@ -3,12 +3,12 @@
 </p>
 
 <p align="center">
-  <strong>AI-native financial operations for finance teams that need to reconcile, investigate, and close with evidence.</strong>
+  <strong>An AI-native finance operations OS for records, people, policies, agents, approvals, and audit.</strong>
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
-  <a href="#the-finoraos-loop">How it works</a> ·
+  <a href="#system-design">System design</a> ·
   <a href="#demo-workflow">Demo workflow</a> ·
   <a href="#evaluation">Evaluation</a> ·
   <a href="https://github.com/IamPritamAcharya/FinoraOS">GitHub</a> ·
@@ -17,20 +17,21 @@
 
 > **Buildathon prototype** · Built for the Razorpay AI Buildathon 2026, Track 04 — AI Finance Controller.
 
-FinoraOS is not a chatbot over a database. It is a financial operations workspace where deterministic software handles verifiable finance work and AI is reserved for ambiguity, investigation, and explanation.
+FinoraOS is not a chatbot over a database. It is a multi-role finance operations control plane where employees submit evidence, finance teams operate shared records, administrators govern organizational spend, and controlled agents investigate and propose actions.
 
-The flagship V1 workflow is reconciliation and exception closure: process a batch of financial records, match what can be proven, surface honest exceptions, then give a finance user evidence for the next controlled action.
+The flagship V1 workflow is reconciliation and exception closure: process a batch of financial records, match what can be proven, surface honest exceptions, investigate only the ambiguity, then validate, approve, audit, and rerun. The same platform also manages receipts, expense review, organization budgets, spend controls, notifications, jobs, custom agent skills, and governed record corrections.
 
 ## Why FinoraOS
 
-Finance teams lose time reconciling payment, settlement, bank, invoice, and tax information across systems. The difficult work is rarely arithmetic—it is locating evidence, explaining variance, resolving ambiguity, and leaving an audit trail.
+Finance operations span more than one finance team or one screen. Employees hold missing receipt evidence. Controllers reconcile payments and settlements. Administrators define budgets and policies. Auditors need an immutable explanation of who or what changed each record. Today these loops are fragmented across spreadsheets, inboxes, provider dashboards, and manual follow-up.
 
 FinoraOS is designed around that reality:
 
 - **Deterministic first** for IDs, references, amounts, settlement relationships, and date windows.
 - **AI only for ambiguity**—never for arbitrary SQL, direct data writes, or financial calculations.
 - **Evidence before action** with structured records, traceable source metadata, proposed actions, and audit events.
-- **One shared source of truth** behind a finance workspace and the Finora conversational interface.
+- **One operating layer** across employee self-service, finance records, organization policy, automation, and Finora.
+- **Role and tenant boundaries** enforced by Keycloak identity, database-owned membership, API permissions, and PostgreSQL row-level security.
 
 ## The FinoraOS loop
 
@@ -45,61 +46,70 @@ Organization-scoped financial records
      Matches         Exceptions
                          │
                          ▼
-              Controlled investigator tools
+             Scoped evidence + controlled tools
                          │
                          ▼
-                 Typed proposed resolution
+              AI-assisted typed proposal
                          │
                          ▼
-          Validation → approval → audit → rerun
+               Zod + policy validation
+                         │
+                 ┌───────┴────────┐
+                 ▼                ▼
+          Human approval     Reject / escalate
+                 │
+                 ▼
+        Derived adjustment + audit
+                 │
+                 ▼
+       Deterministic rerun → closed or open
 ```
 
 The reconciliation engine has no Prisma, NestJS, database, HTTP, environment, clock, vendor SDK, LLM, or random dependency. The API is responsible for organization-scoped loading and transactional persistence; the engine is responsible only for repeatable matching decisions.
 
+## System design
+
+<p align="center">
+  <a href="docs/SYSTEM_DESIGN.md">
+    <img src="docs/assets/finoraos-system-design.png" alt="FinoraOS system design showing web, API, deterministic domain packages, controlled agents, database identities, tenant boundaries, external providers, and offline evaluation" width="100%" />
+  </a>
+</p>
+
+The architecture separates user experience, business orchestration, deterministic domain logic, external gateways, and execution identities. Finora can plan only over role-filtered, Zod-validated tools. It never receives SQL or credentials. Read mode uses a dedicated read-only PostgreSQL identity; write mode can only prepare an expiring diff for human approval before a separate restricted writer executes allowlisted fields.
+
+Read the [complete FinoraOS system design](docs/SYSTEM_DESIGN.md) for component ownership, read/write sequences, reconciliation closure, receipt processing, spend policy, tenancy, failure behavior, and deployment topology.
+
 ## What is working in V1
 
-| Capability                   | What it does now                                                                                                                                                                                                                               |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Finance workspace            | Role-aware Finora, overview, records, reconciliation, exceptions, organization, expenses, agent control, notifications, operations, and unified audit routes over seeded backend data.                                                         |
-| Deterministic reconciliation | Exact-reference, settlement-relationship, date-window, and explicit composite-score matching. Ambiguous cases are never forced into a match.                                                                                                   |
-| Exception persistence        | Reconciliation runs persist matches, exceptions, exception evidence, metrics, and audit events transactionally.                                                                                                                                |
-| Settlement Q&A               | Ask Finora about `STL_0001`; amounts and variance are calculated deterministically, then a configured AI gateway may provide a constrained qualitative explanation.                                                                            |
-| Exception investigation chat | Ask `Investigate EXC_005.`; Finora invokes the controlled investigator, stores an agent-run/proposal/audit record, and renders the approval-pending result.                                                                                    |
-| Controlled chat controller   | The configured model selects one Zod-validated tool from an explicit catalogue: organization users, transactions, invoices, settlements, exceptions/evidence, tax lines, forecast, reconciliation runs, audit events, or agent runs—never SQL. |
-| General Finora conversation  | Greetings, product-identity, and navigation questions use the configured model under a no-invented-finance-data system guardrail.                                                                                                              |
-| AI providers                 | API-key-first gateway selection for Gemini, Groq, and OpenRouter; local Ollama fallback; explicit mock only for tests.                                                                                                                         |
-| Identity and tenancy         | Keycloak OIDC, NextAuth sessions, database-backed workspace roles, API permission checks, and PostgreSQL RLS for the agent's read-only identity.                                                                                               |
-| Finance-hub workflows        | Editable organization tree/canvas, budgets, deterministic hard/category spend controls, audited invoice/expense CSV imports, categorized receipts, targeted limit notifications, approval policies, reminders, and agent/audit inspection.     |
-| Governed record operations   | Create one record or import a batch, edit with optimistic concurrency, and use explicit chat write mode to prepare an expiring before/after diff that cannot execute until an authorized user approves it.                                     |
-| Custom agent skills          | Admin-created guidance can select only an explicit allowlist of existing organization-scoped read tools; it cannot add SQL, credentials, permissions, or write access.                                                                         |
-| Provider gateways            | Mock-first banking/payment/messaging boundaries, Slack outbound reminders, and a Razorpay sandbox-only read adapter.                                                                                                                           |
-| Synthetic demo               | Reproducible Acme Commerce India data: 4 users, node hierarchy, 3 budgets, 4 expenses, 120 transactions, 12 settlements, 49 cash movements, invoices/tax lines, and 14 exceptions.                                                             |
-| Evaluation harness           | Runs the same shared reconciliation package against checked-in input and ground truth.                                                                                                                                                         |
-
-### Honest V1 boundaries
-
-- No real money movement is performed. Razorpay supports test-mode reads only; persistence/sync and webhooks are not yet connected. Banking and ERP entries are explicit mock/disconnected integrations.
-- Slack can send configured receipt reminders, but inbound Slack events and file capture are not implemented.
-- Local receipt storage is a development adapter without malware scanning, OCR, remote object storage, or an authorized download endpoint.
-- AI output is constrained to qualitative explanations. Deterministic finance logic remains authoritative, and an unavailable hosted provider falls back to local Ollama.
-- Chat threads, messages, controller decisions, tool steps, and agent runs are persisted and scoped to the authenticated organization/user.
-- The bundled Keycloak realm runs with `start-dev`; production needs TLS, durable Keycloak storage, managed secrets, and deployment hardening.
-- This is not a production payment system, tax-compliance product, or claim of regulatory certification.
+| Capability                        | What works now                                                                                                                                                                                                               |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Multi-role workspace              | Employee, Finance Controller, and Enterprise Admin experiences over normal application routes, with an Auditor permission model.                                                                                             |
+| Finance command center            | Overview combines posted cash, reconciliation coverage, the current exception queue, and recent settlements. Running reconciliation refreshes the active snapshot instead of inflating the queue.                            |
+| Unified records ledger            | Searchable, paginated transactions, settlements, invoices, tax lines, cash movements, and expenses with linked detail, creation, optimistic editing, and audited CSV imports.                                                |
+| Employee receipt loop             | Employees see only their claims, upload bounded PDF/image evidence, and receive notifications. Finance reviews evidence and approves or rejects with version checks and audit.                                               |
+| Organization and spend governance | Editable tree/canvas, node ownership, budgets, deterministic ancestor hard limits, soft category envelopes, and targeted overage notifications.                                                                              |
+| Deterministic reconciliation      | Exact-reference, settlement-relationship, date-window, and composite-score matching. Ties, missing records, and low-confidence cases become honest exceptions.                                                               |
+| AI exception closure              | `Investigate EXC_005` loads scoped evidence, calculates variance deterministically, uses AI only for constrained interpretation, validates a typed proposal, and awaits human approval before adjustment and rerun.          |
+| Finora read mode                  | A role-aware controller can execute bounded multi-tool plans across organization summaries, budgets, payments, expenses, settlements, invoices, tax, cash, exceptions, reconciliation, users, and audit—never arbitrary SQL. |
+| Governed write mode               | Explicit non-persistent write mode prepares an expiring before/after diff. Approval invokes a tenant-scoped, column-limited writer with optimistic concurrency and atomic audit.                                             |
+| Custom agent skills               | Organization-owned procedures are limited to an explicit allowlist of existing read tools and retain skill/version context in every run.                                                                                     |
+| Operations and audit              | Notifications, integration state, approval policies, scheduled receipt reminders, job outcomes, model/tool steps, and site-wide audit are tenant-scoped and visible.                                                         |
+| Provider abstraction              | Hosted Gemini/Groq/OpenRouter selection, local Ollama/Qwen fallback, Razorpay test reads, mock banking, Slack outbound reminders, and local document storage behind gateways.                                                |
+| Reproducible proof                | Seeded Acme Commerce India workspace plus a checked-in 240-record reconciliation fixture evaluated by the exact engine used by the API.                                                                                      |
 
 ## Demo workflow
 
-1. Open `http://localhost:3000`, sign in as the finance controller, and open **Finora**.
-2. Ask: `Why was settlement STL_0001 short?`
-3. See the deterministic settlement breakdown: expected amount, received amount, gateway fee, GST, refund, and the explained variance.
-4. Ask: `Investigate EXC_005.` See the AI-assisted qualitative explanation and typed proposal. This creates no financial adjustment and requires a later approval step.
-5. Follow up with: `What does the gateway fee mean?` Finora carries forward the bounded settlement context and retrieves the same controlled record.
-6. Ask: `Show unresolved exceptions above ₹25,000.`, `What is our expected cash position this week?`, or `Which GST lines failed to match?`
-7. Open **Reconciliation** to inspect the latest measured run.
-8. Open **Exceptions** to inspect the queue and its supporting reasons.
-9. Open **Records** to create or edit a record, import a CSV batch, or manage expense receipts and reviews. Employees receive only their own expense ledger; every mutation and review appears in **Audit** with its actor and evidence.
-10. In **Finora**, enable **Write mode**, ask `Change pay_00008 status to REFUNDED`, inspect the proposed diff, then approve or reject it. No record changes before approval.
-11. Open **Organization** to edit nodes or use the canvas and set a hard/category limit. Hard breaches are rejected; category overages notify Finance and the node owner.
-12. Run the evaluation harness to demonstrate batch-level accuracy—not a cherry-picked result.
+1. Sign in as `employee`. Notice that the workspace exposes only Finora, personal expenses, receipts, and notifications.
+2. Open **Records → Expenses**, select `EXP_0002`, and upload a PDF or image receipt. The claim becomes submitted while the source record and document evidence remain separately traceable.
+3. Sign out and sign in as `finance`. Overview now exposes organization cash, reconciliation coverage, current exceptions, and settlements.
+4. Run reconciliation from Overview. The previous active exception snapshot is superseded rather than duplicated.
+5. Open **Finora** in read-only mode and ask: `How much did we spend in August 2026, which category was largest, and what is our seven-day cash outlook?`
+6. Expand the tool activity to see the role-filtered multi-tool plan and grounded financial artifacts.
+7. Ask: `Investigate EXC_005 and show me the evidence.` Review the deterministic evidence, AI-assisted explanation, confidence, and typed proposal.
+8. Open **Exceptions** and approve or reject the proposal. Approval creates a derived adjustment, audit event, and reconciliation rerun without overwriting the imported source.
+9. Return to Finora, explicitly enable **Write mode**, and ask: `Change pay_00008 status to REFUNDED.` Inspect the before/after diff before approving or rejecting it.
+10. Open **Organization** to inspect the tree/canvas, node budgets, hard spend limits, and soft category envelopes. Then visit **Notifications**, **Operations**, **Agent control**, and **Audit** to follow the resulting control-plane activity.
+11. Run `pnpm eval:reconciliation` to prove the batch-level result using the exact API engine—not a cherry-picked model response.
 
 The app supports normal route navigation. Server-persisted chat threads remain available when a finance user checks another workspace view and returns.
 
@@ -266,7 +276,7 @@ Match accuracy               100.00%
 
 These are measured results from the fixture and ground truth—not dashboard placeholders. Difficult cases remain visible as exceptions rather than being hidden to inflate the score.
 
-## Architecture
+## Repository layout
 
 ```text
 apps/web                 Next.js 16 workspace and Finora chat UI
@@ -281,7 +291,7 @@ evals                    Batch-level accuracy and exception metrics
 infra                    Local Keycloak realm and development infrastructure assets
 ```
 
-### Provider and safety boundaries
+### Architectural boundaries
 
 ```text
 Finance / reconciliation services → gateway contracts → external systems
@@ -319,6 +329,7 @@ Business modules do not import vendor SDKs directly. Agents do not import Prisma
 
 ## Documentation
 
+- [Complete system design](docs/SYSTEM_DESIGN.md)
 - [Current project status and handoff](docs/STATUS.md)
 - [Architecture decisions](docs/DECISIONS.md)
 - [Product roadmap](docs/ROADMAP.md)

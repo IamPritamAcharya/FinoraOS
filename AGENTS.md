@@ -1,6 +1,6 @@
 # FinoraOS engineering guide
 
-Before substantial work, read this file and `docs/STATUS.md`, `docs/ROADMAP.md`, `docs/DECISIONS.md`, and for UI work `docs/BRANDING.md`.
+Before substantial work, read this file and `docs/STATUS.md`, `docs/ROADMAP.md`, `docs/DECISIONS.md`; read `docs/SYSTEM_DESIGN.md` for architecture changes and `docs/BRANDING.md` for UI work.
 
 FinoraOS is an AI-native financial-operations platform. The flagship loop is deterministic reconciliation → exceptions → controlled AI investigation → typed proposal → validation/approval → audit → rerun/close.
 

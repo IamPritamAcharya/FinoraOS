@@ -1,0 +1,242 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2800" height="1750" viewBox="0 0 2800 1750" role="img" aria-labelledby="title desc">
+  <title id="title">FinoraOS C4 system design</title>
+  <desc id="desc">C4-style architecture showing FinoraOS actors, external systems, web and API containers, controlled agents, deterministic engines, PostgreSQL identities, tenant isolation, operational flows and reconciliation evaluation.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="#475569"/></marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="#1769d2"/></marker>
+    <style>
+      .t{font-family:"DejaVu Sans",Arial,sans-serif;fill:#162033}.h1{font-size:43px;font-weight:700}.sub{font-size:18px;fill:#536176}
+      .boundary{fill:#f8fafc;stroke:#64748b;stroke-width:2}.boundaryHead{fill:#e7edf5}.boundaryLabel{font-size:16px;font-weight:700;fill:#334155;letter-spacing:1.1px}
+      .web{fill:#eaf3ff;stroke:#1769d2;stroke-width:2}.component{fill:#fff;stroke:#8b9db2;stroke-width:1.7}.domain{fill:#edf4ff;stroke:#2b70c9;stroke-width:1.8}
+      .security{fill:#fff7e7;stroke:#bb7411;stroke-width:1.8}.data{fill:#ecf8f1;stroke:#348259;stroke-width:1.8}.external{fill:#f1f5f9;stroke:#64748b;stroke-width:1.7}.adapter{fill:#f8fafc;stroke:#64748b;stroke-width:1.6;stroke-dasharray:7 6}
+      .type{font-size:12px;font-weight:700;fill:#627187;letter-spacing:.7px}.title{font-size:19px;font-weight:700}.copy{font-size:13px;fill:#55657a}.copy2{font-size:12px;fill:#66758a}
+      .edge{fill:none;stroke:#475569;stroke-width:2.1;marker-end:url(#arrow)}.edgeBlue{fill:none;stroke:#1769d2;stroke-width:2.6;marker-end:url(#arrowBlue)}.edgeDash{fill:none;stroke:#64748b;stroke-width:2;stroke-dasharray:8 7;marker-end:url(#arrow)}
+      .edgeLabel{font-size:12px;font-weight:600;fill:#334155;paint-order:stroke;stroke:#fff;stroke-width:6px;stroke-linejoin:round}.laneTitle{font-size:16px;font-weight:700}.laneText{font-size:14px;fill:#4c5e73}
+    </style>
+  </defs>
+  <rect width="2800" height="1750" fill="#fff"/>
+
+  <!-- Header -->
+  <g class="t">
+    <rect x="48" y="40" width="52" height="52" rx="7" fill="#1769d2"/><path d="M64 53h23v7H71v8h13v7H71v12h-7z" fill="#fff"/>
+    <text x="122" y="75" class="h1">FinoraOS — system design</text>
+    <text x="122" y="105" class="sub">C4 container + component view · current V1 implementation · Razorpay AI Buildathon Track 04</text>
+    <text x="2752" y="69" text-anchor="end" class="sub">Deterministic verification · controlled AI · governed action</text>
+    <text x="2752" y="98" text-anchor="end" class="sub">Updated 2 September 2026</text>
+  </g>
+
+  <!-- External systems aligned with their entry points -->
+  <g class="t">
+    <text x="48" y="151" class="boundaryLabel">EXTERNAL SYSTEMS</text>
+    <rect x="420" y="170" width="320" height="122" rx="7" class="external"/>
+    <text x="442" y="198" class="type">&lt;&lt;IDENTITY PROVIDER&gt;&gt;</text><text x="442" y="228" class="title">Keycloak 26</text>
+    <text x="442" y="253" class="copy">OIDC authorization code + PKCE</text><text x="442" y="276" class="copy">Finora theme · development realm</text>
+
+    <rect x="810" y="170" width="300" height="122" rx="7" class="external"/>
+    <text x="832" y="198" class="type">&lt;&lt;AI PROVIDERS&gt;&gt;</text><text x="832" y="228" class="title">Model providers</text>
+    <text x="832" y="253" class="copy">Gemini · Groq · OpenRouter</text><text x="832" y="276" class="copy">Ollama / Qwen3 fallback</text>
+
+    <rect x="1140" y="170" width="260" height="122" rx="7" class="adapter"/>
+    <text x="1162" y="198" class="type">&lt;&lt;PAYMENT API&gt;&gt;</text><text x="1162" y="228" class="title">Razorpay test mode</text>
+    <text x="1162" y="253" class="copy">Read adapter exists</text><text x="1162" y="276" class="copy">Sync is not connected</text>
+
+    <rect x="1430" y="170" width="250" height="122" rx="7" class="adapter"/>
+    <text x="1452" y="198" class="type">&lt;&lt;MESSAGING API&gt;&gt;</text><text x="1452" y="228" class="title">Slack</text>
+    <text x="1452" y="253" class="copy">Outbound reminders</text><text x="1452" y="276" class="copy">No inbound receipts</text>
+
+    <rect x="2260" y="170" width="492" height="122" rx="7" class="external"/>
+    <text x="2282" y="198" class="type">&lt;&lt;SOURCE CONTROL / CI&gt;&gt;</text><text x="2282" y="228" class="title">GitHub Actions</text>
+    <text x="2282" y="253" class="copy">format · enum sync · lint · typecheck</text><text x="2282" y="276" class="copy">82 tests · production build · no paid AI</text>
+  </g>
+
+  <!-- Actor -->
+  <g class="t">
+    <rect x="48" y="500" width="280" height="144" rx="7" class="external"/>
+    <text x="70" y="529" class="type">&lt;&lt;PERSON&gt;&gt;</text><text x="70" y="561" class="title">Workspace user</text>
+    <text x="70" y="588" class="copy">Employee · Finance Controller</text><text x="70" y="612" class="copy">Enterprise Admin · Auditor</text>
+    <text x="70" y="635" class="copy2">Browser on desktop or mobile</text>
+  </g>
+
+  <!-- System boundary -->
+  <rect x="370" y="350" width="2382" height="1045" rx="8" class="boundary"/>
+  <rect x="370" y="350" width="2382" height="40" class="boundaryHead"/>
+  <text x="390" y="377" class="t boundaryLabel">SYSTEM BOUNDARY · FINORAOS</text>
+
+  <!-- Web container -->
+  <rect x="405" y="420" width="355" height="720" rx="7" class="boundary"/>
+  <text x="425" y="449" class="t boundaryLabel">WEB · NEXT.JS 16 / REACT 19</text>
+  <g class="t">
+    <rect x="430" y="478" width="305" height="148" rx="6" class="web"/>
+    <text x="450" y="506" class="type">&lt;&lt;REACT WORKSPACE&gt;&gt;</text><text x="450" y="538" class="title">FinoraOS interface</text>
+    <text x="450" y="565" class="copy">Finora · Overview · Records</text><text x="450" y="588" class="copy">Exceptions · Organization · Audit</text>
+    <text x="450" y="611" class="copy">Shared components from @finora/ui</text>
+
+    <rect x="430" y="657" width="305" height="150" rx="6" class="web"/>
+    <text x="450" y="685" class="type">&lt;&lt;CHAT CLIENT&gt;&gt;</text><text x="450" y="717" class="title">Vercel AI SDK</text>
+    <text x="450" y="744" class="copy">Persisted threads · activity</text><text x="450" y="767" class="copy">Tables · evidence · approval diffs</text>
+    <text x="450" y="790" class="copy">UI-message streaming response</text>
+
+    <rect x="430" y="838" width="305" height="126" rx="6" class="security"/>
+    <text x="450" y="866" class="type">&lt;&lt;SESSION / BFF&gt;&gt;</text><text x="450" y="898" class="title">NextAuth</text>
+    <text x="450" y="925" class="copy">Encrypted HTTP-only session</text><text x="450" y="948" class="copy">Bearer-token forwarding</text>
+
+    <rect x="430" y="995" width="305" height="108" rx="6" class="component"/>
+    <text x="450" y="1023" class="type">&lt;&lt;UI PACKAGE&gt;&gt;</text><text x="450" y="1055" class="title">@finora/ui</text>
+    <text x="450" y="1082" class="copy">Tokens · primitives · finance formats</text>
+  </g>
+
+  <!-- API container -->
+  <rect x="805" y="420" width="720" height="720" rx="7" class="boundary"/>
+  <text x="825" y="449" class="t boundaryLabel">API · NESTJS 11</text>
+  <g class="t">
+    <rect x="830" y="478" width="670" height="92" rx="6" class="security"/>
+    <text x="850" y="506" class="type">&lt;&lt;REQUEST TRUST BOUNDARY&gt;&gt;</text><text x="850" y="537" class="title">AuthService + request context</text>
+    <text x="850" y="560" class="copy">Verify JWT issuer/audience → resolve subject + organization to database membership and role</text>
+
+    <rect x="830" y="600" width="203" height="115" rx="6" class="component"/>
+    <text x="848" y="627" class="type">&lt;&lt;MODULE&gt;&gt;</text><text x="848" y="658" class="title">Finance</text>
+    <text x="848" y="684" class="copy">Overview · records</text><text x="848" y="706" class="copy">cash · tax · forecast</text>
+
+    <rect x="1053" y="600" width="203" height="115" rx="6" class="component"/>
+    <text x="1071" y="627" class="type">&lt;&lt;MODULE&gt;&gt;</text><text x="1071" y="658" class="title">Workspace</text>
+    <text x="1071" y="684" class="copy">Nodes · spend · imports</text><text x="1071" y="706" class="copy">expenses · jobs · skills</text>
+
+    <rect x="1276" y="600" width="224" height="115" rx="6" class="component"/>
+    <text x="1294" y="627" class="type">&lt;&lt;MODULE&gt;&gt;</text><text x="1294" y="658" class="title">Reconciliation</text>
+    <text x="1294" y="684" class="copy">Scoped record loading</text><text x="1294" y="706" class="copy">transactional persistence</text>
+
+    <rect x="830" y="742" width="203" height="115" rx="6" class="component"/>
+    <text x="848" y="769" class="type">&lt;&lt;MODULE&gt;&gt;</text><text x="848" y="800" class="title">Chat</text>
+    <text x="848" y="826" class="copy">Threads · messages</text><text x="848" y="848" class="copy">bounded context</text>
+
+    <rect x="1053" y="742" width="203" height="115" rx="6" class="component"/>
+    <text x="1071" y="769" class="type">&lt;&lt;MODULE&gt;&gt;</text><text x="1071" y="800" class="title">Agents + Tools</text>
+    <text x="1071" y="826" class="copy">Permission allowlist</text><text x="1071" y="848" class="copy">Zod-validated execution</text>
+
+    <rect x="1276" y="742" width="224" height="115" rx="6" class="component"/>
+    <text x="1294" y="769" class="type">&lt;&lt;MODULE&gt;&gt;</text><text x="1294" y="800" class="title">Mutations</text>
+    <text x="1294" y="826" class="copy">Typed diff · approval</text><text x="1294" y="848" class="copy">version-checked execution</text>
+
+    <rect x="830" y="884" width="203" height="108" rx="6" class="component"/>
+    <text x="848" y="911" class="type">&lt;&lt;MODULE&gt;&gt;</text><text x="848" y="942" class="title">Audit</text>
+    <text x="848" y="968" class="copy">User · system · agent</text>
+
+    <rect x="1053" y="884" width="203" height="108" rx="6" class="component"/>
+    <text x="1071" y="911" class="type">&lt;&lt;SCHEDULER&gt;&gt;</text><text x="1071" y="942" class="title">Automation jobs</text>
+    <text x="1071" y="968" class="copy">Receipt reminders · runs</text>
+
+    <rect x="1276" y="884" width="224" height="108" rx="6" class="component"/>
+    <text x="1294" y="911" class="type">&lt;&lt;PERSISTENCE&gt;&gt;</text><text x="1294" y="942" class="title">Prisma 7</text>
+    <text x="1294" y="968" class="copy">PostgreSQL adapter</text>
+
+    <text x="830" y="1028" class="type">&lt;&lt;PROVIDER ADAPTERS&gt;&gt;</text>
+    <rect x="830" y="1044" width="155" height="66" rx="5" class="component"/><text x="848" y="1084" class="title" style="font-size:16px">AI Gateway</text>
+    <rect x="1002" y="1044" width="155" height="66" rx="5" class="adapter"/><text x="1018" y="1084" class="title" style="font-size:16px">Payment</text>
+    <rect x="1174" y="1044" width="155" height="66" rx="5" class="adapter"/><text x="1190" y="1084" class="title" style="font-size:16px">Messaging</text>
+    <rect x="1346" y="1044" width="154" height="66" rx="5" class="component"/><text x="1362" y="1084" class="title" style="font-size:16px">Documents</text>
+  </g>
+
+  <!-- Domain container -->
+  <rect x="1570" y="420" width="500" height="720" rx="7" class="boundary"/>
+  <text x="1590" y="449" class="t boundaryLabel">CONTROLLED / PURE DOMAIN PACKAGES</text>
+  <g class="t">
+    <rect x="1595" y="478" width="450" height="134" rx="6" class="domain"/>
+    <text x="1615" y="506" class="type">&lt;&lt;CONTROLLED AGENT&gt;&gt;</text><text x="1615" y="538" class="title">FinanceAgent</text>
+    <text x="1615" y="565" class="copy">Role-aware routing · bounded plans</text><text x="1615" y="588" class="copy">Grounded answers · no Prisma or SQL</text>
+
+    <rect x="1595" y="642" width="450" height="150" rx="6" class="domain"/>
+    <text x="1615" y="670" class="type">&lt;&lt;PURE ENGINE&gt;&gt;</text><text x="1615" y="702" class="title">@finora/reconciliation</text>
+    <text x="1615" y="729" class="copy">Exact reference → settlement relationship</text><text x="1615" y="752" class="copy">→ date window → composite score</text>
+    <text x="1615" y="775" class="copy">Ambiguity remains an exception</text>
+
+    <rect x="1595" y="822" width="450" height="112" rx="6" class="domain"/>
+    <text x="1615" y="850" class="type">&lt;&lt;PURE ENGINE&gt;&gt;</text><text x="1615" y="882" class="title">@finora/spend-policy</text>
+    <text x="1615" y="909" class="copy">Hard ancestor limits · soft category warnings</text>
+
+    <rect x="1595" y="964" width="450" height="118" rx="6" class="component"/>
+    <text x="1615" y="992" class="type">&lt;&lt;SHARED CONTRACTS&gt;&gt;</text><text x="1615" y="1024" class="title">@finora/platform</text>
+    <text x="1615" y="1051" class="copy">Enums · Zod · Decimal money</text><text x="1615" y="1074" class="copy">permissions · logger contracts</text>
+  </g>
+
+  <!-- Data container -->
+  <rect x="2115" y="420" width="602" height="720" rx="7" class="boundary"/>
+  <text x="2135" y="449" class="t boundaryLabel">DATA STORES &amp; DATABASE IDENTITIES</text>
+  <g class="t">
+    <rect x="2140" y="478" width="552" height="135" rx="6" class="data"/>
+    <text x="2160" y="506" class="type">&lt;&lt;DATABASE&gt;&gt;</text><text x="2160" y="538" class="title">PostgreSQL 16</text>
+    <text x="2160" y="565" class="copy">Finance · chat · runs · evidence · proposals</text><text x="2160" y="588" class="copy">audit · jobs · source metadata · Decimal(18,2)</text>
+
+    <rect x="2140" y="643" width="552" height="104" rx="6" class="security"/>
+    <text x="2160" y="671" class="type">&lt;&lt;TENANT BOUNDARY&gt;&gt;</text><text x="2160" y="703" class="title">Organization row-level security</text>
+    <text x="2160" y="730" class="copy">Transaction-local app.organization_id · absent context returns no rows</text>
+
+    <rect x="2140" y="777" width="170" height="155" rx="6" class="component"/>
+    <text x="2160" y="805" class="type">&lt;&lt;DB IDENTITY&gt;&gt;</text><text x="2160" y="837" class="title">Application</text>
+    <text x="2160" y="864" class="copy">Prisma services</text><text x="2160" y="887" class="copy">Transactional writes</text><text x="2160" y="910" class="copy">API permission checks</text>
+
+    <rect x="2331" y="777" width="170" height="155" rx="6" class="security"/>
+    <text x="2351" y="805" class="type">&lt;&lt;DB ROLE&gt;&gt;</text><text x="2351" y="837" class="title">agent_ro</text>
+    <text x="2351" y="864" class="copy">SELECT only</text><text x="2351" y="887" class="copy">Read-only txn</text><text x="2351" y="910" class="copy">NOBYPASSRLS</text>
+
+    <rect x="2522" y="777" width="170" height="155" rx="6" class="security"/>
+    <text x="2542" y="805" class="type">&lt;&lt;DB ROLE&gt;&gt;</text><text x="2542" y="837" class="title">agent_rw</text>
+    <text x="2542" y="864" class="copy">Approved fields</text><text x="2542" y="887" class="copy">No delete</text><text x="2542" y="910" class="copy">Version checked</text>
+
+    <rect x="2140" y="962" width="265" height="120" rx="6" class="component"/>
+    <text x="2160" y="990" class="type">&lt;&lt;LOCAL FILE STORE&gt;&gt;</text><text x="2160" y="1022" class="title">Receipt documents</text>
+    <text x="2160" y="1049" class="copy">Bounded PDF / image uploads</text><text x="2160" y="1072" class="copy">Development adapter</text>
+
+    <rect x="2427" y="962" width="265" height="120" rx="6" class="adapter"/>
+    <text x="2447" y="990" class="type">&lt;&lt;CACHE&gt;&gt;</text><text x="2447" y="1022" class="title">Redis 7</text>
+    <text x="2447" y="1049" class="copy">Healthy Compose service</text><text x="2447" y="1072" class="copy">No active V1 workload</text>
+  </g>
+
+  <!-- Clean container relationships -->
+  <path d="M328 572H393" class="edgeBlue"/><text x="360" y="555" text-anchor="middle" class="t edgeLabel">HTTPS</text>
+  <path d="M760 572H793" class="edgeBlue"/><text x="777" y="555" text-anchor="middle" class="t edgeLabel">REST + JWT</text>
+  <path d="M1525 572H1558" class="edgeBlue"/><text x="1542" y="555" text-anchor="middle" class="t edgeLabel">typed calls</text>
+  <path d="M1525 490V405H2416V466" class="edge"/><text x="1970" y="400" text-anchor="middle" class="t edgeLabel">Prisma application identity + controlled agent database roles</text>
+
+  <path d="M430 901H350V320H580V304" class="edge"/><text x="364" y="339" class="t edgeLabel">OIDC / PKCE</text>
+  <path d="M830 1077H780V320H960V304" class="edgeBlue"/>
+  <path d="M1080 1110V1148H1538V320H1270V304" class="edgeDash"/>
+  <path d="M1252 1110V1165H1550V312H1555V304" class="edgeDash"/>
+
+  <!-- Runtime lanes -->
+  <g class="t">
+    <rect x="405" y="1180" width="2312" height="174" rx="7" fill="#fff" stroke="#94a3b8"/>
+    <text x="430" y="1210" class="boundaryLabel">KEY RUNTIME PATHS</text>
+    <circle cx="448" cy="1244" r="15" fill="#1769d2"/><text x="448" y="1250" text-anchor="middle" style="font-size:14px;font-weight:700;fill:#fff">1</text>
+    <text x="478" y="1250" class="laneTitle">Read / query</text><text x="640" y="1250" class="laneText">Chat → FinanceAgent → Zod tool → permission check → agent_ro → RLS → PostgreSQL → grounded artifact</text>
+    <circle cx="448" cy="1287" r="15" fill="#1769d2"/><text x="448" y="1293" text-anchor="middle" style="font-size:14px;font-weight:700;fill:#fff">2</text>
+    <text x="478" y="1293" class="laneTitle">Reconciliation</text><text x="640" y="1293" class="laneText">Scoped records → pure engine → matches + exceptions + metrics → Prisma transaction → audit event</text>
+    <circle cx="448" cy="1330" r="15" fill="#bb7411"/><text x="448" y="1336" text-anchor="middle" style="font-size:14px;font-weight:700;fill:#fff">3</text>
+    <text x="478" y="1336" class="laneTitle">Governed write</text><text x="640" y="1336" class="laneText">Write mode → typed diff → human approval → agent_rw → version check + RLS → audit → reconciliation rerun</text>
+  </g>
+
+  <!-- Offline evaluation -->
+  <rect x="48" y="1445" width="2704" height="190" rx="8" class="boundary"/>
+  <rect x="48" y="1445" width="2704" height="39" class="boundaryHead"/>
+  <text x="68" y="1472" class="t boundaryLabel">OFFLINE VERIFICATION · EXACT SAME PURE ENGINE AS THE API · NO OLLAMA OR PAID API</text>
+  <g class="t">
+    <rect x="80" y="1514" width="580" height="78" rx="6" class="component"/>
+    <text x="102" y="1544" class="type">&lt;&lt;CHECKED-IN TEST DATA&gt;&gt;</text><text x="102" y="1575" class="title">240-record fixture + ground truth</text>
+    <path d="M660 1553H790" class="edgeBlue"/>
+    <rect x="802" y="1514" width="520" height="78" rx="6" class="domain"/>
+    <text x="824" y="1544" class="type">&lt;&lt;PURE ENGINE&gt;&gt;</text><text x="824" y="1575" class="title">@finora/reconciliation</text>
+    <path d="M1322 1553H1452" class="edgeBlue"/>
+    <rect x="1464" y="1514" width="1256" height="78" rx="6" class="data"/>
+    <text x="1486" y="1544" class="type">&lt;&lt;MEASURED REPORT&gt;&gt;</text>
+    <text x="1486" y="1575" class="title">108 correct matches · 12 honest exceptions · 0 false auto-matches · 100% match accuracy</text>
+  </g>
+
+  <!-- Legend -->
+  <g class="t">
+    <rect x="48" y="1680" width="18" height="14" class="web"/><text x="78" y="1693" class="copy2">FinoraOS component</text>
+    <rect x="250" y="1680" width="18" height="14" class="security"/><text x="280" y="1693" class="copy2">Trust boundary / restricted identity</text>
+    <rect x="602" y="1680" width="18" height="14" class="data"/><text x="632" y="1693" class="copy2">Data store / measured result</text>
+    <rect x="902" y="1680" width="18" height="14" class="adapter"/><text x="932" y="1693" class="copy2">Adapter or not end-to-end</text>
+    <line x1="1212" y1="1687" x2="1252" y2="1687" stroke="#1769d2" stroke-width="3"/><text x="1264" y="1693" class="copy2">Primary working relationship</text>
+    <text x="2752" y="1693" text-anchor="end" class="copy2">Model boundary: no SQL · no credentials · no direct mutation authority</text>
+  </g>
+</svg>

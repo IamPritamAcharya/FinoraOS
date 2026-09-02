@@ -1,6 +1,6 @@
 # FinoraOS Status
 
-Last updated: 2026-08-31
+Last updated: 2026-09-02
 Current phase: Finance-hub V1 with governed record mutations and unified audit
 Last verified commit: see `git log -1`
 
@@ -14,6 +14,7 @@ The application now has Keycloak login/RBAC, an editable organization tree/canva
 
 - pnpm/Turbo workspace with graceful `pnpm dev` Docker lifecycle and preflight port checks.
 - Lean GitHub Actions CI on pull requests and `main`: frozen pnpm install, enum synchronization, formatting, lint, typecheck, unit tests, and production build in one resource-bounded job. It does not start Docker, Keycloak, databases, or Ollama.
+- Tracked system-design documentation and a presentation-ready architecture image cover product boundaries, domain ownership, controlled read/write paths, reconciliation closure, receipt review, spend policy, tenancy, failures, and development deployment.
 - PostgreSQL/Redis/Keycloak Compose stack; Prisma 7 config, migrations, reproducible seed, shared enums, Decimal money rules, and enum synchronization.
 - Pure deterministic reconciliation package and transactional run/match/exception/evidence/audit persistence.
 - Reconciliation reruns supersede the prior active reconciliation exception snapshot atomically before persisting the new one. Historical evidence remains auditable, while Overview and Exceptions show only the current active queue.
