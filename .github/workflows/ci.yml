@@ -34,6 +34,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma client
+        run: pnpm db:generate
+        env:
+          DATABASE_URL: postgresql://finora:finora@localhost:5432/finora?schema=public
+
       - name: Verify shared contracts
         run: pnpm check:enums
 
