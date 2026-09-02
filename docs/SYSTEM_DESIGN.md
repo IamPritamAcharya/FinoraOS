@@ -225,7 +225,7 @@ sequenceDiagram
   API->>API: Recheck MANAGE_FINANCE_RECORDS permission
   API->>DB: Load current tenant record and version
   API->>DB: Store expiring typed before/after proposal
-  API-->>UI: Render diff; no mutation performed
+  API-->>UI: Render diff with no mutation performed
   FC->>UI: Approve exact proposal
   UI->>API: Proposal ID + explicit approval
   API->>DB: Atomically claim pending proposal
