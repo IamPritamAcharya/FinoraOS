@@ -4,7 +4,7 @@ import { WorkspaceShell } from './components/workspace-shell';
 import { AuthProvider } from './components/auth-provider';
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000'),
-  title: 'FinoraOS — Finance Operations',
+  title: 'FinoraOS',
   description: 'AI-native financial operations. Reconcile. Investigate. Close.',
   icons: { icon: '/brand/favicon.svg' },
   openGraph: {
