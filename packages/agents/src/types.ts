@@ -22,4 +22,11 @@ export interface AiGateway {
   explainSettlement(input: SettlementExplanationInput): Promise<string>;
 }
 
-export type InvestigationResult = ExceptionResolution & { explanation: string };
+export type InvestigationResult = ExceptionResolution & {
+  explanation: string;
+  evidence?: SettlementEvidence & {
+    difference: string;
+    explainedAmount: string;
+    unexplainedAmount: string;
+  };
+};

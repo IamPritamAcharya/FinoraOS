@@ -23,7 +23,8 @@ export class ExceptionInvestigator {
     }
     const difference = money(evidence.expectedAmount).minus(evidence.receivedAmount);
     const explained = money(evidence.gatewayFees).plus(evidence.gstOnFees).plus(evidence.refunds);
-    const resolved = difference.equals(explained);
+    const unexplained = difference.minus(explained);
+    const resolved = unexplained.isZero();
     const resolution = ExceptionResolutionSchema.parse({
       exceptionId,
       type: ExceptionType.SETTLEMENT_MISMATCH,
@@ -48,6 +49,12 @@ export class ExceptionInvestigator {
     });
     return {
       ...resolution,
+      evidence: {
+        ...evidence,
+        difference: difference.toFixed(2),
+        explainedAmount: explained.toFixed(2),
+        unexplainedAmount: unexplained.toFixed(2),
+      },
       explanation: await this.ai.explainSettlement({
         settlementId: evidence.settlementId,
         fullyExplained: resolved,

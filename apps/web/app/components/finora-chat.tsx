@@ -134,7 +134,21 @@ function SettlementArtifact({ artifact, data }: { artifact: FinoraArtifact; data
 function ExceptionArtifact({ artifact, data }: { artifact: FinoraArtifact; data: Data }) {
   const source = valueRecord(data.result ?? data);
   const resolution = valueRecord(source.resolution ?? source.result ?? data.result);
+  const evidence = valueRecord(resolution.evidence ?? source.evidence);
   const confidence = Number(resolution.confidence ?? source.confidence ?? 0);
+  const proposedActions = Array.isArray(resolution.proposedActions)
+    ? resolution.proposedActions
+    : [];
+  const proposedAction = valueRecord(proposedActions[0]);
+  const evidenceRows = [
+    ['Expected', evidence.expectedAmount],
+    ['Received', evidence.receivedAmount],
+    ['Difference', evidence.difference],
+    ['Gateway fees', evidence.gatewayFees],
+    ['GST on fees', evidence.gstOnFees],
+    ['Refunds', evidence.refunds],
+    ['Unexplained', evidence.unexplainedAmount],
+  ].filter((row): row is [string, unknown] => row[1] !== undefined);
   return (
     <section
       className={styles.exceptionCard}
@@ -147,12 +161,41 @@ function ExceptionArtifact({ artifact, data }: { artifact: FinoraArtifact; data:
       <p>
         {String(resolution.reason ?? source.reason ?? 'Review the linked evidence before action.')}
       </p>
+      {resolution.explanation ? (
+        <p className={styles.investigationExplanation}>{String(resolution.explanation)}</p>
+      ) : null}
+      {evidenceRows.length ? (
+        <div className={styles.exceptionEvidence} aria-label="Deterministic evidence">
+          {evidence.settlementId ? (
+            <div className={styles.exceptionEvidenceReference}>
+              <span>Settlement</span>
+              <strong>{String(evidence.settlementId)}</strong>
+            </div>
+          ) : null}
+          <dl>
+            {evidenceRows.map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>
+                  <Amount value={String(value)} />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : null}
       {confidence > 0 && (
         <div className={styles.confidenceRow}>
           <span>Agent confidence</span>
           <strong>{Math.round(confidence * 100)}%</strong>
         </div>
       )}
+      {proposedAction.type ? (
+        <div className={styles.proposedAction}>
+          <span>Proposed action</span>
+          <strong>{humanize(String(proposedAction.type))}</strong>
+        </div>
+      ) : null}
       <p className={styles.exceptionGuardrail}>
         Proposal only. Approval is required before FinoraOS creates an adjustment.
       </p>

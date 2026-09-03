@@ -355,6 +355,63 @@
   line-height: 1.55;
 }
 
+.exceptionCard .investigationExplanation {
+  border-left: 2px solid var(--finora-brand-subtle);
+  color: var(--finora-text-muted);
+  padding-left: 10px;
+}
+
+.exceptionEvidence {
+  margin: 14px 0;
+  border-top: 1px solid var(--finora-border);
+  border-bottom: 1px solid var(--finora-border);
+  padding: 10px 0;
+}
+
+.exceptionEvidenceReference,
+.proposedAction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.exceptionEvidenceReference {
+  margin-bottom: 9px;
+  color: var(--finora-text-muted);
+  font-size: 11px;
+}
+
+.exceptionEvidenceReference strong {
+  color: var(--finora-text);
+  font-size: 12px;
+}
+
+.exceptionEvidence dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 20px;
+}
+
+.exceptionEvidence dl > div {
+  min-width: 0;
+}
+
+.proposedAction {
+  padding: 10px 0;
+}
+
+.proposedAction span {
+  color: var(--finora-text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.proposedAction strong {
+  color: var(--finora-text);
+  font-size: 12px;
+}
+
 .exceptionCard dl {
   display: grid;
   grid-template-columns: 0.75fr 1.25fr;

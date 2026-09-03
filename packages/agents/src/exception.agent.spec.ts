@@ -20,5 +20,16 @@ describe('ExceptionInvestigator', () => {
     const result = await agent.investigate('EXC_042');
     expect(result.status).toBe('PROPOSED');
     expect(result.confidence).toBe(0.97);
+    expect(result.evidence).toEqual({
+      settlementId: 'STL_0042',
+      expectedAmount: '100000.00',
+      receivedAmount: '98230.00',
+      gatewayFees: '1500.00',
+      gstOnFees: '270.00',
+      refunds: '0.00',
+      difference: '1770.00',
+      explainedAmount: '1770.00',
+      unexplainedAmount: '0.00',
+    });
   });
 });
