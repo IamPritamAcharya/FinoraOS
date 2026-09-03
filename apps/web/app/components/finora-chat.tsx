@@ -15,6 +15,7 @@ type PersistedMessage = { id: string; role: string; content: string; payload?: D
 type PersistedThread = ThreadSummary & { messages: PersistedMessage[] };
 
 const activeChatThreadKey = 'finora-active-chat-thread';
+const minimumThinkingMs = 850;
 const suggestions = [
   {
     title: 'Ask about your finances',
@@ -378,7 +379,11 @@ function Activity({ payload }: { payload?: FinoraChatPayload }) {
 function ResponseState() {
   return (
     <div className={styles.investigation} aria-live="polite">
-      <span className={`${styles.investigationDot} ${styles.investigationDotActive}`} />
+      <span className={styles.thinkingDots} aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </span>
       Finora is checking your finance workspace…
     </div>
   );
@@ -407,10 +412,15 @@ export function FinoraChat({ onInvestigationCompleted }: { onInvestigationComple
   const [historyQuery, setHistoryQuery] = useState('');
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [holdAssistantResponse, setHoldAssistantResponse] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
+  const responseStartIndexRef = useRef(0);
+  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isWorking = status === 'submitted' || status === 'streaming';
+  const isInteractionLocked = isWorking || holdAssistantResponse;
+  const showResponseState = isWorking || holdAssistantResponse;
   const currentTitle = messages.length
     ? messageText(messages.find((message) => message.role === 'user') ?? messages[0]).slice(0, 52)
     : 'New conversation';
@@ -449,6 +459,12 @@ export function FinoraChat({ onInvestigationCompleted }: { onInvestigationComple
       }
     })();
   }, [loadThread, refreshThreads]);
+  useEffect(
+    () => () => {
+      if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    },
+    [],
+  );
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       const viewport = scrollViewportRef.current;
@@ -459,7 +475,7 @@ export function FinoraChat({ onInvestigationCompleted }: { onInvestigationComple
         });
     });
     return () => cancelAnimationFrame(frame);
-  }, [isWorking, messages]);
+  }, [showResponseState, messages]);
   useEffect(() => {
     if (status !== 'ready') return;
     const payload = [...messages].reverse().map(messagePayload).find(Boolean);
@@ -474,7 +490,14 @@ export function FinoraChat({ onInvestigationCompleted }: { onInvestigationComple
 
   const send = async (text = input) => {
     const value = text.trim();
-    if (!value || isWorking) return;
+    if (!value || isInteractionLocked) return;
+    responseStartIndexRef.current = messages.length;
+    setHoldAssistantResponse(true);
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = setTimeout(() => {
+      setHoldAssistantResponse(false);
+      revealTimerRef.current = null;
+    }, minimumThinkingMs);
     setInput('');
     await sendMessage({ text: value });
   };
@@ -484,6 +507,9 @@ export function FinoraChat({ onInvestigationCompleted }: { onInvestigationComple
     setWriteMode(next);
   };
   const startNew = () => {
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = null;
+    setHoldAssistantResponse(false);
     threadIdRef.current = createThreadId();
     setMessages([]);
     setInput('');
@@ -553,7 +579,14 @@ export function FinoraChat({ onInvestigationCompleted }: { onInvestigationComple
                   </div>
                 </section>
               )}
-              {messages.map((message) => {
+              {messages.map((message, index) => {
+                if (
+                  holdAssistantResponse &&
+                  index >= responseStartIndexRef.current &&
+                  message.role === 'assistant'
+                ) {
+                  return null;
+                }
                 const text = messageText(message);
                 const payload = messagePayload(message);
                 if (!text) return null;
@@ -583,7 +616,7 @@ export function FinoraChat({ onInvestigationCompleted }: { onInvestigationComple
                   </article>
                 );
               })}
-              {isWorking && <ResponseState />}
+              {showResponseState && <ResponseState />}
               {error && (
                 <div className={styles.error}>
                   Finora could not complete this request. Your conversation is safe; check the API
@@ -635,7 +668,7 @@ export function FinoraChat({ onInvestigationCompleted }: { onInvestigationComple
                   className={styles.sendButton}
                   type="submit"
                   variant="primary"
-                  disabled={!input.trim() || isWorking}
+                  disabled={!input.trim() || isInteractionLocked}
                   aria-label="Send message to Finora"
                 >
                   <FinoraIcon name="send" />

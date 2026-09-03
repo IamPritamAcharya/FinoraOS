@@ -696,16 +696,26 @@
   font-size: 12px;
 }
 
-.investigationDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--finora-success);
+.thinkingDots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
-.investigationDotActive {
+.thinkingDots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
   background: var(--finora-brand);
-  animation: pulse 1.2s ease-in-out infinite;
+  animation: thinking-bounce 900ms ease-in-out infinite;
+}
+
+.thinkingDots span:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.thinkingDots span:nth-child(3) {
+  animation-delay: 240ms;
 }
 
 .error {
@@ -1002,10 +1012,17 @@
   background: var(--finora-brand-strong);
 }
 
-@keyframes pulse {
-  50% {
-    opacity: 0.45;
-    transform: scale(1.3);
+@keyframes thinking-bounce {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
   }
 }
 
