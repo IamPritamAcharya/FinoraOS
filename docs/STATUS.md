@@ -71,7 +71,7 @@ No partial code task is intentionally left in progress at this checkpoint.
 - `pnpm check:enums`
 - `pnpm lint`
 - `pnpm typecheck`
-- `pnpm test` (82 tests)
+- `pnpm test` (83 tests)
 - `pnpm eval:reconciliation`
 - `pnpm build`
 - `pnpm format:check`

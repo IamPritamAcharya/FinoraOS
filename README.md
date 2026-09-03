@@ -103,8 +103,8 @@ Read the [complete FinoraOS system design](docs/SYSTEM_DESIGN.md) for component 
 2. Open **Records → Expenses**, select `EXP_0002`, and upload a PDF or image receipt. The claim becomes submitted while the source record and document evidence remain separately traceable.
 3. Sign out and sign in as `finance`. Overview now exposes organization cash, reconciliation coverage, current exceptions, and settlements.
 4. Run reconciliation from Overview. The previous active exception snapshot is superseded rather than duplicated.
-5. Open **Finora** in read-only mode and ask: `How much did we spend in August 2026, which category was largest, and what is our seven-day cash outlook?`
-6. Expand the tool activity to see the role-filtered multi-tool plan and grounded financial artifacts.
+5. Open **Finora** in read-only mode and ask: `Summarise our expenses last month and tell me the largest category.` Then ask: `What is our seven-day cash outlook?`
+6. Expand the tool activity to see the role-filtered tools and grounded financial artifacts.
 7. Ask: `Investigate EXC_005 and show me the evidence.` Review the deterministic evidence, AI-assisted explanation, confidence, and typed proposal.
 8. Open **Exceptions** and approve or reject the proposal. Approval creates a derived adjustment, audit event, and reconciliation rerun without overwriting the imported source.
 9. Return to Finora, explicitly enable **Write mode**, and ask: `Change pay_00008 status to REFUNDED.` Inspect the before/after diff before approving or rejecting it.
@@ -140,7 +140,7 @@ pnpm db:generate
 pnpm dev
 ```
 
-`pnpm dev` checks ports, starts PostgreSQL, Redis, and Keycloak, waits for health, applies committed migrations, provisions and verifies the read-only and governed-writer roles with RLS policies, refreshes the reproducible demo seed, then launches:
+`pnpm dev` checks ports, starts PostgreSQL, Redis, and Keycloak, waits for health, applies committed migrations, provisions and verifies the read-only and governed-writer roles with RLS policies, seeds the demo when the database is empty, then launches:
 
 - Web: `http://localhost:3000`
 - API: `http://localhost:3001/api`
