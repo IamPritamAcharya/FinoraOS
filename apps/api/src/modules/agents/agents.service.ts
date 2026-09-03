@@ -101,12 +101,18 @@ export class AgentsService {
   async investigateByExternalId(principal: RequestPrincipal, externalId: string) {
     const exception = await this.prisma.exception.findFirst({
       where: { externalId: externalId.toUpperCase(), organizationId: principal.organizationId },
-      select: { id: true, externalId: true },
+      select: {
+        id: true,
+        externalId: true,
+        evidence: { select: { payload: true }, take: 1 },
+      },
     });
     if (!exception) return null;
+    const result = await this.investigate(principal, exception.id);
     return {
       externalId: exception.externalId,
-      result: await this.investigate(principal, exception.id),
+      result,
+      evidence: result.evidence ?? exception.evidence[0]?.payload,
     };
   }
 }

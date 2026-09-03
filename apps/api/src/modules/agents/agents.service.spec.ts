@@ -13,9 +13,12 @@ const prismaMock = () => {
     exception: {
       findFirst: vi.fn().mockResolvedValue({
         id: 'exception-1',
+        externalId: 'EXC_001',
         organizationId: 'demo-org',
         evidence: [
           {
+            label: 'Settlement breakdown',
+            referenceId: 'STL_0001',
             payload: {
               settlementId: 'STL_0001',
               expectedAmount: '100000.00',
@@ -55,5 +58,31 @@ describe('AgentsService.investigate', () => {
       expect.objectContaining({ data: expect.objectContaining({ status: 'PROPOSED' }) }),
     );
     expect(prisma.__transactionClient.auditLog.create).toHaveBeenCalledOnce();
+  });
+
+  it('returns the deterministic evidence with an external-id investigation', async () => {
+    const prisma = prismaMock();
+    const service = new AgentsService(prisma as never, {
+      complete: vi.fn().mockResolvedValue({
+        text: 'The documented adjustments account for the variance.',
+        provider: 'ollama',
+        model: 'qwen3:4b-instruct-2507-q4_K_M',
+      }),
+    });
+
+    const investigation = await service.investigateByExternalId(principal, 'EXC_001');
+
+    expect(investigation).toMatchObject({
+      externalId: 'EXC_001',
+      evidence: {
+        settlementId: 'STL_0001',
+        expectedAmount: '100000.00',
+        receivedAmount: '98230.00',
+        difference: '1770.00',
+        explainedAmount: '1770.00',
+        unexplainedAmount: '0.00',
+      },
+      result: { status: 'PROPOSED', confidence: 0.97 },
+    });
   });
 });

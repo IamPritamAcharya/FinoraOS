@@ -638,7 +638,9 @@ export class FinanceToolsService {
           callId,
           tool: call.tool,
           summary: investigation
-            ? `${investigation.externalId} was investigated. A ${label(investigation.result.status)} proposal was created with ${Math.round(investigation.result.confidence * 100)}% confidence; no financial record was changed.`
+            ? investigation.result.status === 'PROPOSED'
+              ? `${investigation.externalId} was investigated. A resolution was proposed with ${Math.round(investigation.result.confidence * 100)}% confidence; no financial record was changed.`
+              : `${investigation.externalId} was investigated and remains ${label(investigation.result.status).toLowerCase()} at ${Math.round(investigation.result.confidence * 100)}% confidence; no financial record was changed.`
             : `${call.arguments.exceptionId} was not found in this organization.`,
           data: plain(investigation),
           artifact: investigation

@@ -134,7 +134,7 @@ function SettlementArtifact({ artifact, data }: { artifact: FinoraArtifact; data
 function ExceptionArtifact({ artifact, data }: { artifact: FinoraArtifact; data: Data }) {
   const source = valueRecord(data.result ?? data);
   const resolution = valueRecord(source.resolution ?? source.result ?? data.result);
-  const evidence = valueRecord(resolution.evidence ?? source.evidence);
+  const evidence = valueRecord(resolution.evidence ?? source.evidence ?? data.evidence);
   const confidence = Number(resolution.confidence ?? source.confidence ?? 0);
   const proposedActions = Array.isArray(resolution.proposedActions)
     ? resolution.proposedActions
