@@ -680,6 +680,31 @@ const fallbackRoute = (
   return undefined;
 };
 
+const deterministicMultiRoute = (
+  message: string,
+  allowedTools: FinanceToolName[] | undefined,
+  currentDate: string,
+): FinanceToolCall[] | undefined => {
+  if (!isMultiTopicRequest(message)) return undefined;
+  const allowed = (tool: FinanceToolName) => !allowedTools || allowedTools.includes(tool);
+  const text = message.toLowerCase();
+  const asksForExpenses = /\b(expenses?|spend|costs?|outflows?)\b/.test(text);
+  const asksForCash = /\b(cash|liquidity|runway|forecast|outlook)\b/.test(text);
+  if (
+    !asksForExpenses ||
+    !asksForCash ||
+    /\b(my|mine)\b/.test(text) ||
+    !allowed('getExpenseSummary') ||
+    !allowed('getCashForecast')
+  ) {
+    return undefined;
+  }
+  return [
+    { tool: 'getExpenseSummary', arguments: periodFromMessage(message, currentDate) },
+    { tool: 'getCashForecast', arguments: {} },
+  ];
+};
+
 const mutationVerb = /\b(?:change|update|edit|set|correct|replace|mark)\b/i;
 const pendingMutationQuestion =
   /(?:\?|\b(?:which|what exact|exact .* reference|are you requesting|do you mean|please specify)\b)/i;
@@ -774,18 +799,24 @@ export class FinanceAgent {
     const writeTranscript = mutationTranscript(input);
     const mutationIntent = mutationVerb.test(writeTranscript);
     const proposedMutation = input.writeMode ? deterministicMutation(writeTranscript) : undefined;
-    const fastLane =
-      proposedMutation ??
-      (mutationIntent
-        ? undefined
-        : (deterministicFastLane(
-            contextualReference ? `${input.message} ${contextualReference}` : input.message,
-            input.actor?.allowedTools,
-          ) ??
-          (isMultiTopicRequest(input.message) || (input.skills?.length ?? 0) > 0
-            ? undefined
-            : fallbackRoute(input.message, input.actor?.allowedTools, input.currentDate))));
-    if (fastLane && input.actor && !input.actor.allowedTools.includes(fastLane.tool)) {
+    const deterministicPlan = mutationIntent
+      ? undefined
+      : deterministicMultiRoute(input.message, input.actor?.allowedTools, input.currentDate);
+    const fastLane = mutationIntent
+      ? proposedMutation
+      : (deterministicFastLane(
+          contextualReference ? `${input.message} ${contextualReference}` : input.message,
+          input.actor?.allowedTools,
+        ) ??
+        ((input.skills?.length ?? 0) > 0 || isMultiTopicRequest(input.message) || deterministicPlan
+          ? undefined
+          : fallbackRoute(input.message, input.actor?.allowedTools, input.currentDate)));
+    const fastCalls = deterministicPlan ?? (fastLane ? [fastLane] : undefined);
+    if (
+      fastCalls &&
+      input.actor &&
+      fastCalls.some((call) => !input.actor?.allowedTools.includes(call.tool))
+    ) {
       return {
         text:
           input.actor.role === 'EMPLOYEE'
@@ -797,39 +828,36 @@ export class FinanceAgent {
         fallbackReason: 'UNSUPPORTED',
       };
     }
-    if (fastLane) {
-      const callId = 'call-1';
-      try {
-        const observation = await this.tools.execute(fastLane, callId);
-        return {
-          text: observation.summary,
-          observations: [observation],
-          activity: [
-            {
-              callId,
-              tool: fastLane.tool,
-              status: 'COMPLETED',
-              label: observation.summary,
-            },
-          ],
-          clarified: false,
-        };
-      } catch {
-        return {
-          text: 'I could not safely load that finance record right now. Please try again.',
-          observations: [],
-          activity: [
-            {
-              callId,
-              tool: fastLane.tool,
-              status: 'FAILED',
-              label: `${fastLane.tool} could not be completed`,
-            },
-          ],
-          clarified: false,
-          fallbackReason: 'MODEL_ERROR',
-        };
+    if (fastCalls) {
+      for (const [index, call] of fastCalls.entries()) {
+        const callId = `call-${index + 1}`;
+        try {
+          const observation = await this.tools.execute(call, callId);
+          observations.push(observation);
+          activity.push({
+            callId,
+            tool: call.tool,
+            status: 'COMPLETED',
+            label: observation.summary,
+          });
+        } catch {
+          activity.push({
+            callId,
+            tool: call.tool,
+            status: 'FAILED',
+            label: `${call.tool} could not be completed`,
+          });
+        }
       }
+      return {
+        text: observations.length
+          ? observations.map((observation) => observation.summary).join('\n\n')
+          : 'I could not safely load those finance records right now. Please try again.',
+        observations,
+        activity,
+        clarified: false,
+        ...(observations.length ? {} : { fallbackReason: 'MODEL_ERROR' as const }),
+      };
     }
 
     for (let step = 0; step < this.maxSteps; step += 1) {

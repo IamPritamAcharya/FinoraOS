@@ -661,6 +661,50 @@ describe('FinanceAgent', () => {
     expect(model.complete).not.toHaveBeenCalled();
   });
 
+  it('executes both grounded tools for the combined demo expense and cash question', async () => {
+    const model = { complete: vi.fn() };
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce(expenseObservation)
+      .mockResolvedValueOnce({
+        callId: 'call-2',
+        tool: 'getCashForecast',
+        summary: 'No shortfall appears in the known cash schedule.',
+        data: [],
+        artifact: { type: 'forecast', title: 'Cash forecast', data: { rows: [] } },
+      });
+    const result = await new FinanceAgent(model, { execute }).run({
+      message:
+        'Summarise our expenses last month and tell me the largest category. What is our seven-day cash outlook?',
+      currentDate: '2026-09-03T00:00:00.000Z',
+      actor: {
+        role: 'FINANCE_CONTROLLER',
+        allowedTools: ['getExpenseSummary', 'getCashForecast'],
+      },
+    });
+
+    expect(execute).toHaveBeenNthCalledWith(
+      1,
+      {
+        tool: 'getExpenseSummary',
+        arguments: {
+          from: '2026-08-01T00:00:00.000Z',
+          to: '2026-08-31T23:59:59.999Z',
+        },
+      },
+      'call-1',
+    );
+    expect(execute).toHaveBeenNthCalledWith(
+      2,
+      { tool: 'getCashForecast', arguments: {} },
+      'call-2',
+    );
+    expect(result.observations).toHaveLength(2);
+    expect(result.text).toContain('expenses total');
+    expect(result.text).toContain('cash schedule');
+    expect(model.complete).not.toHaveBeenCalled();
+  });
+
   it('lists transactions above an amount despite a common transaction typo', async () => {
     const model = { complete: vi.fn() };
     const execute = vi.fn().mockResolvedValue({

@@ -1,6 +1,6 @@
 # FinoraOS Status
 
-Last updated: 2026-09-02
+Last updated: 2026-09-03
 Current phase: Finance-hub V1 with governed record mutations and unified audit
 Last verified commit: see `git log -1`
 
@@ -19,7 +19,7 @@ The application now has Keycloak login/RBAC, an editable organization tree/canva
 - Pure deterministic reconciliation package and transactional run/match/exception/evidence/audit persistence.
 - Reconciliation reruns supersede the prior active reconciliation exception snapshot atomically before persisting the new one. Historical evidence remains auditable, while Overview and Exceptions show only the current active queue.
 - Ollama/Qwen plus hosted provider abstraction, controlled multi-tool planning, grounded answers, persisted chat, typed proposals, approval/rejection, adjustment records, and reruns.
-- Role-aware controller routing exposes only permitted tools before planning and rechecks authorization at execution. Employees can query their own claims, reimbursements, and receipt gaps; finance roles receive organization-wide evidence; auditors remain read-only. Demo-critical greetings, capability questions, common summaries, relative periods, amount-filtered transaction lists, and frequent typos route immediately and reliably; ambiguous or multi-topic requests still use the controller model.
+- Role-aware controller routing exposes only permitted tools before planning and rechecks authorization at execution. Employees can query their own claims, reimbursements, and receipt gaps; finance roles receive organization-wide evidence; auditors remain read-only. Demo-critical greetings, capability questions, common summaries, relative periods, amount-filtered transaction lists, frequent typos, and the combined expense-plus-cash question route immediately and reliably; other ambiguous or multi-topic requests still use the controller model.
 - `finora_agent_ro` with SELECT-only grants, read-only transactions, `NOBYPASSRLS`, and organization RLS. Provisioning proves no rows are visible without a valid tenant.
 - `finora_agent_rw` with organization RLS, column-limited UPDATE rights, optimistic version checks, no identifier/tenant changes, and no DELETE/TRUNCATE. Rollback-only smoke testing proves correct-tenant writes and zero cross-tenant visibility.
 - Keycloak/NextAuth login with Employee, Finance Controller, and Enterprise Admin identities. Nest verifies JWT issuer/audience and maps `sub + organization_id` to a database membership and database-owned role. The Finora-themed OIDC screen, coordinated provider logout, forced account re-authentication, and explicit 5-minute/30-minute/8-hour token/session limits are configured idempotently on development startup.
@@ -71,7 +71,7 @@ No partial code task is intentionally left in progress at this checkpoint.
 - `pnpm check:enums`
 - `pnpm lint`
 - `pnpm typecheck`
-- `pnpm test` (83 tests)
+- `pnpm test` (84 tests)
 - `pnpm eval:reconciliation`
 - `pnpm build`
 - `pnpm format:check`
