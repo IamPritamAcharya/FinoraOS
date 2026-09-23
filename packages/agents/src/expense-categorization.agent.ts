@@ -40,6 +40,7 @@ export class ExpenseCategorizationAgent {
       prompt: JSON.stringify(input),
       responseFormat: 'json',
     });
+    // Schema validation turns the model response into a bounded suggestion, never a mutation.
     const result = ExpenseCategorizationSchema.parse(JSON.parse(completion.text));
     return { ...result, provider: completion.provider, model: completion.model };
   }

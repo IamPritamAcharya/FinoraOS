@@ -225,6 +225,7 @@ export class RecordMutationService {
     }
   }
 
+  /** Validates an allowlisted change and stores an expiring diff without mutating the record. */
   async propose(
     principal: RequestPrincipal,
     input: unknown,
@@ -326,6 +327,7 @@ export class RecordMutationService {
       proposal.after as Record<string, unknown>,
       proposal.entityId,
     );
+    // Revalidate policy at approval time because spend or limits may have changed since proposal.
     try {
       return await this.writer.execute({
         principal,

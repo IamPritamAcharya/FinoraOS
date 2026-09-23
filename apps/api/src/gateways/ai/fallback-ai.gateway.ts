@@ -13,6 +13,7 @@ export class FallbackAiGateway implements AiGateway {
     try {
       return await this.primary.complete(input);
     } catch (error) {
+      // Fallback preserves the same gateway contract; callers do not retry or branch by provider.
       apiLogger.warn('Hosted AI provider failed; retrying with local Ollama', {
         fallbackProvider: 'ollama',
         error: error instanceof Error ? error.message : 'Unknown provider error',

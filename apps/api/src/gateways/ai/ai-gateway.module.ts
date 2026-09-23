@@ -23,6 +23,7 @@ import { selectAiProvider } from './provider-selection.js';
         groq: GroqGateway,
         openRouter: OpenRouterGateway,
       ) => {
+        // Resolve providers once at startup so business and agent code remain provider-agnostic.
         const selection = selectAiProvider({
           AI_PROVIDER: process.env.AI_PROVIDER,
           GEMINI_API_KEY: process.env.GEMINI_API_KEY,

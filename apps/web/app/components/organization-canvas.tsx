@@ -26,6 +26,7 @@ export function OrganizationCanvas({
     }
     const visible: Array<{ item: OrganizationNode; depth: number; row: number }> = [];
     let row = 0;
+    // Exclude collapsed descendants before laying out nodes and edges.
     const visit = (item: OrganizationNode, depth: number) => {
       visible.push({ item, depth, row: row++ });
       if (!collapsed.has(item.id))

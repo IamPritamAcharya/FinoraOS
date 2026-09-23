@@ -21,6 +21,7 @@ export const defaultReconciliationConfig: ReconciliationConfig = {
   compositeDescriptionWeight: 0.2,
 };
 
+// Stable ordering makes results repeatable even when callers provide records in a different order.
 const ordered = (records: ReconciliationRecord[]) =>
   [...records].sort((a, b) => a.id.localeCompare(b.id));
 
@@ -196,6 +197,7 @@ export const runReconciliation = (
       continue;
     }
 
+    // Composite scoring may auto-match only one clear winner above the configured threshold.
     const scored = available
       .map((right) => ({ right, score: compositeScore(left, right, config) }))
       .filter((candidate) => candidate.score > 0)

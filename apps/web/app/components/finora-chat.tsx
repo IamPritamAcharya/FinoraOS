@@ -50,6 +50,7 @@ const valueRecord = (value: unknown): Data =>
   value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as Data) : {};
 
 const persistedToUiMessage = (threadId: string, message: PersistedMessage): FinoraUIMessage => {
+  // Rehydrate the SDK message shape while retaining Finora's typed evidence payload.
   const payload = valueRecord(message.payload);
   const data: FinoraChatPayload = {
     threadId,
@@ -491,6 +492,7 @@ export function FinoraChat({ onInvestigationCompleted }: { onInvestigationComple
   );
 
   useEffect(() => {
+    // The server stores chat history; local storage remembers only the active thread pointer.
     if (initializedRef.current) return;
     initializedRef.current = true;
     void (async () => {
@@ -509,6 +511,7 @@ export function FinoraChat({ onInvestigationCompleted }: { onInvestigationComple
     [],
   );
   useEffect(() => {
+    // Keep the newest message visible when returning to chat or revealing a response.
     const frame = requestAnimationFrame(() => {
       const viewport = scrollViewportRef.current;
       if (viewport)

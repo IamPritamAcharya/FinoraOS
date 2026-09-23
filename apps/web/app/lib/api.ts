@@ -5,11 +5,13 @@ import { getSession } from 'next-auth/react';
 const api = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
 
 export async function finoraRequest(path: string, init?: RequestInit) {
+  // The browser session supplies a bearer token; NestJS remains the authorization boundary.
   const session = process.env.NEXT_PUBLIC_AUTH_MODE === 'keycloak' ? await getSession() : undefined;
   const hasFormBody = typeof FormData !== 'undefined' && init?.body instanceof FormData;
   const response = await fetch(`${api}${path}`, {
     ...init,
     headers: {
+      // Let the browser add multipart boundaries for file uploads.
       ...(hasFormBody ? {} : { 'content-type': 'application/json' }),
       ...(session?.accessToken ? { authorization: `Bearer ${session.accessToken}` } : {}),
       ...init?.headers,

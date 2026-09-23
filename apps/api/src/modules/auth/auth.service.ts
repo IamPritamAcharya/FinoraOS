@@ -11,8 +11,8 @@ import { requestContext } from '../../common/request-context.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 
 /**
- * Trusted request identity boundary. V1 uses an explicitly configured demo principal;
- * JWT/session verification can replace this implementation without changing business services.
+ * Resolves the request identity to an active database membership. Token roles are hints;
+ * the stored organization and role remain authoritative in both demo and Keycloak modes.
  */
 @Injectable()
 export class AuthService {

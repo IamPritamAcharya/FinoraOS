@@ -7,11 +7,13 @@ const agentDatabaseUrl = () => {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error('AGENT_READ_DATABASE_URL is required for agent reads.');
   const url = new URL(databaseUrl);
+  // Local development derives the restricted credential; deployments should provide a dedicated URL.
   url.username = 'finora_agent_ro';
   url.password = process.env.AGENT_READ_DATABASE_PASSWORD ?? 'finora_agent_readonly_dev';
   return url.toString();
 };
 
+// Tools receive Prisma's transactional client, never the unrestricted application client.
 type ReadClient = Prisma.TransactionClient;
 
 /** Read-only, tenant-scoped data access for controlled agent tools. */
@@ -30,6 +32,7 @@ export class AgentReadService extends PrismaClient implements OnModuleInit, OnMo
   }
 
   async forOrganization<T>(organizationId: string, query: (tx: ReadClient) => Promise<T>) {
+    // The tenant setting is transaction-local; PostgreSQL RLS fails closed outside this scope.
     return this.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
       return query(tx);

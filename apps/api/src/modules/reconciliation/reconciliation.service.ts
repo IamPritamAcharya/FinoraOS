@@ -215,6 +215,7 @@ export class ReconciliationService {
     });
   }
 
+  /** Loads tenant records, delegates matching to the pure engine, and persists one run snapshot. */
   async run(principal: RequestPrincipal) {
     const organizationId = principal.organizationId;
     apiLogger.info('Reconciliation run started', { organizationId });
@@ -296,6 +297,7 @@ export class ReconciliationService {
           reason: item.reason,
         })),
       });
+      // Preserve exception history while replacing the active reconciliation snapshot atomically.
       const superseded = await tx.exception.updateMany({
         where: {
           organizationId,

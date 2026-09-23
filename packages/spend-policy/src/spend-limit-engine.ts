@@ -15,6 +15,7 @@ function sameWindow(left: SpendLimitInput, right: SpendLimitInput) {
 }
 
 function ancestors(nodeId: string, limits: SpendLimitInput[]) {
+  // Follow only nodes with an active limit; the visited set also protects malformed hierarchies.
   const byNode = new Map(limits.map((limit) => [limit.nodeId, limit]));
   const result: SpendLimitInput[] = [];
   const visited = new Set<string>();
@@ -28,6 +29,7 @@ function ancestors(nodeId: string, limits: SpendLimitInput[]) {
 }
 
 function descendants(nodeId: string, limits: SpendLimitInput[]) {
+  // A parent's hard limit covers spend from its entire limited subtree.
   const result = new Set([nodeId]);
   let changed = true;
   while (changed) {
@@ -54,6 +56,7 @@ function usedAmount(
 }
 
 export function validateSpendLimit(input: LimitValidationInput): PolicyEvaluation {
+  // Validate allocation invariants before a limit can be persisted.
   const proposed = input.proposed;
   const limits = [...input.limits.filter((limit) => limit.id !== proposed.id), proposed];
   const violations: SpendPolicyViolation[] = [];
@@ -164,6 +167,7 @@ export function validateSpendLimit(input: LimitValidationInput): PolicyEvaluatio
 }
 
 export function evaluateSpend(input: SpendEvaluationInput): PolicyEvaluation {
+  // Hard limits block spend at any ancestor; category limits remain non-blocking warnings.
   const violations: SpendPolicyViolation[] = [];
   const warnings: CategoryLimitWarning[] = [];
   let amount: Decimal;

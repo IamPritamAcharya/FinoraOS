@@ -16,6 +16,7 @@ const writerUrl = () => {
 };
 
 @Injectable()
+/** Executes an already-approved diff through the restricted database writer. */
 export class AgentWriteService implements OnModuleDestroy {
   private client?: PrismaClient;
 
@@ -51,6 +52,7 @@ export class AgentWriteService implements OnModuleDestroy {
         },
       });
       if (claimed.count !== 1) throw new Error('PROPOSAL_NOT_PENDING');
+      // Organization and version checks prevent cross-tenant or stale updates from succeeding.
       const where = {
         id: input.entityId,
         organizationId: input.principal.organizationId,
@@ -109,6 +111,7 @@ export class AgentWriteService implements OnModuleDestroy {
           break;
       }
       if (count !== 1) throw new Error('STALE_OR_OUT_OF_SCOPE');
+      // The record update and its audit event commit or roll back together.
       await tx.auditLog.create({
         data: {
           id: randomUUID(),

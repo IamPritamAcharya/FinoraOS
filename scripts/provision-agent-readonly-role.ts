@@ -69,6 +69,7 @@ async function main() {
       `REVOKE USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public FROM ${role};`,
     );
     const orgId = `current_setting('app.organization_id', true)`;
+    // Direct tenant tables can enforce scope from their own organizationId column.
     const directTenantTables = [
       ['Organization', `id = ${orgId}`],
       ['User', `"organizationId" = ${orgId}`],
@@ -105,6 +106,7 @@ async function main() {
         `CREATE POLICY finora_agent_org_scope ON public."${table}" FOR SELECT TO ${role} USING (${predicate});`,
       );
     }
+    // Child tables inherit tenant scope through their organization-owned parent.
     const relatedTenantTables = [
       ['ExceptionEvidence', 'Exception', 'exceptionId', 'id'],
       ['ReconciliationMatch', 'ReconciliationRun', 'reconciliationRunId', 'id'],
@@ -162,6 +164,7 @@ async function main() {
     await client.query(
       `REVOKE USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public FROM ${writeRole};`,
     );
+    // The writer receives UPDATE policies only for entities supported by approved diffs.
     const writerTables = [
       'Transaction',
       'Settlement',
@@ -209,6 +212,7 @@ async function main() {
     await client.end();
   }
 
+  // Smoke tests prove the database grants and fail-closed RLS behavior, not only the script intent.
   const readClient = new Client({ connectionString: agentReadUrl });
   await readClient.connect();
   try {

@@ -15,6 +15,7 @@ const sessionMaxAge =
     : 8 * 60 * 60;
 
 const roleFromAccessToken = (accessToken?: string) => {
+  // This role only shapes the UI; the API resolves authoritative membership on every request.
   if (!accessToken) return undefined;
   try {
     const payload = JSON.parse(
@@ -88,6 +89,7 @@ export const authOptions: NextAuthOptions = {
             realmAccess?.roles?.find((role) => workspaceRoles.includes(role)),
         };
       }
+      // Refresh slightly early so a nearly expired token is never forwarded to the API.
       if (token.accessTokenExpires && Date.now() < token.accessTokenExpires - 30_000) return token;
       return refreshAccessToken(token);
     },

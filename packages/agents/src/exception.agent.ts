@@ -21,6 +21,7 @@ export class ExceptionInvestigator {
           'This exception needs a finance review because its supporting records are incomplete.',
       };
     }
+    // Money and resolution state are deterministic; AI contributes only the explanation.
     const difference = money(evidence.expectedAmount).minus(evidence.receivedAmount);
     const explained = money(evidence.gatewayFees).plus(evidence.gstOnFees).plus(evidence.refunds);
     const unexplained = difference.minus(explained);

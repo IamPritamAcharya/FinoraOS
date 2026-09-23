@@ -224,6 +224,7 @@ export class WorkspaceService {
   }
 
   private async policyState(organizationId: string, periodStart: Date, periodEnd: Date) {
+    // Build one deterministic spend snapshot shared by manual edits, imports, and receipt flows.
     const [limits, claims, invoices] = await Promise.all([
       this.prisma.spendLimit.findMany({
         where: { organizationId, status: 'ACTIVE', periodStart, periodEnd },
@@ -533,6 +534,7 @@ export class WorkspaceService {
     description: string;
     fileName?: string;
   }) {
+    // Prefer controlled merchant rules; AI is a suggestion layer and uncertain output needs review.
     const text = `${input.merchant} ${input.description} ${input.fileName ?? ''}`.toLowerCase();
     const rules: Array<[RegExp, CashMovementCategory]> = [
       [/hotel|lodg|airbnb/, CashMovementCategory.LODGING],
@@ -581,6 +583,7 @@ export class WorkspaceService {
     expenseExternalId: string,
     input: RegisterReceiptInput,
   ) {
+    // Receipt metadata, claim state, warnings, and audit history commit as one unit.
     const expense = await this.prisma.expenseClaim.findFirst({
       where: {
         externalId: expenseExternalId,
@@ -814,6 +817,7 @@ export class WorkspaceService {
       overBy: string;
     }>,
   ) {
+    // Notify finance leadership and node owners once each, even when several warnings overlap.
     if (!warnings.length) return [];
     const [financeUsers, nodes] = await Promise.all([
       this.prisma.user.findMany({
@@ -1327,6 +1331,7 @@ export class WorkspaceService {
   }
 
   async runReceiptReminderJob(principal: RequestPrincipal, jobId: string) {
+    // Persist each run so reminder delivery remains observable without requiring a queue service.
     this.require(principal, WorkspacePermission.REVIEW_EXPENSE);
     const job = await this.prisma.automationJob.findFirst({
       where: {

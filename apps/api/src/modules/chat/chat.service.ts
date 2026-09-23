@@ -13,6 +13,7 @@ const explicitFinanceTopic =
 const followUpReference = /\b(?:it|that|those|them|same|the former|the latter)\b/i;
 
 export const shouldUseConversationContext = (message: string) => {
+  // Explicit records and topics stand alone; short or pronominal follow-ups inherit context.
   if (explicitRecord.test(message)) return false;
   if (followUpReference.test(message)) return true;
   if (explicitFinanceTopic.test(message)) return false;
@@ -24,6 +25,7 @@ const clarificationPrompt =
   /(?:\?|\b(?:which|what exact|exact .* reference|are you requesting|do you mean|please specify)\b)/i;
 
 export const shouldResumePendingWrite = (context: FinanceChatContext[], writeMode: boolean) => {
+  // Write context is resumed only after an explicit mutation request and a clarifying question.
   if (!writeMode || context.length < 2) return false;
   const latest = context.at(-1);
   if (latest?.role !== 'assistant' || !clarificationPrompt.test(latest.text)) return false;
@@ -52,6 +54,7 @@ export class ChatService {
       firstMessage: message,
     });
     const persistedContext = await this.chats.context(principal, thread.id);
+    // Server-persisted history is authoritative; client context only supports initial migration.
     const availableContext = persistedContext.length ? persistedContext : clientContext;
     const resumingWrite = shouldResumePendingWrite(availableContext, writeMode);
     const useContext = resumingWrite || shouldUseConversationContext(message);
@@ -65,6 +68,7 @@ export class ChatService {
     });
     const currentDate = new Date().toISOString();
     const skills = await this.tools.activeSkills(principal);
+    // Role and write mode determine the tool surface before the model sees the request.
     const allowedTools = this.tools.allowedTools(principal, writeMode);
     apiLogger.info('Finora routing context prepared', {
       threadId: thread.id,

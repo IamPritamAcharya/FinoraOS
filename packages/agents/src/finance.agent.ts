@@ -393,6 +393,7 @@ Workspace skills are approved operating procedures supplied in the prompt. Selec
 ${toolGuide}`;
 
 const extractObject = (value: string) => {
+  // Small local models may wrap valid JSON in prose; strict schema validation still follows.
   const trimmed = value.trim();
   try {
     return JSON.parse(trimmed) as unknown;
@@ -451,6 +452,7 @@ const repairDecision = (value: unknown) => {
 };
 
 const normalizeForPrompt = (value: unknown) => {
+  // Bound tool evidence so one large result cannot consume the model's full context window.
   const json = JSON.stringify(value);
   return json.length > 7000 ? `${json.slice(0, 7000)}…` : json;
 };
@@ -458,6 +460,7 @@ const normalizeForPrompt = (value: unknown) => {
 const numericTokens = (value: string) => value.match(/(?:₹\s*)?\d[\d,]*(?:\.\d+)?%?/g) ?? [];
 
 const answerIsGrounded = (answer: string, observations: ToolObservation[], userMessage: string) => {
+  // Reject numeric claims that do not appear in controlled evidence or the user's request.
   const evidence = `${normalizeForPrompt(observations)} ${userMessage}`.replaceAll(',', '');
   return numericTokens(answer).every((token) => evidence.includes(token.replace(/[₹\s,]/g, '')));
 };
@@ -472,6 +475,7 @@ const deterministicFastLane = (
   message: string,
   allowedTools?: FinanceToolName[],
 ): FinanceToolCall | undefined => {
+  // Explicit record identifiers bypass model routing but still use the same authorized tools.
   const expenseId = message.match(/\bEXP_\d{4}\b/i)?.[0]?.toUpperCase();
   if (expenseId) {
     if (allowedTools?.includes('getExpenseClaim')) {
@@ -511,6 +515,7 @@ const amountFromMessage = (message: string) =>
   message.match(/(?:₹|INR\s*)\s*([\d,]+(?:\.\d{1,2})?)/i)?.[1]?.replaceAll(',', '');
 
 const periodFromMessage = (message: string, currentDate: string) => {
+  // Calendar periods use the supplied UTC clock so routing is reproducible in tests and replays.
   const match = message.match(/\b(this|current|last|previous)\s+(week|month|quarter|year)\b/i);
   if (!match) return {};
   const now = new Date(currentDate);
@@ -714,6 +719,7 @@ const mutationTranscript = (input: {
   context?: FinanceChatContext[];
   writeMode?: boolean;
 }) => {
+  // Carry prior user turns forward only while completing an explicit pending write clarification.
   if (mutationVerb.test(input.message)) return input.message;
   const context = input.context ?? [];
   const latest = context.at(-1);
@@ -778,6 +784,7 @@ export class FinanceAgent {
     writeMode?: boolean;
     actor?: { role: string; allowedTools: FinanceToolName[] };
   }): Promise<FinanceAgentResult> {
+    // Route safe deterministic cases first, then let the model plan bounded tool calls.
     const observations: ToolObservation[] = [];
     const activity: FinanceAgentResult['activity'] = [];
     const seen = new Set<string>();
